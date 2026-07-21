@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Environment / secrets
+.env
+*.local
+
+# Local database + vault key
+*.db
+.isnad_vault_key.pem
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+.isnad/
+isnad.db
+.venv/
+.venv311/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.py[cod]
