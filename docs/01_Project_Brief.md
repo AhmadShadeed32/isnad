@@ -31,10 +31,6 @@ The project is being developed by a five-person team at Princess Sumaya Universi
 
 This framing matters strategically: it turns "the region that invented chains of trust builds the internet's" into a genuine emotional and cultural hook for MENA judges, distinct from a generic Silicon Valley fraud-detection pitch.
 
-Related Arabic/Islamic-finance terms already identified as a naming system for future features (see Section 6):
-- **Tazkiya (تزكية)** — vouching/endorsement (classical isnad science: chains strengthened when trusted people vouched for transmitters)
-- **Wakala (وكالة)** — the classical contract of agency/power-of-attorney, still used in Islamic finance today
-
 ---
 
 ## 3. What Isnad Is (Core Product)
@@ -110,12 +106,7 @@ The roadmap is organized by delivery horizon:
 5. **The Isnad Graph** — cross-merchant fraud graph. When the same device fingerprint / SIM-swap pattern is detected across multiple merchants, all of them get warned. This is the standard "consortium data" moat used by fraud-detection leaders like Sift and Forter — each new customer makes the product more valuable to every other customer (a genuine network effect, a strong point for investors).
 6. **Evidence vault** — chains stored as signed, replayable records, used to resolve COD disputes and chargebacks with evidence instead of he-said/she-said. Deepens the core COD wedge: not just preventing fake orders, but winning disputes about real ones.
 
-### Tier 3 — Vision-layer / long-horizon (for a single roadmap slide and future planning — not for the core build or demo)
-7. **Tazkiya (تزكية) — human vouching.** Named after the classical isnad concept of trusted people vouching for a transmitter. A thin-file/no-tenure person's chain can be strengthened by a vouch from an employer or long-tenured family member — extends the financial-inclusion narrative (Act III) using the region's own historical mechanism.
-8. **Wakala (وكالة) — agent delegation / power of attorney.** Wakala is a real, current Islamic-finance contract type (delegated agency). When a person authorizes an AI agent to transact on their behalf, Isnad issues a scoped, expiring, spend-limited "wakala" — a mandate chaining every agent action back to a verified human SIM. This turns the "agent economy" pitch (Section 5) into a named, culturally-grounded product rather than a vague claim — a strong closing-slide concept: *"the power-of-attorney layer of the agent economy."*
-9. **Resurrection (account recovery)** — replaces "mother's maiden name"-style security questions with network-based recovery: years of SIM tenure, home-cell stability, and reachability rhythm are used to recover an account with no security questions.
-
-**Strategic guardrail:** Hackathon judges penalize submissions that try to "do everything." Build and demo **Tier 1** only; present **Tier 2/3** as future roadmap items. Do not let the core 10-week build balloon in scope.
+**Strategic guardrail:** Hackathon judges penalize submissions that try to "do everything." Build and demo **Tier 1** only; present **Tier 2** as future roadmap items. Do not let the core 10-week build balloon in scope.
 
 ---
 
@@ -135,14 +126,14 @@ The roadmap is organized by delivery horizon:
 
 ## 8. Scope Boundary
 
-Isnad's current scope is the Tier 1 verification and trust-session features described above. Tier 2 and Tier 3 concepts remain roadmap items and are not part of the core demo or production API.
+Isnad's current scope is the Tier 1 verification and trust-session features described above. Tier 2 concepts remain roadmap items and are not part of the core demo or production API.
 
 ---
 
 ## 9. Next Steps
 
 The next delivery steps are:
-1. **Lock the MVP scope**: keep Reverse Isnad, session TTL revocation, and choreographed step-up within Tier 1; keep Tier 2/3 roadmap-only.
+1. **Lock the MVP scope**: keep Reverse Isnad, session TTL revocation, and choreographed step-up within Tier 1; keep Tier 2 roadmap-only.
 2. **Complete the Idea Capture Template** required for Phase 1, using the product definition and agent design in this brief.
 3. **Refresh the pitch deck** with the fourth demo act and one concise future-roadmap slide without diluting the core COD-fraud story.
 4. **Verify market figures** with dated, named sources before using them in investor or public materials.

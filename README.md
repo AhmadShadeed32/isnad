@@ -137,6 +137,6 @@ fallbacks for older or custom SDK clients.
 ## Still on the roadmap
 
 Real multi-worker consent storage/token caching, Alembic migrations, choreographed
-step-up tuning, and the Tier-2/3 moat features
+step-up tuning, and the Tier-2 moat features
 (Passport, Graph). See
 `Isnad_API_Build_Plan.md`.
