@@ -59,6 +59,14 @@ A 2 min 44 s narrated recording of the running system is in the repo at
 revocation, idempotency and evidence-vault checks, and the raw `POST /v1/verify`
 call with its JSON response.
 
+### Idea Capture Template
+
+The Phase 1 submission document is in
+[`docs/submission/`](docs/submission/), as
+[Word](docs/submission/Isnad_Idea_Capture_Template.docx) and
+[PDF](docs/submission/Isnad_Idea_Capture_Template.pdf): idea summary, project type and
+pillar alignment, theme, the seven-API usage table, and current build status.
+
 ### Live agent console (the on-stage demo)
 
 With the server running, open **http://localhost:8000/console**. It's a
