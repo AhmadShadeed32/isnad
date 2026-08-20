@@ -4,7 +4,7 @@
 
 **Context:** This idea was developed for the **MENA Open Gateway Hackathon 2026** (HackerEarth-hosted, online, Jul 1 – Sep 13, 2026; teams up to 5; winners showcase at MWC Doha, Nov 2026). Submissions must build an AI agent that orchestrates **CAMARA APIs** on **Nokia's Network-as-Code (NaC)** platform as real-time decision inputs (not user-triggered buttons), aligned to one of the hackathon's seven themes. Phase 1 is judged on an Idea Capture Template + Pitch Deck (relevance, impact, innovation, complexity, agent design). Phase 2 is a live demo.
 
-The project is being developed by a five-person team at Princess Sumaya University for Technology (PSUT), Amman, Jordan. This brief is scoped to Isnad alone.
+The project is being developed by a two-person team, Ahmad Shadeed and Yousef Al Masri, at Princess Sumaya University for Technology (PSUT), Amman, Jordan. This brief is scoped to Isnad alone.
 
 ---
 
