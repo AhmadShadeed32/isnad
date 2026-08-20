@@ -52,6 +52,13 @@ uvicorn app.main:app --reload
 #    docs at http://localhost:8000/docs
 ```
 
+### Demo video
+
+A 2 min 44 s narrated recording of the running system is in the repo at
+[`docs/demo/isnad-demo.mp4`](docs/demo/isnad-demo.mp4): all four acts, live session
+revocation, idempotency and evidence-vault checks, and the raw `POST /v1/verify`
+call with its JSON response.
+
 ### Live agent console (the on-stage demo)
 
 With the server running, open **http://localhost:8000/console**. It's a
