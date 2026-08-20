@@ -102,7 +102,7 @@ isnad/
 │   ├── chain/
 │   │   ├── models.py            # EvidenceLink, Chain, Verdict
 │   │   ├── builder.py           # assemble + render chain
-│   │   └── vault.py             # sign + persist (Tier-2 stub)
+│   │   └── vault.py             # sign + persist
 │   ├── domain/
 │   │   ├── schemas.py           # Pydantic request/response
 │   │   └── enums.py             # Verdict, Signal, ProviderName
@@ -255,7 +255,7 @@ class Verdict(BaseModel):
 class Chain(BaseModel):
     id: str
     verdict: Verdict
-    signed: bytes | None         # Ed25519 signature (evidence vault, Tier 2)
+    signed: bytes | None         # Ed25519 signature (evidence vault)
 ```
 
 `chain.render()` produces the human-readable "isnad" — the ordered links with timestamps that appear on screen and in the API response.

@@ -55,7 +55,7 @@ class Chain(BaseModel):
     hypothesis: str = ""
     links: List[EvidenceLink] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=_now)
-    signed: Optional[str] = None   # Ed25519 signature (evidence vault — Tier 2 stub)
+    signed: Optional[str] = None   # Ed25519 signature over the chain (see chain/vault.py)
 
     def add(self, link: EvidenceLink) -> None:
         self.links.append(link)
