@@ -1,9 +1,5 @@
 # Isnad — network-verified trust decisions
 
-> *Isnad* is the chain of transmission that authenticates a narration. You do
-> not accept the report; you accept the chain behind it, narrator by narrator,
-> and you can name every link.
-
 A customer replaces a SIM after losing her phone. Her bank sees a SIM change,
 the card network sees a new device, the merchant sees a first-time customer
 paying on delivery — and every one of those systems does the safe thing and
