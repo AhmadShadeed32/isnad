@@ -1,0 +1,61 @@
+# Isnad number registry — which published numbers belong to which institution.
+#
+# WHAT THIS ANSWERS, AND WHAT IT DOES NOT
+# ---------------------------------------
+# The network layer answers "is this call really coming from the line it
+# presents?". It cannot answer "is +962 6 500 0000 Arab Bank?", because no
+# CAMARA API knows what an institution is called. This file answers the second
+# question and only the second question.
+#
+# A registry hit is NOT a reason to trust a caller. Caller ID is spoofable, so
+# "this number belongs to the bank" is close to zero evidence on its own — a
+# scammer spoofing the bank's real number produces exactly the same hit. The
+# registry earns its place on the NEGATIVE side: it catches a caller claiming an
+# institution from a number that institution does not own, and it makes the
+# combination "the bank's real number + the network says the call is not from
+# it" legible as the strongest reject in the system rather than a contradiction.
+#
+# PROVENANCE IS MANDATORY
+# -----------------------
+# Every institution carries `source`, `basis` and `verified_on`, for the same
+# reason the pricing block in policy.yaml does: an entry here is an assertion
+# that a phone number belongs to a named bank, and an unsourced assertion of
+# that kind is worse than no entry at all. A wrong entry does not merely mislead
+# — it is a way to get a scammer's number trusted. Anything that cannot be
+# traced to a first-party publication does not go in.
+#
+#   basis: published_by_institution  — taken from the institution's own site
+#          published_by_regulator    — from a central bank / telecom regulator list
+#          demo_fixture              — invented for the demo, must never ship as real
+#
+# NOTHING IN THIS FILE IS A REAL BANK NUMBER YET. The entries below are the
+# repo's own demo fixtures, marked `demo_fixture` so they cannot be mistaken for
+# published fact. Real entries need a real source URL and a human who checked it.
+
+institutions:
+  - id: demo-bank-jo
+    name: Demo Bank
+    aliases: ["Demo Bank Jordan", "Demo Bank fraud department"]
+    country: JO
+    basis: demo_fixture
+    source: "app/providers/mock.py — the Reverse Isnad genuine-caller fixture"
+    verified_on: 2026-08-30
+    numbers:
+      # The main switchboard. `outbound: true` says the institution does place
+      # calls from this line, so seeing it as caller ID is not itself odd.
+      - number: "+96265000000"
+        kind: landline
+        outbound: true
+      # A DID block. Institutions own ranges, not single numbers: a registry of
+      # exact numbers alone misses every extension behind the switchboard, which
+      # is most of the numbers a customer will actually be called from.
+      - prefix: "+9626500"
+        kind: pbx_range
+        outbound: true
+      # An inbound-only hotline. The institution publishes it for customers to
+      # call IN; it never originates calls. Seeing it as caller ID therefore
+      # means it was spoofed — a published number is a convenient thing to
+      # spoof precisely because customers recognise it.
+      - number: "+96280022222"
+        kind: hotline
+        outbound: false

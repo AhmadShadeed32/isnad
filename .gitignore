@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+*.local
+
+# Local database + vault key
+*.db
+*.db-wal
+*.db-shm
+*.db.*
+# The real path is .isnad/vault-key.pem; the old entry here never matched
+# it and it was only ignored because the whole .isnad/ directory is (S13).
+*.pem
+*.key
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+.isnad/
+isnad.db
+.venv/
+.venv311/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.py[cod]
+.isnad/stage-key.txt
+.isnad/public-8020.log
+.coverage
+
+# Local development material
+.claude/
+CLAUDE.md
+docs/*.md
+docs/mentorship/
+docs/video/
+graphify-out/

@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Isnad — Verified Checkout</title>
+<style>
+  :root{
+    --night:#070b20; --surface:#111834; --surface2:#182247; --line:#2d3b70;
+    --text:#eef2ff; --muted:#aab5d4; --gold:#e5bb59; --green:#56d3a0;
+    --red:#ff7979; --amber:#ffc35c; --sans:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    --mono:"SFMono-Regular",Consolas,"Liberation Mono",monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:radial-gradient(circle at 14% -10%,#243673 0,transparent 31rem),var(--night);color:var(--text);font-family:var(--sans)}
+  .shell{max-width:1240px;margin:0 auto;padding:26px 28px 48px}
+  header{display:flex;justify-content:space-between;align-items:center;gap:16px;border-bottom:1px solid #24315e;padding-bottom:21px}
+  .brand{display:flex;align-items:center;gap:12px;font-weight:700;letter-spacing:.02em}.brand .arabic{font-size:23px;color:var(--gold);font-weight:500}.brand small{font-size:12px;color:var(--muted);font-weight:500;display:block;letter-spacing:0;margin-top:2px}
+  .mode{font:11px var(--mono);border:1px solid var(--line);border-radius:999px;padding:8px 10px;color:var(--muted);white-space:nowrap}.mode.live{border-color:var(--green);color:var(--green)}.mode.sim{border-color:var(--amber);color:var(--amber)}
+  .lead{display:flex;align-items:end;justify-content:space-between;gap:28px;padding:44px 0 30px}.eyebrow{color:var(--gold);font:700 11px var(--mono);letter-spacing:.13em;text-transform:uppercase}.lead h1{font-size:clamp(31px,5vw,55px);letter-spacing:-.045em;line-height:1.01;max-width:760px;margin:11px 0 14px}.lead p{max-width:610px;color:var(--muted);font-size:16px;line-height:1.55;margin:0}.trust-note{max-width:275px;border-left:2px solid var(--gold);padding:4px 0 4px 14px;font-size:12px;color:var(--muted);line-height:1.5}
+  .grid{display:grid;grid-template-columns:minmax(290px,.82fr) minmax(430px,1.4fr);gap:20px;align-items:stretch}.card{background:linear-gradient(145deg,rgba(24,34,71,.96),rgba(13,19,45,.96));border:1px solid var(--line);border-radius:18px;box-shadow:0 18px 48px rgba(0,0,0,.18)}
+  .checkout{padding:27px;display:flex;flex-direction:column}.merchant{display:flex;justify-content:space-between;gap:12px;align-items:center}.merchant-badge{width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,var(--gold),#a26c21);display:grid;place-items:center;color:#15162d;font-weight:900}.merchant-name{font-weight:700}.merchant-meta{color:var(--muted);font-size:12px;margin-top:3px}.checkout h2{font-size:25px;letter-spacing:-.03em;margin:37px 0 9px}.checkout p{color:var(--muted);font-size:13px;line-height:1.5;margin:0}.summary{border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin:25px 0 20px;padding:17px 0}.summary-line{display:flex;justify-content:space-between;align-items:center;font-size:13px;margin:8px 0}.summary-line.total{font-weight:700;font-size:16px;margin-top:15px}.subdued{color:var(--muted)}
+  button{font:inherit}.primary{border:0;border-radius:10px;padding:14px 16px;color:#17162b;background:linear-gradient(110deg,#f4cf71,var(--gold));font-weight:800;cursor:pointer;box-shadow:0 8px 20px rgba(229,187,89,.18);transition:transform .16s,opacity .16s}.primary:hover:not(:disabled){transform:translateY(-1px)}button:disabled{opacity:.5;cursor:not-allowed}.checkout-foot{margin-top:13px;font-size:11px;line-height:1.45;color:var(--muted)}.checkout-foot strong{color:var(--text)}
+  .journey{padding:22px 24px 20px;min-height:525px;display:flex;flex-direction:column}.journey-head{display:flex;justify-content:space-between;align-items:start;gap:14px}.journey h2{font-size:15px;margin:0;letter-spacing:.01em}.journey .caption{font-size:12px;color:var(--muted);margin:5px 0 0}.statusline{font:11px var(--mono);color:var(--muted);padding:8px 0 14px;border-bottom:1px solid var(--line);min-height:38px}.steps{display:flex;gap:5px;margin:17px 0}.step{height:5px;flex:1;background:#26325b;border-radius:8px;transition:.25s}.step.active{background:var(--gold)}.step.good{background:var(--green)}.step.bad{background:var(--red)}
+  .trace{flex:1;display:flex;flex-direction:column;gap:8px;overflow:auto;max-height:275px;padding-right:2px}.empty{margin:auto;color:var(--muted);font-size:13px;text-align:center;line-height:1.55;max-width:350px}.trace-row{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:10px;align-items:start;border:1px solid #26325b;background:#0c1230;border-radius:10px;padding:10px 12px;font-size:12px}.trace-row .mark{font-weight:800;text-align:center}.trace-row.pass .mark{color:var(--green)}.trace-row.flag .mark{color:var(--red)}.trace-row.info .mark{color:var(--amber)}.trace-title{font-weight:700}.trace-detail{margin-top:3px;color:var(--muted);line-height:1.4}.trace-meta{font:10px var(--mono);color:var(--muted);text-align:right;white-space:nowrap}.provenance{display:inline-block;margin-top:4px;border:1px solid #43527f;border-radius:999px;padding:2px 5px;font:9px var(--mono);letter-spacing:.02em;color:var(--muted)}.provenance.sim{border-color:#946f2e;color:var(--amber)}.provenance.live{border-color:#317b61;color:var(--green)}
+  .outcome{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;border-top:1px solid var(--line);margin-top:15px;padding-top:15px}.decision{font:800 23px var(--mono);letter-spacing:.04em}.decision.ALLOW{color:var(--green)}.decision.CHALLENGE{color:var(--amber)}.decision.DECLINE{color:var(--red)}.reason{font-size:12px;color:var(--muted);line-height:1.4;margin-top:4px;max-width:470px}.grade{font:10px var(--mono);color:var(--muted);margin-top:6px}.receipt{display:none;text-align:right}.receipt.visible{display:block}.receipt a{display:inline-block;border:1px solid var(--gold);color:var(--gold);padding:8px 10px;border-radius:8px;font-size:11px;text-decoration:none;font-weight:700}.receipt button{display:block;margin:7px 0 0 auto;border:0;background:none;color:var(--muted);font-size:10px;text-decoration:underline;cursor:pointer}.vault{font:10px var(--mono);color:var(--green);margin-top:5px;min-height:12px}
+  .session-beat{display:none;margin-top:14px;border:1px solid #38556d;background:#0c1832;border-radius:11px;padding:12px}.session-beat.visible{display:block}.session-title{display:flex;gap:8px;align-items:center;font-size:12px;font-weight:700}.session-title .provenance{margin:0}.session-copy{font-size:11px;line-height:1.45;color:var(--muted);margin:6px 0 10px}.session-actions{display:flex;gap:8px;flex-wrap:wrap}.session-actions button{border:1px solid #526695;border-radius:7px;background:#152448;color:var(--text);font-size:11px;font-weight:700;padding:8px 9px;cursor:pointer}.session-actions button:hover:not(:disabled){border-color:var(--gold);color:var(--gold)}.session-state{font:10px var(--mono);color:var(--muted);margin-top:9px;min-height:14px}.session-state.ok{color:var(--green)}.session-state.flag{color:var(--red)}
+  .proof{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:20px}.proof .card{padding:17px}.proof h3{font-size:12px;margin:0 0 7px;color:var(--gold);letter-spacing:.04em}.proof p{font-size:12px;line-height:1.48;color:var(--muted);margin:0}.proof b{color:var(--text)}
+  .fallback{display:none;margin-top:18px;border:1px solid #70404b;border-radius:11px;color:#ffc4c4;background:#321d2a;padding:12px;font-size:12px;line-height:1.45}.fallback.visible{display:block}.technical{margin-top:20px;text-align:center;color:var(--muted);font-size:11px}.technical a{color:var(--gold)}
+  @media(max-width:820px){.shell{padding:20px 15px 32px}.lead{display:block;padding:33px 0 25px}.trust-note{margin-top:22px}.grid{grid-template-columns:1fr}.journey{min-height:480px}.proof{grid-template-columns:1fr}.trace{max-height:250px}.outcome{grid-template-columns:1fr}.receipt{text-align:left}.receipt button{margin-left:0}.mode{white-space:normal;text-align:right}}
+</style>
+</head>
+<body>
+<main class="shell">
+  <header>
+    <div class="brand"><span class="arabic">إسناد</span><span>Isnad<small>Network-verified trust</small></span></div>
+    <span id="mode" class="mode">checking environment…</span>
+  </header>
+
+  <section class="lead">
+    <div><div class="eyebrow">A merchant checkout, not another OTP</div><h1>Trust the interaction with the minimum necessary network evidence.</h1><p>Isnad’s agent chooses evidence, explains its decisions, and issues a receipt that either side can verify independently.</p></div>
+    <div class="trust-note">This judge flow uses a deterministic stage fixture when the environment says <strong>SIMULATOR</strong>. Every evidence item carries its own provenance—nothing scripted is presented as live network evidence.</div>
+  </section>
+
+  <section class="grid" aria-label="Isnad customer checkout demonstration">
+    <article class="card checkout">
+      <div class="merchant"><div style="display:flex;align-items:center;gap:10px"><span class="merchant-badge">N</span><div><div class="merchant-name">Noura Market</div><div class="merchant-meta">Cross-border COD checkout</div></div></div><span class="provenance">merchant demo</span></div>
+      <h2>Complete checkout</h2>
+      <p>A new customer has no merchant history. Instead of interrupting them with an OTP, Noura asks Isnad for only the evidence needed to make this decision.</p>
+      <div class="summary"><div class="summary-line"><span class="subdued">Basket</span><span>Home essentials</span></div><div class="summary-line"><span class="subdued">Payment</span><span>Cash on delivery</span></div><div class="summary-line total"><span>Total</span><span>1,500 USD</span></div></div>
+      <button id="checkout" class="primary" type="button">Verify securely — no OTP</button>
+      <div id="checkoutFoot" class="checkout-foot"><strong>Consent-first:</strong> this stage fixture is safe to run repeatedly and never calls a live operator API.</div>
+    </article>
+
+    <article class="card journey">
+      <div class="journey-head"><div><h2>Evidence decision trace</h2><p class="caption">The agent’s selection rationale and the proof it received.</p></div><span id="planner" class="provenance">planner: —</span></div>
+      <div id="statusline" class="statusline">Ready for checkout.</div>
+      <div class="steps" aria-hidden="true"><span id="s1" class="step"></span><span id="s2" class="step"></span><span id="s3" class="step"></span><span id="s4" class="step"></span></div>
+      <div id="trace" class="trace"><p class="empty">Start the checkout to see exactly what the agent considers, what it asks the network, and why it stops.</p></div>
+      <div class="outcome"><div><div id="decision" class="decision">—</div><div id="reason" class="reason">No evidence chain yet.</div><div id="grade" class="grade"></div></div><div id="receipt" class="receipt"><a id="receiptLink" href="#">Open signed receipt ↗</a><button id="verifySignature" type="button">Check Ed25519 signature</button><div id="vault" class="vault"></div></div></div>
+      <div id="sessionBeat" class="session-beat"><div class="session-title">Continue trust after checkout <span class="provenance sim">DEMO-ONLY · simulator</span></div><p id="sessionCopy" class="session-copy">Start a short trust session for this fixed checkout fixture, then simulate a SIM change. A live deployment waits for a real network signal instead.</p><div class="session-actions"><button id="startTrust" type="button">Continue trust</button><button id="simulateSwap" type="button" disabled>Simulate SIM swap</button></div><div id="sessionState" class="session-state">No live trust session.</div></div>
+    </article>
+  </section>
+
+  <section class="proof" aria-label="Why this is different">
+    <article class="card"><h3>MINIMUM NECESSARY EVIDENCE</h3><p>The agent spends its evidence budget only until the decision is justified. It can <b>stop early</b> rather than collect a surveillance profile.</p></article>
+    <article class="card"><h3>VISIBLE ORCHESTRATION</h3><p>Each selected CAMARA check shows its <b>decision rationale, source, and result</b>, instead of hiding a fixed rules sequence behind “AI.”</p></article>
+    <article class="card"><h3>VERIFIABLE AFTER THE SALE</h3><p>The final decision is stored as an <b>Ed25519-signed evidence receipt</b>. A merchant, customer, or dispute team can verify it later.</p></article>
+  </section>
+  <div id="fallback" class="fallback"></div>
+  <p class="technical">Need the full test console? <a href="/console">Open Isnad Live Agent Console</a></p>
+</main>
+<script>
+'use strict';
+// This page is intentionally a presentation client only.  It uses the reviewed
+// console fixture endpoint and its authenticated event stream; it introduces no
+// new provider-call or state-changing route.
+const DEMO_TOKEN = '__ISNAD_JUDGE_TOKEN__';
+const checkout = document.getElementById('checkout');
+const mode = document.getElementById('mode');
+const planner = document.getElementById('planner');
+const statusline = document.getElementById('statusline');
+const trace = document.getElementById('trace');
+const decision = document.getElementById('decision');
+const reason = document.getElementById('reason');
+const grade = document.getElementById('grade');
+const receipt = document.getElementById('receipt');
+const receiptLink = document.getElementById('receiptLink');
+const verifySignature = document.getElementById('verifySignature');
+const vault = document.getElementById('vault');
+const sessionBeat = document.getElementById('sessionBeat');
+const sessionCopy = document.getElementById('sessionCopy');
+const startTrust = document.getElementById('startTrust');
+const simulateSwap = document.getElementById('simulateSwap');
+const sessionState = document.getElementById('sessionState');
+const fallback = document.getElementById('fallback');
+const stepEls = [1,2,3,4].map(n => document.getElementById('s' + n));
+let demoMode = false;
+let configuredProvider = 'unknown';
+let activeRunId = null;
+let latestChainId = null;
+let eventSource = null;
+let streamCredential = null;
+let streamReconnectTimer = null;
+let sessionId = null;
+let streamedVerdict = null;
+
+function key(){ return DEMO_TOKEN; }
+function newRunId(){ return 'judge-' + Date.now() + '-' + Math.random().toString(16).slice(2); }
+function clearSteps(){ stepEls.forEach(s => s.className = 'step'); }
+function setStep(index, kind = 'active'){ if (stepEls[index]) stepEls[index].className = 'step ' + kind; }
+function setStatus(text){ statusline.textContent = text; }
+function safeError(err){ return err && err.message ? err.message : 'The demo request did not complete.'; }
+function provenance(source){
+  const normalized = String(source || 'unknown').toLowerCase();
+  if (normalized === 'mock') return {label:'SIMULATOR · mock fixture', cls:'sim'};
+  if (normalized === 'nac') return {label:'LIVE · Nokia NaC', cls:'live'};
+  if (normalized === 'local') return {label:'LOCAL · Isnad state', cls:''};
+  return {label:'PROVENANCE · ' + normalized, cls:''};
+}
+function appendTrace(kind, title, detail, source, meta){
+  const row = document.createElement('div');
+  row.className = 'trace-row ' + kind;
+  const mark = document.createElement('div'); mark.className = 'mark'; mark.textContent = kind === 'pass' ? '✓' : kind === 'flag' ? '!' : '·';
+  const body = document.createElement('div');
+  const heading = document.createElement('div'); heading.className = 'trace-title'; heading.textContent = title;
+  const copy = document.createElement('div'); copy.className = 'trace-detail'; copy.textContent = detail || '';
+  body.append(heading, copy);
+  if (source){ const p = provenance(source); const badge = document.createElement('span'); badge.className = 'provenance ' + p.cls; badge.textContent = p.label; body.appendChild(badge); }
+  const side = document.createElement('div'); side.className = 'trace-meta'; side.textContent = meta || '';
+  row.append(mark, body, side); trace.appendChild(row); trace.scrollTop = trace.scrollHeight;
+}
+async function apiJson(path, options = {}){
+  const response = await fetch(path, { ...options, headers:{'Authorization':'Bearer ' + key(), ...(options.body ? {'Content-Type':'application/json'} : {}), ...(options.headers || {})} });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.detail?.message || data.detail?.code || 'request failed (' + response.status + ')');
+  return data;
+}
+function setMode(data){
+  demoMode = data.demo_mode === true;
+  configuredProvider = data.provider || 'unknown';
+  const providerLabel = configuredProvider === 'nac' ? 'LIVE PROVIDER · Nokia NaC' : configuredProvider === 'mock' ? 'SIMULATOR · mock provider' : 'PROVIDER · ' + configuredProvider;
+  mode.textContent = providerLabel + (demoMode ? ' · stage mode' : '');
+  mode.className = 'mode ' + (configuredProvider === 'nac' && !demoMode ? 'live' : 'sim');
+  planner.textContent = 'planner: ' + (data.planner || 'unknown');
+  if (!demoMode){ checkout.disabled = true; document.getElementById('checkoutFoot').textContent = 'Stage checkout is disabled outside demo mode. Use the authenticated production API for live customer requests.'; }
+}
+function scheduleStreamReconnect(){
+  if (streamReconnectTimer || !key()) return;
+  streamReconnectTimer = setTimeout(() => {
+    streamReconnectTimer = null;
+    connectStream().catch(() => {});
+  }, 5000);
+}
+async function connectStream(){
+  if (!key()) return;
+  try{
+    const token = await apiJson('/v1/console/stream-token', {method:'POST'});
+    streamCredential = token.stream_token;
+    if (!streamCredential) throw new Error('Could not start the evidence stream.');
+    if (eventSource) eventSource.close();
+    eventSource = new EventSource('/v1/console/stream?stream_token=' + encodeURIComponent(streamCredential));
+    eventSource.onmessage = message => { try { onEvent(JSON.parse(message.data)); } catch (_) { /* Ignore a malformed stream frame. */ } };
+    eventSource.onerror = () => {
+      if (eventSource) eventSource.close();
+      eventSource = null; streamCredential = null;
+      if (activeRunId) setStatus('Connection interrupted; reconnecting to the evidence stream…');
+      scheduleStreamReconnect();
+    };
+  }catch(err){
+    scheduleStreamReconnect();
+    throw err;
+  }
+}
+function onEvent(event){
+  if (event.type !== 'session' && (!activeRunId || event.run_id !== activeRunId)) return;
+  if (event.type === 'session'){
+    handleSessionEvent(event);
+  } else if (event.type === 'start'){
+    setStep(0); setStatus('Agent formed a ' + String(event.hypothesis || 'checkout') + ' hypothesis. Prior P(fraud): ' + event.prior_p_fraud + '.');
+  } else if (event.type === 'decision'){
+    setStep(1); const label = event.action === 'stop' ? 'Agent stops' : 'Agent selects ' + (event.api || event.action);
+    appendTrace('info', label, event.rationale || 'No rationale returned.', null, (event.planner || 'policy') + ' · budget ' + event.budget_left);
+    if (event.phase === 'investigation' && event.planner) planner.textContent = 'planner: ' + event.planner;
+    setStatus('Agent selected the next check from the remaining evidence budget.');
+  } else if (event.type === 'evidence'){
+    setStep(2); const kind = event.result === 'PASS' ? 'pass' : event.result === 'FLAG' ? 'flag' : 'info';
+    const windowText = typeof event.max_age_hours === 'number' ? ' · window ' + event.max_age_hours + 'h' : '';
+    appendTrace(kind, event.api || event.signal || 'Network evidence', event.detail || event.signal || '', event.source, 'P(fraud) ' + event.p_fraud + windowText);
+    setStatus('Evidence received with its source and result.');
+  } else if (event.type === 'verdict'){
+    stepEls.forEach((s, index) => s.className = 'step ' + (index === 3 ? (event.decision === 'DECLINE' ? 'bad' : 'good') : 'good'));
+    streamedVerdict = event;
+    renderVerdict(event); setStatus('Decision complete. The receipt below contains the signed evidence chain.');
+  }
+}
+function renderVerdict(data){
+  latestChainId = data.chain_id;
+  decision.textContent = data.decision || '—'; decision.className = 'decision ' + (data.decision || '');
+  reason.textContent = data.reason || '';
+  const steps = data.evidence_steps ?? '—';
+  const latency = data.latency_ms ?? '—';
+  grade.textContent = 'chain grade: ' + (data.chain_grade || 'not recorded') + ' · ' + steps + ' evidence steps · ' + latency + ' ms';
+  if (data.planner) planner.textContent = 'planner: ' + data.planner;
+  receiptLink.href = '/r/' + encodeURIComponent(latestChainId);
+  receipt.classList.add('visible'); vault.textContent = '';
+  sessionId = null; simulateSwap.disabled = true;
+  sessionBeat.classList.add('visible');
+  const canSimulate = demoMode && configuredProvider === 'mock';
+  startTrust.disabled = !canSimulate;
+  sessionCopy.textContent = canSimulate
+    ? 'Start a short trust session for this fixed checkout fixture, then simulate a SIM change. A live deployment waits for a real network signal instead.'
+    : 'This continuity drill is intentionally disabled: simulated swaps are available only in demo mode with the mock provider. Live deployments wait for real network changes.';
+  setSessionState(canSimulate ? 'Ready for a demo-only continuity check.' : 'Simulator continuity drill unavailable in this environment.');
+}
+async function runCheckout(){
+  if (!demoMode || !key()) return;
+  checkout.disabled = true; fallback.classList.remove('visible'); latestChainId = null; streamedVerdict = null; receipt.classList.remove('visible');
+  trace.replaceChildren(); clearSteps(); decision.textContent = 'VERIFYING'; decision.className = 'decision'; reason.textContent = 'The agent is deciding what evidence it needs.'; grade.textContent = '';
+  activeRunId = newRunId(); setStatus('Starting a deterministic, simulated checkout fixture…');
+  try{
+    const data = await apiJson('/v1/console/run/act3', {method:'POST', headers:{'X-Console-Run-Id':activeRunId}});
+    // SSE normally draws the outcome first; rendering the response too makes a
+    // successful decision resilient to an event stream reconnect.
+    renderVerdict({...data, ...(streamedVerdict || {})});
+  }catch(err){
+    fallback.textContent = 'Checkout fixture could not run: ' + safeError(err) + '. Reload for a fresh demo session, then try again.';
+    fallback.classList.add('visible'); setStatus('Checkout did not complete.');
+  }finally{ checkout.disabled = !demoMode; }
+}
+async function checkSignature(){
+  if (!latestChainId) return;
+  vault.textContent = 'Checking signed evidence…';
+  try{
+    const data = await apiJson('/v1/chains/' + encodeURIComponent(latestChainId) + '/verification');
+    vault.textContent = data.valid && data.key_trusted ? '✓ Ed25519 signature valid; signing key trusted' : 'Signature check did not pass.';
+  }catch(err){ vault.textContent = 'Signature check unavailable: ' + safeError(err); }
+}
+function setSessionState(text, kind = ''){ sessionState.textContent = text; sessionState.className = 'session-state ' + kind; }
+function handleSessionEvent(event){
+  if (!sessionId || event.session_id !== sessionId) return;
+  if (event.event === 'started'){
+    setSessionState('ACTIVE · monitoring the trusted interaction for SIM/device changes.', 'ok');
+    startTrust.disabled = true; simulateSwap.disabled = false;
+  } else if (event.event === 'revoked'){
+    setSessionState('REVOKED · ' + (event.reason || 'network evidence changed'), 'flag');
+    simulateSwap.disabled = true; startTrust.disabled = false; sessionId = null;
+  } else if (event.event === 'expired' || event.event === 'ended'){
+    setSessionState((event.status || 'ENDED') + ' · ' + (event.reason || 'session complete'));
+    simulateSwap.disabled = true; startTrust.disabled = false; sessionId = null;
+  }
+}
+async function startTrustSession(){
+  if (!demoMode || configuredProvider !== 'mock' || sessionId) return;
+  startTrust.disabled = true; setSessionState('Starting a demo-only trust session…');
+  try{
+    // The number is the fixed Act III checkout subject.  There is no form field
+    // or caller-selected target: this UI cannot create sessions for someone else.
+    const data = await apiJson('/v1/sessions', {method:'POST', body:JSON.stringify({phone_number:'+99999991002'})});
+    sessionId = data.session_id;
+    handleSessionEvent({event:'started', session_id:data.session_id, status:data.status, reason:data.reason});
+  }catch(err){ setSessionState('Could not start the continuity check: ' + safeError(err), 'flag'); startTrust.disabled = false; }
+}
+async function simulateTrustSwap(){
+  if (!sessionId || !demoMode || configuredProvider !== 'mock') return;
+  const id = sessionId; simulateSwap.disabled = true;
+  setSessionState('SIM swap injected into the simulator; waiting for the monitor…');
+  try{
+    await apiJson('/v1/sessions/' + encodeURIComponent(id) + '/simulate-swap', {method:'POST'});
+    // The SSE stream normally delivers revocation first. Polling the existing
+    // session read route is a resilient fallback if a venue proxy reconnects it.
+    for (let attempt = 0; attempt < 10 && sessionId === id; attempt++){
+      await new Promise(resolve => setTimeout(resolve, 400));
+      const data = await apiJson('/v1/sessions/' + encodeURIComponent(id));
+      if (data.status !== 'ACTIVE'){
+        handleSessionEvent({event:data.status === 'REVOKED' ? 'revoked' : 'ended', session_id:id, ...data});
+        return;
+      }
+    }
+    setSessionState('SIM change injected; monitor is still checking.', 'flag');
+  }catch(err){ setSessionState('Could not simulate the change: ' + safeError(err), 'flag'); simulateSwap.disabled = false; }
+}
+checkout.addEventListener('click', runCheckout);
+verifySignature.addEventListener('click', checkSignature);
+startTrust.addEventListener('click', startTrustSession);
+simulateSwap.addEventListener('click', simulateTrustSwap);
+(async function configure(){
+  try { setMode(await apiJson('/v1/console/mode')); await connectStream(); }
+  catch(err){ mode.textContent = 'SERVER MODE UNKNOWN'; mode.className = 'mode sim'; checkout.disabled = true; fallback.textContent = 'Could not read the secure demo mode: ' + safeError(err); fallback.classList.add('visible'); }
+}());
+</script>
+</body>
+</html>

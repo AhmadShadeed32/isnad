@@ -1,0 +1,24 @@
+{
+  "action": "device_intelligence",
+  "api": "Device Intelligence",
+  "sdk": "network-as-code",
+  "sdk_version": "10.0.0",
+  "rapidapi_host": "network-as-code.nokia.rapidapi.com",
+  "captured_at": "2026-08-30T12:07:24.233431+00:00",
+  "elapsed_ms": 0,
+  "device_suffix": "00",
+  "raw": {
+    "ok": true,
+    "result": "Result.INFO",
+    "signal": "EVIDENCE_UNAVAILABLE",
+    "detail": "device intelligence adapter is not configured"
+  },
+  "normalized": {
+    "result": "Result.INFO",
+    "signal": "EVIDENCE_UNAVAILABLE",
+    "detail": "device intelligence adapter is not configured",
+    "source": "nac",
+    "requires_consent": false,
+    "consent_basis": "NaC application authorization"
+  }
+}

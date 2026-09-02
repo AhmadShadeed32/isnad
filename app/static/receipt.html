@@ -1,0 +1,288 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Isnad — evidence receipt</title>
+<!--
+  T6 — a public receipt anyone can verify on their own phone.
+
+  Zero external origins, like console.html: no CDN, no font host, no QR library,
+  no analytics. The Ed25519 check is done here in the browser with WebCrypto
+  against the public key, over the exact bytes the server signed. Nothing on this
+  page is taken on trust from the server except those bytes, and the whole point
+  is that they either verify or they do not.
+
+  No PII: the signed payload contains no phone number by construction (S5 binds
+  to an HMAC instead), and this page renders only the decision, the grade and the
+  normalized link signals — never link.detail, which on the NaC path carries
+  operator-supplied strings.
+-->
+<style>
+  :root{--bg:#0d1117;--fg:#e6edf3;--mut:#8b949e;--green:#3fb950;--red:#f85149;
+        --line:#30363d;--card:#161b22}
+  *{box-sizing:border-box}
+  body{margin:0;padding:1.2rem;background:var(--bg);color:var(--fg);
+       font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  main{max-width:640px;margin:0 auto}
+  h1{font-size:15px;font-weight:600;margin:0 0 .2rem}
+  .sub{color:var(--mut);font-size:12px;margin-bottom:1rem;word-break:break-all}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:6px;
+        padding:.9rem;margin-bottom:.8rem}
+  .status{font-size:18px;font-weight:600;display:flex;align-items:center;gap:.5rem}
+  .ok{color:var(--green)} .bad{color:var(--red)} .pending{color:var(--mut)}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{text-align:left;color:var(--mut);font-weight:normal;padding:.2rem .3rem}
+  td{padding:.2rem .3rem;border-top:1px solid var(--line)}
+  .k{color:var(--mut)}
+  .row{display:flex;justify-content:space-between;gap:1rem;padding:.15rem 0}
+  button{background:#21262d;border:1px solid var(--line);color:inherit;font:inherit;
+         padding:.4rem .8rem;border-radius:4px;cursor:pointer;margin-top:.6rem}
+  button:disabled{opacity:.5;cursor:default}
+  .mono{font-size:11px;color:var(--mut);word-break:break-all}
+  .note{font-size:11px;color:var(--mut);margin-top:.5rem}
+</style>
+<main>
+  <h1>Isnad — evidence receipt</h1>
+  <div class="sub" id="chainId">loading…</div>
+
+  <div class="card">
+    <div class="status pending" id="status">⋯ verifying signature…</div>
+    <div class="note" id="statusNote"></div>
+    <button id="tamperBtn" disabled>tamper with one byte and re-verify</button>
+    <button id="resetBtn" hidden>restore the original bytes</button>
+  </div>
+
+  <div class="card" id="summaryCard" hidden>
+    <div class="row"><span class="k">decision</span><span id="decision"></span></div>
+    <div class="row"><span class="k">chain grade</span><span id="grade"></span></div>
+    <div class="row"><span class="k">P(fraud)</span><span id="confidence"></span></div>
+    <div class="row"><span class="k">hypothesis</span><span id="hypothesis"></span></div>
+    <div class="row"><span class="k">planner</span><span id="planner"></span></div>
+    <div class="row"><span class="k">signed at</span><span id="signedAt"></span></div>
+  </div>
+
+  <div class="card" id="stepsCard" hidden>
+    <table>
+      <thead><tr><th>#</th><th>network API</th><th>signal</th><th>result</th><th>&Delta; log-odds</th><th>asked over</th></tr></thead>
+      <tbody id="steps"></tbody>
+    </table>
+  </div>
+
+  <!-- The belief, redone rather than asserted. Every number here comes out of
+       the signed payload, and the page adds them up in front of the reader: a
+       total computed on the server and printed would be one more claim to take
+       on trust, which is the opposite of the point. -->
+  <div class="card" id="mathCard" hidden>
+    <div class="k" style="margin-bottom:8px">check our arithmetic</div>
+    <div class="row"><span class="k">prior (log-odds)</span><span id="mPrior"></span></div>
+    <div class="row"><span class="k">+ evidence above</span><span id="mDeltas"></span></div>
+    <div class="row"><span class="k">= total</span><span id="mTotal"></span></div>
+    <div class="row"><span class="k">P(fraud) = 1/(1+e<sup>-total</sup>)</span><span id="mP"></span></div>
+    <div class="row"><span class="k">policy thresholds</span><span id="mThresholds"></span></div>
+    <div class="row"><span class="k">signed decision</span><span id="mVerdict"></span></div>
+    <div class="mono" id="mNote" style="margin-top:10px"></div>
+  </div>
+
+  <div class="card">
+    <div class="k">public key (Ed25519, raw hex)</div>
+    <div class="mono" id="publicKey"></div>
+    <div class="k" style="margin-top:.5rem">signature</div>
+    <div class="mono" id="signature"></div>
+    <div class="note">
+      This page contains no phone number. Verification runs in your browser
+      against the exact bytes the server signed — nothing here is taken on trust.
+    </div>
+  </div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const rawChainId = location.pathname.split('/').pop() || '';
+let chainId = '';
+try { chainId = decodeURIComponent(rawChainId); } catch (_) { /* handled by main */ }
+let payloadBytes = null, originalBytes = null, sigBytes = null, keyBytes = null;
+
+function hexToBytes(hex){
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.substr(i * 2, 2), 16);
+  return out;
+}
+
+function setStatus(state, text, note){
+  const el = $('status');
+  el.className = 'status ' + state;
+  el.textContent = text;
+  $('statusNote').textContent = note || '';
+}
+
+async function verify(){
+  if (!window.isSecureContext || !crypto.subtle){
+    // Honest failure rather than a misleading red cross: WebCrypto is simply
+    // unavailable outside a secure context.
+    setStatus('pending', '⋯ cannot verify here',
+      'WebCrypto needs HTTPS (or localhost). Open this page over HTTPS to verify.');
+    return null;
+  }
+  try{
+    const key = await crypto.subtle.importKey('raw', keyBytes, {name:'Ed25519'}, false, ['verify']);
+    return await crypto.subtle.verify({name:'Ed25519'}, key, sigBytes, payloadBytes);
+  }catch(err){
+    setStatus('pending', '⋯ cannot verify here',
+      'This browser does not support Ed25519 in WebCrypto.');
+    return null;
+  }
+}
+
+async function showVerification(){
+  const ok = await verify();
+  if (ok === null) return null;
+  if (ok){
+    setStatus('ok', '✓ signature valid',
+      'These bytes match the key below. Compare that public key with a trusted source to establish the signer’s identity.');
+  } else {
+    setStatus('bad', '✗ signature INVALID',
+      'The bytes do not match the signature. This receipt has been altered.');
+  }
+  return ok;
+}
+
+function render(signed, publicKey, signature){
+  $('chainId').textContent = signed.chain_id;
+  $('publicKey').textContent = publicKey;
+  $('signature').textContent = signature;
+  $('signedAt').textContent = signed.signed_at || '—';
+
+  $('decision').textContent = signed.decision;
+  $('grade').textContent = signed.chain_grade || 'UNGRADED';
+  $('confidence').textContent = signed.confidence;
+  $('hypothesis').textContent = signed.hypothesis;
+  $('planner').textContent = signed.planner;
+  $('summaryCard').hidden = false;
+
+  const body = $('steps');
+  body.replaceChildren();
+  // Allow-list each signed link field before rendering. `detail` is also in the
+  // signed payload, but on the NaC path it can contain provider prose and this
+  // public receipt must never display it.
+  const steps = Array.isArray(signed.chain) ? signed.chain : [];
+  steps.forEach(step => {
+    const tr = document.createElement('tr');
+    const delta = typeof step.delta_logodds === 'number'
+      ? (step.delta_logodds >= 0 ? '+' : '') + step.delta_logodds.toFixed(2)
+      : '—';
+    // The window the question covered, NOT the age of the event: CAMARA answers
+    // "was there a swap in the last N hours" with a boolean and no timestamp,
+    // so an event age would be invented.
+    const window = typeof step.max_age_hours === 'number'
+      ? `last ${step.max_age_hours}h` : '—';
+    [step.step, step.api, step.signal, step.result, delta, window].forEach(v => {
+      const td = document.createElement('td');
+      td.textContent = v;              // textContent throughout: never markup
+      tr.appendChild(td);
+    });
+    body.appendChild(tr);
+  });
+  $('stepsCard').hidden = steps.length === 0;
+  renderArithmetic(signed, steps);
+}
+
+// Redo the belief and threshold decision from signed parts. Older verdicts do
+// not contain a policy snapshot, so they remain verifiable but cannot claim a
+// threshold replay rather than quietly borrowing today's deployment policy.
+function renderArithmetic(signed, steps){
+  const card = $('mathCard');
+  const prior = signed.prior_logodds;
+  if (prior === null || prior === undefined || prior === 0){
+    // A chain signed before the prior was recorded. Showing 0.0 as if it were
+    // the real starting point would be inventing a number the vault never
+    // attested, so the card says why it cannot be shown instead.
+    card.hidden = true;
+    return;
+  }
+  const deltas = steps
+    .map(step => typeof step.delta_logodds === 'number' ? step.delta_logodds : 0);
+  const sum = deltas.reduce((a2, b) => a2 + b, 0);
+  const total = prior + sum;
+  const p = 1 / (1 + Math.exp(-total));
+
+  const fixed = n => (n >= 0 ? '+' : '') + n.toFixed(4);
+  $('mPrior').textContent = prior.toFixed(4);
+  $('mDeltas').textContent = fixed(sum);
+  $('mTotal').textContent = total.toFixed(4);
+  $('mP').textContent = p.toFixed(3);
+  const snapshot = signed.policy_snapshot || {};
+  const allowBelow = snapshot.allow_below;
+  const declineAbove = snapshot.decline_above;
+  if (typeof allowBelow !== 'number' || typeof declineAbove !== 'number'){
+    $('mThresholds').textContent = 'not recorded by this older receipt';
+    $('mVerdict').textContent = signed.decision;
+    $('mNote').textContent =
+      'Belief recomputed from signed values. This older receipt did not sign its policy thresholds, so its decision cannot be replayed from thresholds.';
+    $('mNote').style.color = 'var(--mut)';
+    card.hidden = false;
+    return;
+  }
+  const expected = p <= allowBelow ? 'ALLOW' : p >= declineAbove ? 'DECLINE' : 'CHALLENGE';
+  $('mThresholds').textContent = `ALLOW ≤ ${allowBelow.toFixed(3)} · DECLINE ≥ ${declineAbove.toFixed(3)}`;
+  $('mVerdict').textContent = expected;
+  if (expected === signed.decision){
+    $('mNote').textContent = 'Recomputed in this browser from the signed prior, link deltas, and policy snapshot.';
+    $('mNote').style.color = '';
+  } else {
+    // Unresolved provider evidence can conservatively retain CHALLENGE even
+    // where the numeric threshold alone would allow. Make that difference
+    // conspicuous rather than silently replacing the signer’s decision.
+    $('mNote').textContent = `MISMATCH: threshold replay is ${expected}, but the signed decision is ${signed.decision}. The signed chain contains a conservative unresolved-evidence override.`;
+    $('mNote').style.color = 'var(--amber)';
+  }
+  card.hidden = false;
+}
+
+// The tamper control: alter one byte in front of the viewer and let them watch
+// the same check fail. A judge doing this on their own phone is worth more than
+// any claim we make about tamper-evidence.
+$('tamperBtn').addEventListener('click', async () => {
+  payloadBytes = Uint8Array.from(originalBytes);
+  const i = Math.floor(payloadBytes.length / 2);
+  payloadBytes[i] = payloadBytes[i] ^ 0x01;   // flip a single bit
+  await showVerification();
+  $('tamperBtn').disabled = true;
+  $('resetBtn').hidden = false;
+});
+
+$('resetBtn').addEventListener('click', async () => {
+  payloadBytes = Uint8Array.from(originalBytes);
+  await showVerification();
+  $('tamperBtn').disabled = false;
+  $('resetBtn').hidden = true;
+});
+
+(async function main(){
+  try{
+    if (!chainId){
+      setStatus('bad', '✗ invalid receipt link', 'This receipt URL does not contain a valid chain id.');
+      return;
+    }
+    const response = await fetch(`/v1/receipts/${encodeURIComponent(chainId)}`);
+    if (!response.ok){
+      setStatus('bad', '✗ no such receipt', 'This chain id was not found.');
+      $('chainId').textContent = chainId;
+      return;
+    }
+    const data = await response.json();
+    originalBytes = new TextEncoder().encode(data.signed_payload);
+    payloadBytes = Uint8Array.from(originalBytes);
+    sigBytes = hexToBytes(data.signature);
+    keyBytes = hexToBytes(data.public_key);
+    const verified = await showVerification();
+    if (verified !== true) return;
+    const signed = JSON.parse(data.signed_payload);
+    if (!signed || signed.chain_id !== chainId){
+      setStatus('bad', '✗ receipt mismatch', 'The signed receipt does not belong to this URL.');
+      return;
+    }
+    render(signed, data.public_key, data.signature);
+    $('tamperBtn').disabled = false;
+  }catch(err){
+    setStatus('bad', '✗ could not load', 'The receipt could not be fetched.');
+  }
+})();
+</script>

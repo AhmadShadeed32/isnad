@@ -1,0 +1,24 @@
+{
+  "action": "reachability",
+  "api": "Device Reachability Status",
+  "sdk": "network-as-code",
+  "sdk_version": "10.0.0",
+  "rapidapi_host": "network-as-code.nokia.rapidapi.com",
+  "captured_at": "2026-08-30T12:07:23.445836+00:00",
+  "elapsed_ms": 438,
+  "device_suffix": "00",
+  "raw": {
+    "ok": true,
+    "result": "Result.PASS",
+    "signal": "REACHABLE_NORMAL",
+    "detail": "device reachable via SMS"
+  },
+  "normalized": {
+    "result": "Result.PASS",
+    "signal": "REACHABLE_NORMAL",
+    "detail": "device reachable via SMS",
+    "source": "nac",
+    "requires_consent": false,
+    "consent_basis": "NaC application authorization"
+  }
+}

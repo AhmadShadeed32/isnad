@@ -1,0 +1,24 @@
+{
+  "action": "number_verify",
+  "api": "Number Verification",
+  "sdk": "network-as-code",
+  "sdk_version": "10.0.0",
+  "rapidapi_host": "network-as-code.nokia.rapidapi.com",
+  "captured_at": "2026-08-30T12:07:22.144981+00:00",
+  "elapsed_ms": 0,
+  "device_suffix": "00",
+  "raw": {
+    "ok": true,
+    "result": "Result.INFO",
+    "signal": "CONSENT_REQUIRED",
+    "detail": "number verification requires user consent"
+  },
+  "normalized": {
+    "result": "Result.INFO",
+    "signal": "CONSENT_REQUIRED",
+    "detail": "number verification requires user consent",
+    "source": "nac",
+    "requires_consent": true,
+    "consent_basis": "NaC authorization / end-user consent"
+  }
+}

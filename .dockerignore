@@ -1,0 +1,26 @@
+# Never let a secret or a local artifact into the build context.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.isnad/
+*.db
+*.db-wal
+*.db-shm
+*.db.*
+.venv/
+.venv311/
+.git/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+tests/
+docs/
+demo/
+
+# The registry signature is made with the DEPLOYMENT vault key, not the
+# developer's. Shipping the dev .sig into an image makes a fresh volume — which
+# generates its own key — refuse to start: the signature verifies against a key
+# the new deployment does not trust. Sign at deploy time instead.
+app/registry/*.sig

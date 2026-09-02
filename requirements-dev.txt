@@ -1,0 +1,25 @@
+# Development / test dependencies (pip install -r requirements-dev.txt)
+-r requirements.txt
+pytest>=8.0
+pytest-asyncio>=0.23
+ruff==0.16.5
+# GitHub's Python image currently ships setuptools 79.0.1, which pip-audit
+# reports as vulnerable. Install a fixed version before the audit runs.
+setuptools>=83.0.0
+# `make lint` runs this; a build that resolves a fresh advisory should fail
+# noisily rather than ship (S8).
+pip-audit>=2.10
+# Database migrations are a release operation, not an application import.
+alembic>=1.14
+
+# NOTE on pip: network-as-code==10.0.0 declares `pip==25.3` as a runtime
+# dependency and will DOWNGRADE your pip when installed. pip 25.3 carries six
+# advisories, so `make audit` fails until you override it:
+#
+#     python -m pip install --upgrade 'pip>=26.2'
+#
+# pip will warn about the conflict. Ignore it: the SDK never imports pip (the
+# only occurrences are an error-message string, its README and a test), and it
+# imports and resolves NetworkAsCodeApi with pip removed entirely — verified,
+# not assumed. The shipped image is unaffected; it installs with --no-deps and
+# asserts at build time that pip is absent.
