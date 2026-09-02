@@ -1,22 +1,59 @@
-# Isnad — network-verified trust decisions
+<div align="center">
 
-A customer replaces a SIM after losing her phone. Her bank sees a SIM change,
-the card network sees a new device, the merchant sees a first-time customer
-paying on delivery — and every one of those systems does the safe thing and
-says no. **The signal that catches an account takeover is the same signal a
-stolen phone produces.**
+# Isnad
 
-Isnad decides how much network evidence a risky interaction
-actually needs, buys only that much, and returns `ALLOW` / `CHALLENGE` /
-`DECLINE` with the ordered, signed chain of evidence that produced it.
+### Network-verified trust decisions, with the chain of evidence attached
 
-It is a hackathon prototype, and this README is written to be checked rather
-than believed: what is real is marked real, what is scripted is marked
-scripted, and what is not known is left unmeasured rather than estimated.
+[![Verify](https://github.com/AhmadShadeed32/isnad/actions/workflows/ci.yml/badge.svg)](https://github.com/AhmadShadeed32/isnad/actions/workflows/ci.yml)
+![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)
+![CAMARA](https://img.shields.io/badge/CAMARA-SIM%20Swap%20%C2%B7%20Number%20Verification-0A7CBC)
+![Ed25519 signed](https://img.shields.io/badge/receipts-Ed25519%20signed-4C1)
 
-## The thesis, in one line
+</div>
 
-**"We could not check" and "the check failed" are not the same fact** — and
+## The customer this is built for
+
+She loses her phone and replaces her SIM. Her bank sees a SIM change, the card
+network sees a new device, the merchant sees a first-time customer paying on
+delivery — and every one of those systems does the safe thing and says no.
+**The signal that catches an account takeover is the same signal a stolen phone
+produces.**
+
+Isnad decides how much network evidence a risky interaction actually needs,
+buys only that much, and returns `ALLOW` / `CHALLENGE` / `DECLINE` together with
+the ordered, signed chain of evidence that produced it.
+
+This is a hackathon prototype, and the README is written to be *checked*: every
+claim below names the script that reproduces it, and every surface labels where
+its evidence came from.
+
+---
+
+## Quick start
+
+```bash
+pip install -e ".[dev]"
+pytest -q
+python scripts/evidence_pack.py     # writes JSON + Markdown reports to .isnad/
+```
+
+Then open the console:
+
+```bash
+ISNAD_DEMO_MODE=true ISNAD_MERCHANT_API_KEYS=demo-merchant-key \
+  uvicorn app.main:app --host 127.0.0.1 --port 8010 --proxy-headers
+```
+
+[Judge Mode](http://127.0.0.1:8010/judge) runs the 90-second customer checkout —
+evidence trace, signed receipt, and the simulator-only trust-revocation beat.
+[The full console](http://127.0.0.1:8010/console) plays every stage act. Both
+surfaces show which provider is answering.
+
+---
+
+## The idea, in one line
+
+**"We could not check" and "the check failed" are two different facts** — and
 every stack that collapses them into one score manufactures false declines.
 Merchants falsely decline **2–10% of all eCommerce orders, and one in five
 decline more than 10%** (Merchant Risk Council, *Global eCommerce Payments &
@@ -32,24 +69,27 @@ So Isnad grades every chain on what it could actually establish:
 | `DEGRADED` | Answered, but with evidence missing or stale. |
 | `REFUTED` | The network answered against the subject. |
 
-An `UNRESOLVED` link can never later be read as a pass.
+An `UNRESOLVED` link stays unresolved. It can never later be read as a pass.
 
-## Two rules the decision flow never overrides
+## Two invariants the decision flow always holds
 
-The evidence-selection step does **not** get a vote on the invariants:
+Evidence selection is free to choose the route. It gets no vote on these:
 
 1. **Corroborate before declining.** When belief turns adverse, an exculpatory
-   check named by policy must be attempted first. One adverse signal never
-   carries a decline alone. *(This is the gate that would have saved the
-   customer above.)*
+   check named by policy is attempted first. One adverse signal never carries a
+   decline alone. *(This is the gate that saves the customer above.)*
 2. **An allow rests on a network fact.** Local evidence alone cannot buy an
    `ALLOW`; the chain must hold a supporting fact the network returned. *(This
    is the gate that stops a stolen API key talking its way to an instant pass.)*
 
+---
+
 ## Measured, not asserted
 
-Run `scripts/planner_divergence.py` to reproduce. Against the scripted
-scenarios, comparing the two available decision strategies:
+### Same verdicts, shorter route
+
+`scripts/planner_divergence.py` reproduces this. Across the scripted scenarios,
+comparing the two available decision strategies:
 
 | Measure | Result |
 | --- | --- |
@@ -58,92 +98,76 @@ scenarios, comparing the two available decision strategies:
 | Different verdict or chain grade | **0/5** |
 | Paid network checks to reach them | **17 → 14 (−18%)** |
 
-**Same verdicts, by a shorter route.** Policy owns the verdict; evidence
-selection owns the route. Five scripted scenarios and one run — a strategy comparison, not an
-accuracy study.
+Policy owns the verdict; evidence selection owns the route. Five scripted
+scenarios and one run — a strategy comparison, not an accuracy study.
 
-## What it saves, against the stack it replaces
+### Against the decision rules it replaces
 
-`scripts/false_decline_baseline.py` compares Isnad with the two decision rules
-real systems use, on a population generated from `policy.yaml`'s own signal
-vocabulary — one case per adverse signal, one per unanswerable check, every
-pair of strong adverse signals, and a multi-adverse control. Both baselines are
-given the **full** evidence set, not the subset Isnad chose to buy.
+`scripts/false_decline_baseline.py` compares Isnad with the two rules real
+systems use, on a population generated from `policy.yaml`'s own signal
+vocabulary — one case per adverse signal, one per unanswerable check, every pair
+of strong adverse signals, and a multi-adverse control. Both baselines are given
+the **full** evidence set, not the subset Isnad chose to buy.
 
-| | Result |
+| Rule | False declines |
 | --- | --- |
-| `single-signal` — any flagged check, decline | **7 of 12** false declines |
-| `collapse-unknowns` — any flagged *or unanswered* check, decline | **12 of 12** false declines |
+| `single-signal` — any flagged check, decline | 7 of 12 |
+| `collapse-unknowns` — any flagged *or unanswered* check, decline | 12 of 12 |
 | **Isnad** | **0 of 12** |
-| Network checks bought | run-everything **196**, Isnad **96** — **51% fewer** |
+
+Network checks bought: run-everything **196**, Isnad **96** — **51% fewer**.
 
 **Against a stack that scores a missing check as a failed one, Isnad avoids
 twelve of twelve false declines while buying half the network calls.**
 
-The same harness reports the cost of that, and we would rather state it than be
-asked: of 16 cases where two independent checks disagree with the customer,
-Isnad **allows 8** at the shipped threshold, because it had already formed a
-confident-clean belief on cheaper evidence and stopped — an unbought signal
-cannot move a verdict. That is the budget working as designed, and it is a
-dial, not a defect. `--sweep` prints the curve:
+### The dial, and where it is set
+
+The same harness reports the other side of the trade. Of 16 cases where two
+independent checks disagree with the customer, Isnad **allows 8** at the shipped
+threshold: it had already formed a confident-clean belief on cheaper evidence
+and stopped, and an unbought signal cannot move a verdict. That is the budget
+working as designed — and it is a dial. `--sweep` prints the curve:
 
 | `allow_below` | false declines | corroborated-adverse allowed | checks |
 | --- | --- | --- | --- |
 | 0.15 (shipped) | 0/12 | 8/16 | 96 |
 | 0.05 | 0/12 | 1/16 | 142 |
 
-One line in `policy.yaml` per row — no code, no retraining. A merchant picks
-the point that matches what a lost customer costs them. The shipped default
-stays at 0.15 because tightening it makes `ATTESTED_PARTIAL` unreachable in the
-demo, and a grade nothing can produce is worse than a dial nobody moved.
+One line in `policy.yaml` per row — no code, no retraining. A merchant picks the
+point that matches what a lost customer costs them. The shipped default stays at
+0.15 so that `ATTESTED_PARTIAL` remains reachable in the demo; a grade nothing
+can produce teaches a judge nothing.
 
-Scripted fixtures over a generated population, one run. This compares decision
-policy against stated baselines; it is not an accuracy study and claims no
-real-world decline rate.
+> [!NOTE]
+> Scripted fixtures over a generated population, one run. These figures compare
+> decision policy against stated baselines. They are not an accuracy study and
+> claim no real-world decline rate.
 
-## What is real, and what is scripted
+---
 
-| | |
-| --- | --- |
-| **Real** | The evidence-selection loop, policy engine, budget and early stopping, chain grading, Ed25519 signing and verification, the signed institution registry, Tier 1 screening, session revocation, and the Nokia Network as Code adapter. |
-| **Real, on request** | `ISNAD_PROVIDER=nac` uses Nokia NaC only in a non-demo deployment with generated merchant credentials, a mounted vault key, persisted pepper, and an HTTPS consent callback. Provider failures become unresolved evidence; they never become a fixture result. |
-| **Scripted** | Everything else in the demo comes from deterministic local fixtures. Every surface labels its source. |
-| **Not claimed** | No accuracy study, no latency benchmark, no production coverage, no operator contract. |
+## Demo scenarios
 
-CAMARA maturity, read from the specification repositories rather than recalled:
-SIM Swap and Number Verification are **Incubating** (both v2.1.0, Number
-Insights sub-project); VerifiedCaller is **Sandbox**, 0.1.0 in its current
-release with a 0.2.0 alpha in pre-release, and does not yet belong to a
-sub-project. We are early to that one, not late.
-
-## Known limitations, named rather than buried
-
-- **The optional remote decision service answers about half the time** under
-  bursty sequential calls. Every failure uses the deterministic strategy and
-  the verdict records which strategy was used. Do not rely on that service in a demo.
-- **No MENA-specific fraud figure is quoted anywhere**, because none is
-  published. US and UK regulator data is used only where it can be labelled a
-  proxy.
-- **Counterfactual pricing is deliberately `null`** where no defensible public
-  figure exists, and renders as "not priced — merchant-specific" rather than a
-  guess.
-- **CAMARA SIM Swap returns a boolean against a window**, not a timestamp. So
-  "the swap was four hours ago" is not a statement this system can make; "no
-  swap in the last 240 hours" is.
-- **Number Verification's consent round trip has not been exercised** on a real
-  handset, and is not presented as working.
+| Scenario | What it demonstrates | Intended decision |
+| --- | --- | --- |
+| Act I — clean signup | A supporting network fact can avoid OTP friction. | `ALLOW` |
+| Act II — takeover risk | Multiple adverse facts are corroborated before stopping a high-risk checkout. | `DECLINE` |
+| Act III — thin-file customer | Stable network evidence can support a low-friction decision. | `ALLOW` |
+| Act V — evidence gap | Missing consent or provider evidence is uncertainty, not a false decline. | `CHALLENGE` / `UNRESOLVED` |
+| Act VI — recent SIM change | A risk signal is investigated and stepped up rather than auto-rejected. | `CHALLENGE` / `DEGRADED` |
 
 ## What makes it different
 
-- **Evidence-aware orchestration:** Isnad chooses the next affordable,
-  relevant check and stops when policy has enough evidence. A recent SIM change
-  is corroborated rather than treated as an automatic decline.
-- **Honest uncertainty:** unavailable evidence or withheld consent results in
-  `CHALLENGE` / `UNRESOLVED`, not a fabricated pass or failure.
-- **Verifiable receipts:** the chain, decision, planner label, and subject
-  binding are signed with Ed25519 and can be checked later.
-- **Trust that can expire:** an accepted session can be rechecked and revoked
-  when a scripted SIM/device change occurs.
+- **Evidence-aware orchestration** — Isnad chooses the next affordable, relevant
+  check and stops once policy has enough. A recent SIM change gets corroborated,
+  not auto-declined.
+- **Honest uncertainty** — unavailable evidence or withheld consent produces
+  `CHALLENGE` / `UNRESOLVED`, never a fabricated pass or failure.
+- **Verifiable receipts** — chain, decision, planner label, and subject binding
+  are signed with Ed25519 and can be re-checked later.
+- **Trust that can expire** — an accepted session can be rechecked and revoked
+  when a scripted SIM or device change occurs.
+
+---
 
 ## Architecture
 
@@ -162,43 +186,31 @@ flowchart LR
     S --> R[Receipt, verification endpoint, and demo console]
 ```
 
-The same investigator path is used for both providers. `MockProvider` is for
-repeatable local demonstrations only; `NacProvider` requires sandbox
-credentials and the applicable user consent.
+Both providers travel the same investigator path. `MockProvider` gives
+repeatable local demonstrations; `NacProvider` runs against sandbox credentials
+and the applicable user consent.
 
-## Run locally
+### The evidence pack
 
-Use Python 3.11+ and install the development dependencies:
-
-```bash
-pip install -e ".[dev]"
-pytest -q
-
-# Produces JSON and Markdown reports under the ignored .isnad/ directory.
-python scripts/evidence_pack.py
-```
-
-The evidence-pack command forces the local mock provider and deterministic
-planner before application code loads. It runs five scripted cases, persists
-each chain, recomputes its signature, and writes:
+`python scripts/evidence_pack.py` forces the local mock provider and the
+deterministic planner before application code loads, runs five scripted cases,
+persists each chain, recomputes its signature, and writes:
 
 - `.isnad/evidence-pack/evidence-pack.json` — machine-readable scenario,
   evidence, provenance, signature, and counterfactual fields.
 - `.isnad/evidence-pack/evidence-pack.md` — a concise review table.
 
-The report explicitly says that it contains local fixtures only. It does not
-call Nokia Network as Code or an external decision service.
+The report states on its face that it contains local fixtures only. It calls
+neither Nokia Network as Code nor an external decision service.
 
-### Open the demo console
+---
 
-```bash
-ISNAD_DEMO_MODE=true ISNAD_MERCHANT_API_KEYS=demo-merchant-key \
-  uvicorn app.main:app --host 127.0.0.1 --port 8010 --proxy-headers
-```
+## Running against the live network
 
-For a genuinely live CAMARA verification, run a separate non-demo deployment
-(billable; needs NaC credentials). It deliberately has no public demo token or
-scripted fallback:
+`ISNAD_PROVIDER=nac` reaches Nokia Network as Code from a non-demo deployment
+with generated merchant credentials, a mounted vault key, a persisted pepper,
+and an HTTPS consent callback. It is billable, and it carries no public demo
+token and no scripted fallback by design:
 
 ```bash
 export ISNAD_MERCHANT_API_KEYS=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')
@@ -209,39 +221,52 @@ ISNAD_DEMO_MODE=false ISNAD_PROVIDER=nac \
   uvicorn app.main:app --host 127.0.0.1 --port 8000 --no-access-log --proxy-headers
 ```
 
-The stage console stays fully scripted. Recorded NaC captures may be shown as
-historical evidence, but a public demo control can never authorize live spend.
+A provider failure becomes unresolved evidence — it never becomes a fixture
+result. The stage console stays fully scripted, so a public demo control can
+never authorize live spend; recorded NaC captures may be shown beside it as
+historical evidence.
 
-Open [Judge Mode](http://127.0.0.1:8010/judge) for the 90-second customer
-checkout, evidence trace, signed receipt, and simulator-only trust-revocation
-beat. Open [the full console](http://127.0.0.1:8010/console) for every stage
-act. Both surfaces make provider mode visible. Do not present an act as a live
-operator response when it is running on the mock provider.
+## What is real, and what is scripted
 
-The stage console is designed for a concise judge flow from evidence to a
-signed verdict.
+| | |
+| --- | --- |
+| **Real** | The evidence-selection loop, policy engine, budget and early stopping, chain grading, Ed25519 signing and verification, the signed institution registry, Tier 1 screening, session revocation, and the Nokia Network as Code adapter. |
+| **Real, on request** | The live NaC path above, in a non-demo deployment. |
+| **Scripted** | Everything else in the demo comes from deterministic local fixtures. Every surface labels its source. |
+| **Scope of the prototype** | Decision policy and provenance. Accuracy, latency, production coverage, and an operator contract are outside it. |
 
-## Demo scenarios
+CAMARA maturity, read from the specification repositories rather than recalled:
+SIM Swap and Number Verification are **Incubating** (both v2.1.0, Number
+Insights sub-project); VerifiedCaller is **Sandbox**, 0.1.0 in its current
+release with a 0.2.0 alpha in pre-release, and does not yet belong to a
+sub-project. We are early to that one, not late.
 
-| Scenario | What it demonstrates | Intended decision |
-| --- | --- | --- |
-| Act I — clean signup | A supporting network fact can avoid OTP friction. | `ALLOW` |
-| Act II — takeover risk | Multiple adverse facts are corroborated before stopping a high-risk checkout. | `DECLINE` |
-| Act III — thin-file customer | Stable network evidence can support a low-friction decision. | `ALLOW` |
-| Act V — evidence gap | Missing consent/provider evidence is uncertainty, not a false decline. | `CHALLENGE` / `UNRESOLVED` |
-| Act VI — recent SIM change | A risk signal can be investigated and stepped up instead of automatically rejected. | `CHALLENGE` / `DEGRADED` |
+## Boundaries
 
-## Trust and deployment boundaries
+- **Deterministic first.** The optional remote decision service answers about
+  half the time under bursty sequential calls; every failure falls back to the
+  deterministic strategy, and the verdict records which strategy ran. Demos use
+  the deterministic path.
+- **Sourced figures only.** No MENA-specific fraud figure appears anywhere,
+  because none is published. US and UK regulator data is used only where it can
+  be labelled a proxy.
+- **Unpriced beats guessed.** Counterfactual pricing is `null` where no
+  defensible public figure exists, and renders as "not priced —
+  merchant-specific".
+- **What SIM Swap can actually say.** CAMARA returns a boolean against a window,
+  so the claim is "no swap in the last 240 hours" — not "the swap was four hours
+  ago".
+- **Next: consent on a handset.** Number Verification's consent round trip is
+  built but not yet exercised on real hardware, so it is not presented as
+  working.
+- **Receipts prove issuance.** A signed receipt shows that this Isnad instance
+  issued the stored chain; fixture data stays fixture data.
+- **Live deployments bring their own keys.** Generate merchant keys and mount a
+  persisted signing-key volume (see the command above); the sample demo key is
+  public and belongs to the demo. A production consent callback needs a public
+  HTTPS URL registered with the provider — localhost is for local development.
 
-- The signed receipt proves that this Isnad instance issued the stored chain; it
-  does not turn fixture data into an operator attestation.
-- Number Verification is consent-gated. A production callback must use a public
-  HTTPS URL registered with the provider; localhost is for local development.
-- Use real, secret merchant keys and a persisted signing-key volume for a live
-  provider. The sample demo key is public and must never protect a billable
-  deployment.
-- Counterfactual values retain a source and basis. Unpriced merchant-specific
-  fields intentionally remain unpriced rather than guessed.
+---
 
 ## Useful endpoints
 
@@ -252,6 +277,3 @@ signed verdict.
 | `POST /v1/reverse-verify` | Check an incoming caller's claimed identity. |
 | `POST /v1/sessions` | Create a time-limited trust session that can be revoked. |
 | `GET /console` | Open the local stage console. |
-
-The local console keeps the full flow in one place: investigation, evidence,
-and a signed result.
