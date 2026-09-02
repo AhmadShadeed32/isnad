@@ -33,6 +33,21 @@ its evidence came from.
 
 ```bash
 pip install -e ".[dev]"
+python -m demo.run_acts             # every act, decided, in your terminal
+```
+
+That is clone to verdict with no server and no credentials — the real engine on
+local fixtures, printing the chain it reasoned over:
+
+```
+VERDICT: DECLINE / REFUTED  (P(fraud)=0.981)
+Reason: Fraud indicators: SIM swap inside the last 240 h, device swap inside
+        the last 240 h, device is not at the claimed location.
+```
+
+Then the tests and the reproducible evidence pack:
+
+```bash
 pytest -q
 python scripts/evidence_pack.py     # writes JSON + Markdown reports to .isnad/
 ```
@@ -81,67 +96,6 @@ Evidence selection is free to choose the route. It gets no vote on these:
 2. **An allow rests on a network fact.** Local evidence alone cannot buy an
    `ALLOW`; the chain must hold a supporting fact the network returned. *(This
    is the gate that stops a stolen API key talking its way to an instant pass.)*
-
----
-
-## Measured, not asserted
-
-### Same verdicts, shorter route
-
-`scripts/planner_divergence.py` reproduces this. Across the scripted scenarios,
-comparing the two available decision strategies:
-
-| Measure | Result |
-| --- | --- |
-| Same decision state, both planners | **12/12 chose a different next check** |
-| Different evidence path | **4/5 scenarios** |
-| Different verdict or chain grade | **0/5** |
-| Paid network checks to reach them | **17 → 14 (−18%)** |
-
-Policy owns the verdict; evidence selection owns the route. Five scripted
-scenarios and one run — a strategy comparison, not an accuracy study.
-
-### Against the decision rules it replaces
-
-`scripts/false_decline_baseline.py` compares Isnad with the two rules real
-systems use, on a population generated from `policy.yaml`'s own signal
-vocabulary — one case per adverse signal, one per unanswerable check, every pair
-of strong adverse signals, and a multi-adverse control. Both baselines are given
-the **full** evidence set, not the subset Isnad chose to buy.
-
-| Rule | False declines |
-| --- | --- |
-| `single-signal` — any flagged check, decline | 5 of 10 |
-| `collapse-unknowns` — any flagged *or unanswered* check, decline | 10 of 10 |
-| **Isnad** | **0 of 10** |
-
-Network checks bought: run-everything **119**, Isnad **58** — **51% fewer**.
-
-**Against a stack that scores a missing check as a failed one, Isnad avoids
-ten of ten false declines while buying half the network calls.**
-
-### The dial, and where it is set
-
-The same harness reports the other side of the trade. Of 7 cases where two
-independent checks disagree with the customer, Isnad **allows 1** at the shipped
-threshold: it had already formed a confident-clean belief on cheaper evidence
-and stopped, and an unbought signal cannot move a verdict. That is the budget
-working as designed — and it is a dial. `--sweep` prints the curve:
-
-| `allow_below` | false declines | corroborated-adverse allowed | checks |
-| --- | --- | --- | --- |
-| 0.15 (shipped) | 0/10 | 1/7 | 58 |
-| 0.10 | 0/10 | 1/7 | 59 |
-| 0.05 | 0/10 | 0/7 | 82 |
-
-One line in `policy.yaml` per row — no code, no retraining. A merchant picks the
-point that matches what a lost customer costs them: tightening to 0.05 closes
-the last corroborated-adverse allow and buys 24 more network checks to do it.
-
-> [!NOTE]
-> Scripted fixtures over a generated population, one run. These figures compare
-> decision policy against stated baselines. They are not an accuracy study and
-> claim no real-world decline rate.
 
 ---
 
@@ -277,6 +231,100 @@ Ed25519 signature over the stored chain and `GET /v1/receipts/{id}` renders it
 for a phone — neither needs your API key, so anyone you hand the link to can
 check the verdict was not edited afterwards.
 
+### Integrating it
+
+You call `/v1/verify` at the decision point you already have — the checkout, the
+signup, the payout — and you act on one field. `ALLOW` proceeds. `DECLINE`
+stops. `CHALLENGE` means run the step-up you already own; Isnad does not send
+OTPs, because the channel belongs to you. Nothing else in your stack has to
+change, and `chain_id` is what you file when the customer disputes it.
+
+The thing you tune afterwards is `policy.yaml`: thresholds, per-check costs, the
+budget, and which checks must be attempted before an adverse signal is allowed
+to decline anyone. No retraining, no model to host.
+
+### What this is worth to an operator
+
+The figures measured below are all merchant-side, so here is the other
+direction. Isnad buys **fewer** network calls per decision — 58 against 119 for
+running everything — which sounds like less revenue and is not. A call that gets bought is a call
+that changed a verdict, and the signed chain proves the operator's answer was
+used rather than overridden by an internal score. That turns a CAMARA endpoint
+from a data feed billed per lookup into a decision the merchant can point at
+when the chargeback arrives.
+
+The corroboration rule is the same argument in policy form: a SIM Swap `true`
+cannot decline anyone by itself, so the network is never left carrying the blame
+for a lost customer it merely reported a fact about.
+
+## Measured, not asserted
+
+### Same verdicts, shorter route
+
+`scripts/planner_divergence.py` reproduces this. Across the scripted scenarios,
+comparing the two available decision strategies:
+
+| Measure | Result |
+| --- | --- |
+| Same decision state, both planners | **12/12 chose a different next check** |
+| Different evidence path | **4/5 scenarios** |
+| Different verdict or chain grade | **0/5** |
+| Paid network checks to reach them | **17 → 14 (−18%)** |
+
+Policy owns the verdict; evidence selection owns the route. Five scripted
+scenarios and one run — a strategy comparison, not an accuracy study.
+
+### Against the decision rules it replaces
+
+`scripts/false_decline_baseline.py` compares Isnad with the two rules real
+systems use, on a population generated from `policy.yaml`'s own signal
+vocabulary — one case per adverse signal, one per unanswerable check, every pair
+of strong adverse signals, and a multi-adverse control. Both baselines are given
+the **full** evidence set, not the subset Isnad chose to buy.
+
+| Rule | False declines |
+| --- | --- |
+| `single-signal` — any flagged check, decline | 5 of 10 |
+| `collapse-unknowns` — any flagged *or unanswered* check, decline | 10 of 10 |
+| **Isnad** | **0 of 10** |
+
+Network checks bought: run-everything **119**, Isnad **58** — **51% fewer**.
+
+**Against a stack that scores a missing check as a failed one, Isnad avoids
+ten of ten false declines while buying half the network calls.**
+
+**"So why not just call all seven every time?"** Because the run-everything
+column above is that system, and it costs 119 calls to reach verdicts Isnad
+reaches in 58. Buying evidence you have already been given enough to decide
+without is spend, latency and consent surface with no verdict attached — and on
+a check that needs the customer's consent, it is friction you asked a real
+person for and did not use.
+
+### The dial, and where it is set
+
+The same harness reports the other side of the trade. Of 7 cases where two
+independent checks disagree with the customer, Isnad **allows 1** at the shipped
+threshold: it had already formed a confident-clean belief on cheaper evidence
+and stopped, and an unbought signal cannot move a verdict. That is the budget
+working as designed — and it is a dial. `--sweep` prints the curve:
+
+| `allow_below` | false declines | corroborated-adverse allowed | checks |
+| --- | --- | --- | --- |
+| 0.15 (shipped) | 0/10 | 1/7 | 58 |
+| 0.10 | 0/10 | 1/7 | 59 |
+| 0.05 | 0/10 | 0/7 | 82 |
+
+One line in `policy.yaml` per row — no code, no retraining. A merchant picks the
+point that matches what a lost customer costs them: tightening to 0.05 closes
+the last corroborated-adverse allow and buys 24 more network checks to do it.
+
+> [!NOTE]
+> Scripted fixtures over a generated population, one run. These figures compare
+> decision policy against stated baselines. They are not an accuracy study and
+> claim no real-world decline rate.
+
+---
+
 ## Demo scenarios
 
 | Scenario | What it demonstrates | Intended decision |
@@ -294,6 +342,12 @@ check the verdict was not edited afterwards.
   not auto-declined.
 - **Honest uncertainty** — unavailable evidence or withheld consent produces
   `CHALLENGE` / `UNRESOLVED`, never a fabricated pass or failure.
+- **A link can only say what the network said** — every evidence sentence comes
+  from one table, `app/providers/vocabulary.py`, shared by the mock and the live
+  NaC adapter, and `tests/test_provider_vocabulary.py` fails the build if a
+  fixture invents a new one. It is the reason no chain here claims "the swap was
+  41 minutes ago" from an API that returns a boolean. Demo prose is where a
+  telecoms demo usually gets caught, so this is enforced rather than reviewed.
 - **Verifiable receipts** — chain, decision, planner label, and subject binding
   are signed with Ed25519 and can be re-checked later.
 - **Trust that can expire** — an accepted session can be rechecked and revoked
@@ -398,11 +452,9 @@ early to that one, not late.
 - **Unpriced beats guessed.** Counterfactual pricing is `null` where no
   defensible public figure exists, and renders as "not priced —
   merchant-specific".
-- **A link can only say what the network said.** Every evidence sentence comes
-  from one table, `app/providers/vocabulary.py`, shared by the mock and the live
-  NaC adapter. CAMARA SIM Swap and Device Swap answer a boolean against the
-  `max_age` we send, so a link says "SIM swap inside the last 240 h" and never
-  "the swap was 41 minutes ago". A test fails the build if a fixture invents one.
+- **The window, not the timestamp.** CAMARA's swap APIs answer a boolean against
+  the `max_age` we send, so a link says "SIM swap inside the last 240 h" and
+  carries `240` in `max_age_hours`.
 - **Device Intelligence is unresolved, not trusted.** Nokia Network as Code
   exposes no device-reputation product, so the agent cannot buy that check and
   no chain carries a reputation verdict. It stays priced in `policy.yaml` for the
