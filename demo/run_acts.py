@@ -29,7 +29,8 @@ ACTS = [
         ),
     ),
     # No merchant-side history (account_age_days=0) + high-value COD => an
-    # uncertain start; 6 years of SIM tenure is what actually clears them.
+    # uncertain start; what clears them is that every check the operator can
+    # answer comes back clean. The network cannot report SIM tenure.
     (
         "ACT III — Approve the invisible",
         VerificationRequest(

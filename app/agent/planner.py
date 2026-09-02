@@ -19,7 +19,16 @@ from app.policy.engine import PolicyEngine
 # loop starts, so offering them to a planner whose whole job is spending a budget
 # would be offering a choice that does not exist.
 _LOCAL = {Action.REGISTRY_CHECK, Action.CALL_ANNOUNCEMENT}
-_CANDIDATES = [a for a in Action if a != Action.STEP_UP_OTP and a not in _LOCAL]
+
+# DEVICE_INTELLIGENCE is excluded for the same reason STEP_UP_OTP is: there is
+# no provider call behind it. Nokia Network as Code exposes no device-reputation
+# product, so buying it spends budget to guarantee a hole in the chain. It stays
+# priced in policy.yaml for the day a reputation provider is wired in; until
+# then, offering it to a planner is offering a choice that does not exist.
+_UNSERVED = {Action.DEVICE_INTELLIGENCE}
+_CANDIDATES = [
+    a for a in Action if a != Action.STEP_UP_OTP and a not in _LOCAL and a not in _UNSERVED
+]
 
 # The model's way of saying it has enough. A first-class choice: deciding when to
 # stop is the most agent-like decision available, and the loop used to exit only

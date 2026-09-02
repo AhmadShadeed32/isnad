@@ -32,10 +32,18 @@ signals:
   NOT_AT_CLAIMED_LOCATION: 1.6
   LOCATION_UNKNOWN: 0.0
   REACHABLE_NORMAL: -0.4
+  # RESERVED — nothing emits this. A reachability response says whether the
+  # device is reachable and over which channel; it cannot characterise a line as
+  # automated or VoIP. Kept priced for a provider that could one day say it.
   REACHABLE_BOTPATTERN: 1.4
   REACHABLE_UNAVAILABLE: 0.4
   HOME_NETWORK: -0.3
   ROAMING_NETWORK: 0.2
+  # RESERVED — nothing emits these two. Nokia Network as Code exposes no device
+  # reputation product: the captured probe in docs/nac/device_intelligence.json
+  # returns EVIDENCE_UNAVAILABLE. Until a reputation provider is wired in, a
+  # Device Intelligence link is a hole in the chain, not a verdict. Kept priced
+  # so that provider inherits a weight instead of a guess.
   DEVICE_TRUSTED: -0.6
   DEVICE_RISKY: 1.5
   # RESERVED — nothing emits this. An OTP is sent by the merchant, in a channel
@@ -96,6 +104,8 @@ actions:
   location_verify:     { cost: 3, gain: 1.5, friction: 0 }
   reachability:        { cost: 2, gain: 1.3, friction: 0 }
   roaming:             { cost: 2, gain: 1.6, friction: 0 }
+  # Priced, never selected — see planner._UNSERVED. No CAMARA device-reputation
+  # API exists on Nokia NaC, so the agent cannot buy this check today.
   device_intelligence: { cost: 2, gain: 1.4, friction: 0 }
   # Priced, never selected. `cheapest_stepup` used to fall back to it, which
   # spent 6 of a 12 budget on a provider call that does not exist. CHALLENGE is

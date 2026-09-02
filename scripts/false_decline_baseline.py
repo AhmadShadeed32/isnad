@@ -65,56 +65,49 @@ from app.providers import mock as mock_mod
 from app.providers.mock import MockProvider
 
 # The clean baseline every generated case is a single mutation of.
-CLEAN: dict[Action, tuple[Result, str, str]] = {
-    Action.NUMBER_VERIFY: (Result.PASS, "NUMBER_MATCH", "number matches the device"),
-    Action.SIM_SWAP: (Result.PASS, "SIM_STABLE", "no SIM change on record"),
-    Action.DEVICE_SWAP: (Result.PASS, "DEVICE_STABLE", "same device as usual"),
-    Action.LOCATION_VERIFY: (Result.PASS, "AT_CLAIMED_LOCATION", "at claimed address"),
-    Action.REACHABILITY: (Result.PASS, "REACHABLE_NORMAL", "normal connectivity"),
-    Action.ROAMING: (Result.PASS, "HOME_NETWORK", "on home network"),
-    Action.DEVICE_INTELLIGENCE: (Result.PASS, "DEVICE_TRUSTED", "good device reputation"),
+#
+# Device Intelligence is UNRESOLVED here rather than PASS, because Nokia
+# Network as Code exposes no device-reputation product: `docs/nac/
+# device_intelligence.json` came back INFO / EVIDENCE_UNAVAILABLE. A population
+# built on a reading no operator can return would measure a system that does not
+# exist. See `app/providers/vocabulary.py`.
+CLEAN: dict[Action, tuple[Result, str]] = {
+    Action.NUMBER_VERIFY: (Result.PASS, "NUMBER_MATCH"),
+    Action.SIM_SWAP: (Result.PASS, "SIM_STABLE"),
+    Action.DEVICE_SWAP: (Result.PASS, "DEVICE_STABLE"),
+    Action.LOCATION_VERIFY: (Result.PASS, "AT_CLAIMED_LOCATION"),
+    Action.REACHABILITY: (Result.PASS, "REACHABLE_NORMAL"),
+    Action.ROAMING: (Result.PASS, "HOME_NETWORK"),
+    Action.DEVICE_INTELLIGENCE: (Result.INFO, "EVIDENCE_UNAVAILABLE"),
 }
 
 # Which action emits which signal, so a generated case stays coherent: a SIM
 # Swap check cannot come back saying the device is risky.
-EMITS: dict[str, tuple[Action, Result, str]] = {
-    "NUMBER_MISMATCH": (Action.NUMBER_VERIFY, Result.FLAG, "number does not match the device"),
-    "SIM_SWAPPED": (Action.SIM_SWAP, Result.FLAG, "swap detected inside the window"),
-    "DEVICE_SWAPPED": (Action.DEVICE_SWAP, Result.FLAG, "new handset, first seen today"),
-    "NOT_AT_CLAIMED_LOCATION": (Action.LOCATION_VERIFY, Result.FLAG, "not at claimed address"),
-    "REACHABLE_BOTPATTERN": (
-        Action.REACHABILITY,
-        Result.FLAG,
-        "connectivity pattern looks automated",
-    ),
-    "REACHABLE_UNAVAILABLE": (
-        Action.REACHABILITY,
-        Result.FLAG,
-        "reachability could not be established",
-    ),
-    "ROAMING_NETWORK": (Action.ROAMING, Result.INFO, "on a partner network"),
-    "DEVICE_RISKY": (Action.DEVICE_INTELLIGENCE, Result.FLAG, "device linked to prior fraud"),
+#
+# Only signals a CAMARA API can actually return appear here. DEVICE_RISKY and
+# REACHABLE_BOTPATTERN were dropped on 2 Sep 2026: no Nokia NaC response
+# produces either, so a case built on one was measuring fiction. That costs the
+# population two adverse cases, and the figures below moved accordingly.
+EMITS: dict[str, tuple[Action, Result]] = {
+    "NUMBER_MISMATCH": (Action.NUMBER_VERIFY, Result.FLAG),
+    "SIM_SWAPPED": (Action.SIM_SWAP, Result.FLAG),
+    "DEVICE_SWAPPED": (Action.DEVICE_SWAP, Result.FLAG),
+    "NOT_AT_CLAIMED_LOCATION": (Action.LOCATION_VERIFY, Result.FLAG),
+    "REACHABLE_UNAVAILABLE": (Action.REACHABILITY, Result.FLAG),
+    "ROAMING_NETWORK": (Action.ROAMING, Result.INFO),
     # Zero-delta: the network could not answer. Not evidence against anyone.
-    "CONSENT_REQUIRED": (
-        Action.NUMBER_VERIFY,
-        Result.INFO,
-        "customer has not authorized this check",
-    ),
-    "PROVIDER_UNAVAILABLE": (
-        Action.SIM_SWAP,
-        Result.INFO,
-        "operator has not exposed this API here",
-    ),
-    "LOCATION_UNKNOWN": (Action.LOCATION_VERIFY, Result.INFO, "no location evidence for this line"),
-    "LOCATION_PARTIAL": (Action.LOCATION_VERIFY, Result.INFO, "location evidence is partial"),
+    "CONSENT_REQUIRED": (Action.NUMBER_VERIFY, Result.INFO),
+    "PROVIDER_UNAVAILABLE": (Action.SIM_SWAP, Result.INFO),
+    "LOCATION_UNKNOWN": (Action.LOCATION_VERIFY, Result.INFO),
+    "LOCATION_PARTIAL": (Action.LOCATION_VERIFY, Result.INFO),
 }
 
 FRAUD = {
     **CLEAN,
-    Action.SIM_SWAP: (Result.FLAG, "SIM_SWAPPED", "swap detected 41 min ago"),
-    Action.DEVICE_SWAP: (Result.FLAG, "DEVICE_SWAPPED", "new handset, first seen today"),
-    Action.LOCATION_VERIFY: (Result.FLAG, "NOT_AT_CLAIMED_LOCATION", "not at claimed address"),
-    Action.DEVICE_INTELLIGENCE: (Result.FLAG, "DEVICE_RISKY", "device linked to prior fraud"),
+    Action.SIM_SWAP: (Result.FLAG, "SIM_SWAPPED"),
+    Action.DEVICE_SWAP: (Result.FLAG, "DEVICE_SWAPPED"),
+    Action.LOCATION_VERIFY: (Result.FLAG, "NOT_AT_CLAIMED_LOCATION"),
+    Action.NUMBER_VERIFY: (Result.FLAG, "NUMBER_MISMATCH"),
 }
 
 # Deliberately Act VI's context — a new account, cash on delivery, mid-value.
@@ -147,7 +140,7 @@ def population(signal_deltas: dict[str, float]) -> list[dict]:
     """Every single-signal case the policy vocabulary admits, plus a control."""
     cases: list[dict] = []
     n = 0
-    for signal, (action, result, detail) in EMITS.items():
+    for signal, (action, result) in EMITS.items():
         if signal not in signal_deltas:
             continue
         delta = signal_deltas[signal]
@@ -157,7 +150,7 @@ def population(signal_deltas: dict[str, float]) -> list[dict]:
                 "name": signal,
                 "group": "ADVERSE-1" if delta > 0 else "UNKNOWN-1",
                 "number": f"+9995550{n:04d}",
-                "scenario": {**CLEAN, action: (result, signal, detail)},
+                "scenario": {**CLEAN, action: (result, signal)},
                 # One bad or missing reading on an otherwise clean line does not
                 # justify losing the customer. A step-up does.
                 "deserves_decline": False,
@@ -171,13 +164,13 @@ def population(signal_deltas: dict[str, float]) -> list[dict]:
     # answer, so what is reported is simply what each system does with them.
     strong = [
         sig
-        for sig, (_a, res, _d) in EMITS.items()
+        for sig, (_a, res) in EMITS.items()
         if signal_deltas.get(sig, 0.0) >= 1.0 and res == Result.FLAG
     ]
     for i, first in enumerate(strong):
         for second in strong[i + 1 :]:
-            a1, r1, d1 = EMITS[first]
-            a2, r2, d2 = EMITS[second]
+            a1, r1 = EMITS[first]
+            a2, r2 = EMITS[second]
             if a1 == a2:
                 continue  # one check cannot return two answers
             n += 1
@@ -186,7 +179,7 @@ def population(signal_deltas: dict[str, float]) -> list[dict]:
                     "name": f"{first[:12]}+{second[:12]}",
                     "group": "CORROBORATED-2",
                     "number": f"+9995550{n:04d}",
-                    "scenario": {**CLEAN, a1: (r1, first, d1), a2: (r2, second, d2)},
+                    "scenario": {**CLEAN, a1: (r1, first), a2: (r2, second)},
                     "deserves_decline": True,
                 }
             )

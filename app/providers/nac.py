@@ -14,6 +14,7 @@ from app.chain.models import EvidenceLink
 from app.config import settings
 from app.domain.enums import API_LABEL, Action, Result
 from app.domain.schemas import VerificationRequest
+from app.providers.vocabulary import detail_for
 
 # A dedicated, bounded pool for the blocking SDK (S12).
 #
@@ -172,11 +173,10 @@ class NacProvider:
                 max_age=settings.nac_max_age_hours,
             )
             swapped = bool(self._value(response, "swapped", False))
-            return (
-                Result.FLAG if swapped else Result.PASS,
-                "SIM_SWAPPED" if swapped else "SIM_STABLE",
-                "recent SIM swap detected" if swapped else "no recent SIM swap",
-            )
+            signal = "SIM_SWAPPED" if swapped else "SIM_STABLE"
+            # The window is the answer: the API returns a boolean against the
+            # max_age we just sent, never a date. See providers/vocabulary.py.
+            return Result.FLAG if swapped else Result.PASS, signal, detail_for(signal)
 
         if action == Action.DEVICE_SWAP:
             response = self.client.device_swap.check(
@@ -184,29 +184,33 @@ class NacProvider:
                 max_age=settings.nac_max_age_hours,
             )
             swapped = bool(self._value(response, "swapped", False))
-            return (
-                Result.FLAG if swapped else Result.PASS,
-                "DEVICE_SWAPPED" if swapped else "DEVICE_STABLE",
-                "recent device swap detected" if swapped else "no recent device swap",
-            )
+            signal = "DEVICE_SWAPPED" if swapped else "DEVICE_STABLE"
+            return Result.FLAG if swapped else Result.PASS, signal, detail_for(signal)
 
         if action == Action.REACHABILITY:
             response = self.client.device_status.retrieve_reachability_status(device=device)
             reachable = self._value(response, "reachable", None)
             connectivity = self._value(response, "connectivity", None)
             if reachable:
-                connection = ", ".join(connectivity or []) or "network connection"
-                return Result.PASS, "REACHABLE_NORMAL", f"device reachable via {connection}"
-            return Result.FLAG, "REACHABLE_UNAVAILABLE", "device is not reachable from the network"
+                connection = ", ".join(connectivity or []) or None
+                return (
+                    Result.PASS,
+                    "REACHABLE_NORMAL",
+                    detail_for("REACHABLE_NORMAL", connectivity=connection),
+                )
+            return Result.FLAG, "REACHABLE_UNAVAILABLE", detail_for("REACHABLE_UNAVAILABLE")
 
         if action == Action.ROAMING:
             response = self.client.device_status.retrieve_roaming_status(device=device)
             roaming = bool(self._value(response, "roaming", False))
             countries = self._value(response, "countryName", []) or []
             if roaming:
-                suffix = f" ({', '.join(countries)})" if countries else ""
-                return Result.INFO, "ROAMING_NETWORK", f"device is roaming{suffix}"
-            return Result.PASS, "HOME_NETWORK", "device is on its home network"
+                return (
+                    Result.INFO,
+                    "ROAMING_NETWORK",
+                    detail_for("ROAMING_NETWORK", countries=", ".join(countries) or None),
+                )
+            return Result.PASS, "HOME_NETWORK", detail_for("HOME_NETWORK")
 
         if action == Action.LOCATION_VERIFY:
             claim = request.context.claimed_location
@@ -223,20 +227,20 @@ class NacProvider:
             )
             verification = str(self._value(response, "verification_result", "UNKNOWN")).upper()
             if verification == "TRUE":
-                return Result.PASS, "AT_CLAIMED_LOCATION", "device is at the claimed location"
+                return Result.PASS, "AT_CLAIMED_LOCATION", detail_for("AT_CLAIMED_LOCATION")
             if verification == "FALSE":
                 return (
                     Result.FLAG,
                     "NOT_AT_CLAIMED_LOCATION",
-                    "device is not at the claimed location",
+                    detail_for("NOT_AT_CLAIMED_LOCATION"),
                 )
             if verification == "PARTIAL":
-                return Result.INFO, "LOCATION_PARTIAL", "device partially overlaps the claimed area"
-            return Result.INFO, "LOCATION_UNKNOWN", "fresh location evidence is unavailable"
+                return Result.INFO, "LOCATION_PARTIAL", detail_for("LOCATION_PARTIAL")
+            return Result.INFO, "LOCATION_UNKNOWN", detail_for("LOCATION_UNKNOWN")
 
         if action == Action.NUMBER_VERIFY:
             if not self.number_verification_token:
-                return Result.INFO, "CONSENT_REQUIRED", "number verification requires user consent"
+                return Result.INFO, "CONSENT_REQUIRED", detail_for("CONSENT_REQUIRED")
             number_api = self._number_verification_api()
             verify = getattr(number_api, "verify", None) if number_api is not None else None
             if not callable(verify):
@@ -259,12 +263,12 @@ class NacProvider:
                 "verified",
             )
             if verified is True:
-                return Result.PASS, "NUMBER_MATCH", "network number matches the provided number"
+                return Result.PASS, "NUMBER_MATCH", detail_for("NUMBER_MATCH")
             if verified is False:
                 return (
                     Result.FLAG,
                     "NUMBER_MISMATCH",
-                    "network number does not match the provided number",
+                    detail_for("NUMBER_MISMATCH"),
                 )
             return (
                 Result.INFO,

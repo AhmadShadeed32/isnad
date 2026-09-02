@@ -28,7 +28,10 @@ class EvidenceLink(BaseModel):
     api: str  # human-readable CAMARA API label
     result: Result
     signal: str  # normalized signal name, e.g. "SIM_SWAPPED"
-    detail: str  # plain-language, e.g. "swap detected 41 min ago"
+    # Plain-language, e.g. "SIM swap inside the last 240 h". Never free prose:
+    # every sentence comes from app/providers/vocabulary.py, so a link can only
+    # say what a CAMARA API can actually return.
+    detail: str
     consent_basis: str = "n/a"
     source: str = "unknown"  # mock, nac, or another normalized provider
     requires_consent: bool = False

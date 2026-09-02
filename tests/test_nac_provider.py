@@ -55,7 +55,8 @@ async def test_nac_provider_normalizes_sim_swap():
     assert link.source == "nac"
     assert link.result == Result.FLAG
     assert link.signal == "SIM_SWAPPED"
-    assert "recent SIM swap" in link.detail
+    # The window is the answer a boolean-against-max_age can give; a date is not.
+    assert link.detail == "SIM swap inside the last 240 h"
 
 
 @pytest.mark.asyncio

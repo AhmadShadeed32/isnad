@@ -416,17 +416,11 @@ async def test_an_announcement_cannot_outvote_a_network_contradiction(bound_key,
     # not coming from that line.
     contradicted = {
         BANK_NUMBER: {
-            Action.NUMBER_VERIFY: (
-                Result.FLAG,
-                "NUMBER_MISMATCH",
-                "caller ID is not associated with this device",
-            ),
-            Action.SIM_SWAP: (Result.FLAG, "SIM_SWAPPED", "swap detected 20 min ago"),
-            Action.REACHABILITY: (
-                Result.FLAG,
-                "REACHABLE_BOTPATTERN",
-                "VoIP / burner pattern",
-            ),
+            Action.NUMBER_VERIFY: (Result.FLAG, "NUMBER_MISMATCH"),
+            Action.SIM_SWAP: (Result.FLAG, "SIM_SWAPPED"),
+            # Was REACHABLE_BOTPATTERN. No CAMARA response characterises a line
+            # as a VoIP burner; "not reachable" is what the network can say.
+            Action.REACHABILITY: (Result.FLAG, "REACHABLE_UNAVAILABLE"),
         }
     }
 

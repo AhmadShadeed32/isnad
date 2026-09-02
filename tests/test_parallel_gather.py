@@ -161,19 +161,31 @@ async def test_concurrent_runs_do_not_interleave_chains():
     """
     from app.domain.enums import Action, Result
 
+    # A link can no longer carry a made-up marker sentence — every detail comes
+    # from the network vocabulary now — so the two runs are told apart by which
+    # *signals* they return. A link from B appearing in A's chain is still the
+    # interleaving this test exists to catch.
+    MARKED = {
+        "A": {
+            Action.NUMBER_VERIFY: (Result.PASS, "NUMBER_MATCH"),
+            Action.SIM_SWAP: (Result.PASS, "SIM_STABLE"),
+            Action.DEVICE_SWAP: (Result.PASS, "DEVICE_STABLE"),
+            Action.LOCATION_VERIFY: (Result.PASS, "AT_CLAIMED_LOCATION"),
+            Action.REACHABILITY: (Result.PASS, "REACHABLE_NORMAL"),
+            Action.ROAMING: (Result.PASS, "HOME_NETWORK"),
+        },
+        "B": {
+            Action.NUMBER_VERIFY: (Result.FLAG, "NUMBER_MISMATCH"),
+            Action.SIM_SWAP: (Result.FLAG, "SIM_SWAPPED"),
+            Action.DEVICE_SWAP: (Result.FLAG, "DEVICE_SWAPPED"),
+            Action.LOCATION_VERIFY: (Result.FLAG, "NOT_AT_CLAIMED_LOCATION"),
+            Action.REACHABILITY: (Result.FLAG, "REACHABLE_UNAVAILABLE"),
+            Action.ROAMING: (Result.INFO, "ROAMING_NETWORK"),
+        },
+    }
+
     def _scenario(marker: str):
-        return {
-            action: (Result.PASS, signal, f"detail for {marker}")
-            for action, signal in (
-                (Action.NUMBER_VERIFY, "NUMBER_MATCH"),
-                (Action.SIM_SWAP, "SIM_STABLE"),
-                (Action.DEVICE_SWAP, "DEVICE_STABLE"),
-                (Action.LOCATION_VERIFY, "AT_CLAIMED_LOCATION"),
-                (Action.REACHABILITY, "REACHABLE_NORMAL"),
-                (Action.ROAMING, "HOME_NETWORK"),
-                (Action.DEVICE_INTELLIGENCE, "DEVICE_TRUSTED"),
-            )
-        }
+        return MARKED[marker]
 
     async def _run_marked(marker: str, number: str):
         request = VerificationRequest(
@@ -193,8 +205,10 @@ async def test_concurrent_runs_do_not_interleave_chains():
 
     assert a.chain_id != b.chain_id
     assert a.chain and b.chain
-    assert all(link.detail == "detail for A" for link in a.chain), [link.detail for link in a.chain]
-    assert all(link.detail == "detail for B" for link in b.chain), [link.detail for link in b.chain]
+    a_signals = {sig for _r, sig in MARKED["A"].values()}
+    b_signals = {sig for _r, sig in MARKED["B"].values()}
+    assert all(link.signal in a_signals for link in a.chain), [link.signal for link in a.chain]
+    assert all(link.signal in b_signals for link in b.chain), [link.signal for link in b.chain]
     # And each chain numbers its own steps from 1, with no gaps.
     for verdict in (a, b):
         assert [link.step for link in verdict.chain] == list(range(1, len(verdict.chain) + 1))

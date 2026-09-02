@@ -111,32 +111,32 @@ the **full** evidence set, not the subset Isnad chose to buy.
 
 | Rule | False declines |
 | --- | --- |
-| `single-signal` — any flagged check, decline | 7 of 12 |
-| `collapse-unknowns` — any flagged *or unanswered* check, decline | 12 of 12 |
-| **Isnad** | **0 of 12** |
+| `single-signal` — any flagged check, decline | 5 of 10 |
+| `collapse-unknowns` — any flagged *or unanswered* check, decline | 10 of 10 |
+| **Isnad** | **0 of 10** |
 
-Network checks bought: run-everything **196**, Isnad **96** — **51% fewer**.
+Network checks bought: run-everything **119**, Isnad **58** — **51% fewer**.
 
 **Against a stack that scores a missing check as a failed one, Isnad avoids
-twelve of twelve false declines while buying half the network calls.**
+ten of ten false declines while buying half the network calls.**
 
 ### The dial, and where it is set
 
-The same harness reports the other side of the trade. Of 16 cases where two
-independent checks disagree with the customer, Isnad **allows 8** at the shipped
+The same harness reports the other side of the trade. Of 7 cases where two
+independent checks disagree with the customer, Isnad **allows 1** at the shipped
 threshold: it had already formed a confident-clean belief on cheaper evidence
 and stopped, and an unbought signal cannot move a verdict. That is the budget
 working as designed — and it is a dial. `--sweep` prints the curve:
 
 | `allow_below` | false declines | corroborated-adverse allowed | checks |
 | --- | --- | --- | --- |
-| 0.15 (shipped) | 0/12 | 8/16 | 96 |
-| 0.05 | 0/12 | 1/16 | 142 |
+| 0.15 (shipped) | 0/10 | 1/7 | 58 |
+| 0.10 | 0/10 | 1/7 | 59 |
+| 0.05 | 0/10 | 0/7 | 82 |
 
 One line in `policy.yaml` per row — no code, no retraining. A merchant picks the
-point that matches what a lost customer costs them. The shipped default stays at
-0.15 so that `ATTESTED_PARTIAL` remains reachable in the demo; a grade nothing
-can produce teaches a judge nothing.
+point that matches what a lost customer costs them: tightening to 0.05 closes
+the last corroborated-adverse allow and buys 24 more network checks to do it.
 
 > [!NOTE]
 > Scripted fixtures over a generated population, one run. These figures compare
@@ -253,9 +253,15 @@ sub-project. We are early to that one, not late.
 - **Unpriced beats guessed.** Counterfactual pricing is `null` where no
   defensible public figure exists, and renders as "not priced —
   merchant-specific".
-- **What SIM Swap can actually say.** CAMARA returns a boolean against a window,
-  so the claim is "no swap in the last 240 hours" — not "the swap was four hours
-  ago".
+- **A link can only say what the network said.** Every evidence sentence comes
+  from one table, `app/providers/vocabulary.py`, shared by the mock and the live
+  NaC adapter. CAMARA SIM Swap and Device Swap answer a boolean against the
+  `max_age` we send, so a link says "SIM swap inside the last 240 h" and never
+  "the swap was 41 minutes ago". A test fails the build if a fixture invents one.
+- **Device Intelligence is unresolved, not trusted.** Nokia Network as Code
+  exposes no device-reputation product, so the agent cannot buy that check and
+  no chain carries a reputation verdict. It stays priced in `policy.yaml` for the
+  provider that could one day answer it.
 - **Next: consent on a handset.** Number Verification's consent round trip is
   built but not yet exercised on real hardware, so it is not presented as
   working.
