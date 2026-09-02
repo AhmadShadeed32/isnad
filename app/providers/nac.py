@@ -14,7 +14,7 @@ from app.chain.models import EvidenceLink
 from app.config import settings
 from app.domain.enums import API_LABEL, Action, Result
 from app.domain.schemas import VerificationRequest
-from app.providers.vocabulary import detail_for
+from app.providers.vocabulary import detail_for, window_hours
 
 # A dedicated, bounded pool for the blocking SDK (S12).
 #
@@ -25,20 +25,6 @@ from app.providers.vocabulary import detail_for
 # application depends on. Bounded here, so the damage from a hanging provider is
 # capped and confined to provider calls.
 _NAC_POOL = ThreadPoolExecutor(max_workers=8, thread_name_prefix="nac")
-
-
-def _window_hours(action: Action) -> float | None:
-    """The age window this action's question covered, if it has one.
-
-    Mirrors the max_age arguments passed in _gather_sync, and is kept beside
-    them deliberately: if one changes and the other does not, the receipt starts
-    reporting a window the call did not actually use.
-    """
-    if action in (Action.SIM_SWAP, Action.DEVICE_SWAP):
-        return float(settings.nac_max_age_hours)
-    if action == Action.LOCATION_VERIFY:
-        return settings.nac_location_max_age_seconds / 3600.0
-    return None
 
 
 class NacProvider:
@@ -107,7 +93,7 @@ class NacProvider:
             consent_basis=self._consent_basis(action),
             source="nac",
             requires_consent=signal == "CONSENT_REQUIRED",
-            max_age_hours=_window_hours(action),
+            max_age_hours=window_hours(action),
             latency_ms=self._latency_ms(started),
         )
 

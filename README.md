@@ -145,6 +145,122 @@ the last corroborated-adverse allow and buys 24 more network checks to do it.
 
 ---
 
+## What you get back
+
+Isnad is an HTTP API; the console is a client of it. This is Act VI — a customer
+who really did replace a SIM — captured verbatim from a local run rather than
+written by hand:
+
+```bash
+curl -X POST http://127.0.0.1:8010/v1/verify \
+  -H 'authorization: Bearer <your merchant key>' \
+  -H 'content-type: application/json' \
+  -d '{"phone_number":"+962790000006",
+       "context":{"event":"checkout","payment_method":"cod",
+                  "account_age_days":0,"amount":{"value":1500}}}'
+```
+
+```json
+{
+  "decision": "CHALLENGE",
+  "planner": "greedy",
+  "chain_grade": "DEGRADED",
+  "confidence": 0.242,
+  "hypothesis": "account_takeover",
+  "reason": "Unresolved doubt — cheapest step-up needed before trusting.",
+  "chain_id": "chn_3ec980dc54da4adea275",
+  "chain": [
+    {
+      "step": 2,
+      "action": "sim_swap",
+      "api": "SIM Swap",
+      "result": "FLAG",
+      "signal": "SIM_SWAPPED",
+      "detail": "SIM swap inside the last 240 h",
+      "consent_basis": "3-legged CIBA token",
+      "source": "mock",
+      "requires_consent": false,
+      "latency_ms": 90,
+      "max_age_hours": 240.0,
+      "delta_logodds": 2.2
+    },
+    {
+      "step": 3,
+      "action": "device_swap",
+      "api": "Device Swap",
+      "result": "PASS",
+      "signal": "DEVICE_STABLE",
+      "detail": "no device swap in the last 240 h",
+      "consent_basis": "3-legged CIBA token",
+      "source": "mock",
+      "requires_consent": false,
+      "latency_ms": 135,
+      "max_age_hours": 240.0,
+      "delta_logodds": -0.5
+    },
+    {
+      "step": 4,
+      "action": "location_verify",
+      "api": "Location Verification",
+      "result": "PASS",
+      "signal": "AT_CLAIMED_LOCATION",
+      "detail": "device is at the claimed location",
+      "consent_basis": "3-legged CIBA token",
+      "source": "mock",
+      "requires_consent": false,
+      "latency_ms": 45,
+      "max_age_hours": 1.0,
+      "delta_logodds": -1.2
+    },
+    "\u2026 3 more links: number_verify, roaming, reachability"
+  ],
+  "evidence_cost": 12.0,
+  "latency_ms": 0,
+  "evidence_steps": 6,
+  "provider_sources": [
+    "mock"
+  ],
+  "alternative": {
+    "isnad_calls": {
+      "value": 6.0,
+      "basis": "measured",
+      "source": "this chain"
+    },
+    "otp_cost_usd": {
+      "value": 0.4429,
+      "basis": "list_price",
+      "source": "Twilio published SMS list price for JO"
+    },
+    "false_decline_cost_usd": {
+      "value": null,
+      "basis": "unpriced",
+      "source": "Merchant-specific and not publicly sourceable; set pricing.false_decline_cost_usd in policy.yaml from your own basket value, margin and lifetime value."
+    }
+  }
+}
+```
+
+A rules engine sees `SIM_SWAPPED` and declines. Isnad keeps going, finds the
+handset unchanged and the device where the customer says it is, and steps up
+instead of losing them. The fields that carry that:
+
+| Field | What it is for |
+| --- | --- |
+| `decision` | `ALLOW` / `CHALLENGE` / `DECLINE` — the only field you have to act on |
+| `chain_grade` | What the evidence could establish, kept separate from the decision. `DEGRADED` here: answered, but adverse |
+| `confidence` | P(fraud) after the chain, against the `allow_below` / `decline_above` you set |
+| `chain[]` | Every check in order — signal, sentence, cost, and how far it moved belief |
+| `max_age_hours` | The window the question actually covered. "SIM swap inside the last 240 h" is bounded, not dated, because CAMARA returns a boolean against that window |
+| `delta_logodds` | How much this one link moved belief. The verdict is re-derivable from these |
+| `source` | `mock` or `nac`, per link, so a scripted link can never be read as a network one |
+| `evidence_cost` | Spend against the budget in `policy.yaml` |
+| `alternative` | The OTP path this replaced, each figure labelled `measured`, `list_price`, `estimate` or `unpriced`. Merchant-specific numbers stay `null` rather than guessed |
+
+`chain_id` is the receipt. `GET /v1/chains/{id}/verification` recomputes the
+Ed25519 signature over the stored chain and `GET /v1/receipts/{id}` renders it
+for a phone — neither needs your API key, so anyone you hand the link to can
+check the verdict was not edited afterwards.
+
 ## Demo scenarios
 
 | Scenario | What it demonstrates | Intended decision |

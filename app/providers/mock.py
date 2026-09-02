@@ -5,7 +5,7 @@ import asyncio
 from app.chain.models import EvidenceLink
 from app.domain.enums import API_LABEL, Action, Result
 from app.domain.schemas import VerificationRequest
-from app.providers.vocabulary import detail_for
+from app.providers.vocabulary import detail_for, window_hours
 
 # Consent basis recorded per action (privacy-by-design audit trail).
 _CONSENT = {
@@ -210,6 +210,7 @@ class MockProvider:
                 consent_basis=_CONSENT.get(action, "n/a"),
                 source="mock",
                 latency_ms=40,
+                max_age_hours=window_hours(action),
             )
         scenario = self.scenarios.get(request.phone_number, _CLEAN)
         result, signal = scenario.get(action, (Result.INFO, "EVIDENCE_UNAVAILABLE"))
@@ -225,4 +226,5 @@ class MockProvider:
             consent_basis=_CONSENT.get(action, "n/a"),
             source="mock",
             latency_ms=cost_ms,
+            max_age_hours=window_hours(action),
         )

@@ -25,6 +25,7 @@ becomes sayable — and that is the only way it becomes sayable.
 from __future__ import annotations
 
 from app.config import settings
+from app.domain.enums import Action
 
 # Signals with no CAMARA source at all. Nokia Network as Code exposes no device
 # reputation product (`docs/nac/device_intelligence.json` came back INFO /
@@ -32,6 +33,21 @@ from app.config import settings
 # a VoIP burner. They stay priced in policy.yaml as RESERVED so a future
 # provider has a weight to inherit; nothing may emit them today.
 UNBACKED_SIGNALS = frozenset({"DEVICE_TRUSTED", "DEVICE_RISKY", "REACHABLE_BOTPATTERN"})
+
+
+def window_hours(action: Action) -> float | None:
+    """The age window this action's question covered, if it has one.
+
+    Mirrors the max_age arguments the live adapter passes, and lives beside the
+    sentence that quotes it: a link that SAYS "in the last 240 h" must also
+    CARRY 240 in `max_age_hours`, or the receipt shows a window the call did not
+    use. Mock links carry it too — the fixture is answering the same question.
+    """
+    if action in (Action.SIM_SWAP, Action.DEVICE_SWAP):
+        return float(settings.nac_max_age_hours)
+    if action == Action.LOCATION_VERIFY:
+        return settings.nac_location_max_age_seconds / 3600.0
+    return None
 
 
 def _window() -> str:

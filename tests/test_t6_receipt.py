@@ -346,7 +346,10 @@ def test_the_receipt_reports_the_window_asked_about_not_an_event_age():
     system can state, and the field must never be presented as one.
     """
     from app.domain.enums import Action
-    from app.providers.nac import _window_hours
+
+    # The window moved to providers/vocabulary.py, beside the sentence that
+    # quotes it, so mock links carry the same field the live adapter does.
+    from app.providers.vocabulary import window_hours as _window_hours
 
     assert _window_hours(Action.SIM_SWAP) == float(settings.nac_max_age_hours)
     assert _window_hours(Action.DEVICE_SWAP) == float(settings.nac_max_age_hours)
