@@ -163,15 +163,15 @@ curl -X POST http://127.0.0.1:8010/v1/verify \
 ```json
 {
   "decision": "CHALLENGE",
-  "planner": "greedy",
+  "planner": "llm",
   "chain_grade": "DEGRADED",
-  "confidence": 0.242,
+  "confidence": 0.28,
   "hypothesis": "account_takeover",
   "reason": "Unresolved doubt — cheapest step-up needed before trusting.",
-  "chain_id": "chn_3ec980dc54da4adea275",
+  "chain_id": "chn_0adbfd38b72e4589a682",
   "chain": [
     {
-      "step": 2,
+      "step": 1,
       "action": "sim_swap",
       "api": "SIM Swap",
       "result": "FLAG",
@@ -185,7 +185,7 @@ curl -X POST http://127.0.0.1:8010/v1/verify \
       "delta_logodds": 2.2
     },
     {
-      "step": 3,
+      "step": 2,
       "action": "device_swap",
       "api": "Device Swap",
       "result": "PASS",
@@ -199,7 +199,7 @@ curl -X POST http://127.0.0.1:8010/v1/verify \
       "delta_logodds": -0.5
     },
     {
-      "step": 4,
+      "step": 3,
       "action": "location_verify",
       "api": "Location Verification",
       "result": "PASS",
@@ -212,17 +212,30 @@ curl -X POST http://127.0.0.1:8010/v1/verify \
       "max_age_hours": 1.0,
       "delta_logodds": -1.2
     },
-    "\u2026 3 more links: number_verify, roaming, reachability"
+    {
+      "step": 4,
+      "action": "number_verify",
+      "api": "Number Verification",
+      "result": "PASS",
+      "signal": "NUMBER_MATCH",
+      "detail": "network number matches the provided number",
+      "consent_basis": "simulator authorization",
+      "source": "mock",
+      "requires_consent": false,
+      "latency_ms": 45,
+      "max_age_hours": null,
+      "delta_logodds": -1.2
+    }
   ],
-  "evidence_cost": 12.0,
-  "latency_ms": 0,
-  "evidence_steps": 6,
+  "evidence_cost": 8.0,
+  "latency_ms": 4983,
+  "evidence_steps": 4,
   "provider_sources": [
     "mock"
   ],
   "alternative": {
     "isnad_calls": {
-      "value": 6.0,
+      "value": 4.0,
       "basis": "measured",
       "source": "this chain"
     },
@@ -242,11 +255,14 @@ curl -X POST http://127.0.0.1:8010/v1/verify \
 
 A rules engine sees `SIM_SWAPPED` and declines. Isnad keeps going, finds the
 handset unchanged and the device where the customer says it is, and steps up
-instead of losing them. The fields that carry that:
+instead of losing them. Note the order: it opened on the check that could
+settle the hypothesis, not the cheapest one, and stopped after four. The
+fields that carry all that:
 
 | Field | What it is for |
 | --- | --- |
 | `decision` | `ALLOW` / `CHALLENGE` / `DECLINE` — the only field you have to act on |
+| `planner` | Which strategy chose the route, `llm` or `greedy`. Recorded per verdict, because a planner call that timed out and fell back is greedy answering in the model's name |
 | `chain_grade` | What the evidence could establish, kept separate from the decision. `DEGRADED` here: answered, but adverse |
 | `confidence` | P(fraud) after the chain, against the `allow_below` / `decline_above` you set |
 | `chain[]` | Every check in order — signal, sentence, cost, and how far it moved belief |
