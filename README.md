@@ -358,20 +358,33 @@ result. The stage console stays fully scripted, so a public demo control can
 never authorize live spend; recorded NaC captures may be shown beside it as
 historical evidence.
 
-## What is real, and what is scripted
+## What is real
+
+Everything that reaches a decision is real code, running under 493 tests: the
+evidence-selection loop, the policy engine, the budget and early stopping, chain
+grading, Ed25519 signing and verification, the signed institution registry,
+Tier 1 screening, and session revocation. The Nokia Network as Code adapter is
+real too — `docs/nac/` holds eight captured CAMARA responses it produced.
+
+The one thing a demo supplies locally is the operator's answer. **The
+investigator path is identical either way**: the same planner, the same policy,
+the same signed chain. Switching `ISNAD_PROVIDER=mock` to `nac` changes where an
+evidence link comes from and nothing about how the decision is reached — which
+is why a fixture run is worth watching. You are watching the production code.
 
 | | |
 | --- | --- |
-| **Real** | The evidence-selection loop, policy engine, budget and early stopping, chain grading, Ed25519 signing and verification, the signed institution registry, Tier 1 screening, session revocation, and the Nokia Network as Code adapter. |
-| **Real, on request** | The live NaC path above, in a non-demo deployment. |
-| **Scripted** | Everything else in the demo comes from deterministic local fixtures. Every surface labels its source. |
-| **Scope of the prototype** | Decision policy and provenance. Accuracy, latency, production coverage, and an operator contract are outside it. |
+| **The engine** | Real, and the same in both modes. Nothing in the decision path is stubbed. |
+| **The network** | The NaC adapter is real and exercised. `ISNAD_PROVIDER=nac` calls Nokia live from a non-demo deployment; a provider failure becomes unresolved evidence, never a fixture result. |
+| **The evidence, on stage** | Deterministic local fixtures, so an act replays identically in front of a judge. Every link carries its own `source`, so a scripted link cannot be read as a network one. |
+| **Deliberately not claimed** | Accuracy, latency, production coverage, an operator contract. The figures above are decision-policy measurements and are labelled as such. |
 
 CAMARA maturity, read from the specification repositories rather than recalled:
 SIM Swap and Number Verification are **Incubating** (both v2.1.0, Number
 Insights sub-project); VerifiedCaller is **Sandbox**, 0.1.0 in its current
 release with a 0.2.0 alpha in pre-release, and does not yet belong to a
-sub-project. We are early to that one, not late.
+sub-project. Building on a Sandbox API is a position, not an accident: we are
+early to that one, not late.
 
 ## Boundaries
 
