@@ -92,6 +92,31 @@ async def test_mock_location_with_a_claim_returns_the_scripted_mismatch():
 
 
 @pytest.mark.asyncio
+async def test_mock_location_with_a_claim_still_reports_a_scripted_provider_failure():
+    """The precondition must only fire when the claim is ABSENT.
+
+    A claim can be present and the network can still fail to answer (the
+    mock's analogue of NacProvider's provider-failure case, since MockProvider
+    itself never raises). That is a genuinely different fact from "no claim
+    was made", and the fix must not collapse the two — a scripted
+    unavailable/unknown result with a claim present must still pass through.
+    """
+    number = "+9995559911"
+    provider = MockProvider(
+        scenarios={number: {Action.LOCATION_VERIFY: (Result.INFO, "PROVIDER_UNAVAILABLE")}}
+    )
+    request = VerificationRequest(
+        phone_number=number,
+        context=RequestContext(event="checkout", claimed_location=_CLAIM),
+    )
+
+    link = await provider.gather(Action.LOCATION_VERIFY, request)
+
+    assert link.result == Result.INFO
+    assert link.signal == "PROVIDER_UNAVAILABLE"
+
+
+@pytest.mark.asyncio
 async def test_mock_other_actions_are_unaffected_by_the_location_precondition():
     """The fix must be scoped to LOCATION_VERIFY only."""
     request = VerificationRequest(

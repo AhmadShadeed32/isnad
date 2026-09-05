@@ -602,12 +602,16 @@ isolated sqlite DB and vault key, `ISNAD_PROVIDER=mock`), captured its exact
 fix touches only provider evidence-gathering, never `Verdict`/`EvidenceLink`
 shape or the signing path, so this was expected and confirmed.
 
-*Test/lint evidence.* New `tests/test_provider_preconditions.py` (9 tests: both
-providers × {no claim, match, mismatch}, plus NacProvider provider-failure and
-Mock-other-actions-unaffected). Full suite: 506 → 515 passed. Ruff (`app tests
-scripts demo`): clean. README's example curl body and score explanation
-updated from these same verified outputs; the "fixture gap" caveat paragraph
-removed now that the regression passes and both providers agree.
+*Test/lint evidence.* New `tests/test_provider_preconditions.py` (10 tests:
+both providers × {no claim, match, mismatch, provider failure} — Mock's
+"failure" analogue is a scripted unavailable/unknown result WITH a claim
+present, since Mock itself never raises, and this pins that the precondition
+only fires when the claim is absent, never masking a scripted failure when a
+claim exists — plus a Mock-other-actions-unaffected check). Full suite:
+506 → 516 passed. Ruff (`app tests scripts demo`): clean. README's example
+curl body and score explanation updated from these same verified outputs; the
+"fixture gap" caveat paragraph removed now that the regression passes and both
+providers agree.
 
 *Known gaps for P2:* no browser/UI click-through of `/console` or `/judge` was
 done in this pass — P1's own "Required evidence" list doesn't call for one
