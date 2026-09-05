@@ -48,6 +48,7 @@ Sources: `app/providers/mock.py`, `nac.py`, `vocabulary.py`, and
 
 | Priority | Change | Acceptance criterion |
 | --- | --- | --- |
+| P0 | Supply a claimed location in the replacement fixture and its documented request, then test mock/live precondition parity. | `routes_console.py` Act VI currently omits `claimed_location` while mock returns `AT_CLAIMED_LOCATION`; NaC correctly returns unavailable. Use an explicit synthetic Area and verify both adapters require it. Preserve expected outcomes or update their evidence reports if they change. |
 | P0 | Give judges the focused entry point. `/` currently redirects to `/console`; use `/judge` as the demo landing page or publish its exact URL. | A judge's first visit opens the customer story, not the engineering console; production/demo gating remains intact. |
 | P0 | Build a dedicated live consent journey over the existing consent APIs, separate from fixed stage buttons. | A supported subscriber approves operator consent, Number Verification returns `source=nac`, and a verifiable receipt is shown. No merchant/provider key is embedded in public HTML. |
 | P1 | Translate the result into a merchant action. Lead with “Additional verification needed”; retain CHALLENGE and DEGRADED as secondary technical labels. | Judges understand that the order was not auto-declined and that the merchant owns the next step. Do not imply Isnad has sent an OTP. |
@@ -119,20 +120,24 @@ the last review). Use the current live app recording script instead.
   changes. Exercise the affected UI; greedy-only tests do not validate LLM STOP.
 - Refresh Graphify after changes. When compacting documents, remove stale graph
   concepts tied to the replaced text before rebuilding their headings.
-- Private remote: `AhmadShadeed32/isnad-private`, `main`; last pushed `568a828`.
+- Private remote: `AhmadShadeed32/isnad-private`, `main`; last pushed `4b689e4`.
   Public `origin` is a different destination. Do not infer a public push from a
   private publication request.
 
 ## 6. Latest session
 
-**Intent — 5 Sep:** make README persuasive for judges while integrating technical
-details into the story. User explicitly rejected numbered pitch-deck sections
-and a separate technical appendix.
+**Intent — 5 Sep:** substantially improve README readability and persuasion:
+show the running product early, pair outcomes with technical mechanisms, simplify
+five diagrams and remove repetition. Preserve integrated technical narrative,
+mock/live distinction and honest evaluation limits. Capture only the local mock
+demo for the README; no app behavior change or external publication requested.
 
-**Completion:** customer scenario flows into architecture, budget/policy loop,
-signed receipts, mock/live parity, consent and measured evidence. Diagrams sit
-beside the claims they explain; only API examples and test commands collapse.
-Preserved limitations, 650 ms pacing and live prerequisites. No app behavior
-changed. Local links, anchors and Markdown structure checked; graph refreshed.
-User authorized publication to private/main; this documentation revision includes
-the integrated README, diagrams and refreshed graph.
+**Completion:** rewrote the README around the actual product screenshot,
+side-by-side checkout outcomes, a runnable demo and five compact diagrams woven
+into the technical story. Fresh mock startup exposed the bundled registry trust
+requirement; launch instructions now pin its public key without disabling checks.
+Captured `docs/assets/judge-checkout.png` from an isolated local mock run with
+CHALLENGE / DEGRADED, six checks and a valid, trusted signature. Mermaid rendered
+all five diagrams; preview checked at desktop and phone widths. Links and diff
+whitespace checked. Added the discovered missing location claim to app priorities;
+no app code changed. Graph refreshed. Changes saved locally; not pushed.

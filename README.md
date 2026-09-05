@@ -2,256 +2,100 @@
 
 # Isnad · إسناد
 
-### Investigate the signal. Keep the evidence.
+### A changed SIM should start an investigation.
 
-**Mobile-network evidence → a checkout decision → a verifiable receipt.**
+**Isnad turns mobile-network signals into checkout decisions—with the evidence attached.**
 
-A changed SIM should start an investigation, not end a customer relationship.
+![Network APIs](https://img.shields.io/badge/network%20APIs-CAMARA-0A7CBC)
+![Signed receipts](https://img.shields.io/badge/signed%20receipts-Ed25519-3b8058)
 
-[![Verify](https://github.com/AhmadShadeed32/isnad-private/actions/workflows/ci.yml/badge.svg)](https://github.com/AhmadShadeed32/isnad-private/actions/workflows/ci.yml)
-![CAMARA](https://img.shields.io/badge/network%20APIs-CAMARA-0A7CBC)
-![Ed25519](https://img.shields.io/badge/evidence%20receipts-Ed25519-3b8058)
-
-[The customer story](#a-sim-change-starts-the-investigation) · [How it works](#from-checkout-to-a-signed-decision) · [Run locally](#run-the-demo) · [The evidence](#what-we-can-demonstrate-today)
+[See the product](#one-warning-two-very-different-checkouts) · [Run the demo](#try-it-in-90-seconds) · [Follow the engine](#every-check-has-a-job) · [Inspect the results](#evidence-you-can-rerun)
 
 </div>
 
 ---
 
-## A SIM change starts the investigation
+A customer replaces her SIM, then places a cash-on-delivery order. That SIM
+change could signal account takeover. It could also be exactly what it looks
+like: a real customer with a replacement SIM.
 
-A customer replaces her SIM and tries to pay. The network sees a change;
-the merchant still needs to know whether this is an attacker or a legitimate
-customer. A rule that declines every SIM change would reject this order.
+**The merchant needs a decision. A network API gives it a fact. Isnad connects the two.**
 
-**Isnad investigates before the merchant acts.** It gathers mobile-network
-facts within a policy budget, then returns ALLOW, CHALLENGE or DECLINE with
-a signed record of the evidence behind the decision.
+At checkout, Isnad chooses which evidence to gather, applies policy within a
+budget, and returns **ALLOW**, **CHALLENGE** or **DECLINE**. Every result comes
+with an ordered, signed evidence trail that can be inspected after the decision.
 
-In the lead demo, selected facts from the six-check investigation tell a more
-useful story than the first warning alone:
+## One warning. Two very different checkouts.
 
-| Network fact | Contribution to the investigation |
-| --- | --- |
-| SIM changed inside the last 240 hours | An adverse signal worth investigating. |
-| No device swap in that window | Supporting evidence of handset stability. |
-| Device matches the claimed location | Another fact supports the customer's account. |
+![Actual Isnad mock checkout showing the customer story, evidence trace and CHALLENGE result](docs/assets/judge-checkout.png)
 
-The result is **CHALLENGE / DEGRADED**: the merchant runs its existing step-up
-instead of automatically declining. The SIM warning remains in the evidence
-chain. A second, clean checkout demonstrates **ALLOW after two supporting checks**.
+*Captured from the running local demo with simulated operator answers. The investigation
+and signature check execute in the app; this is not a product mockup.*
 
-These are repeatable mock scenarios. The fixtures provide the facts; the
-investigation engine computes the decisions.
-
-## From checkout to a signed decision
-
-A merchant calls `POST /v1/verify` with the phone number and interaction context. Isnad buys evidence within a
-policy budget, then returns a decision the merchant can act on and a receipt
-someone else can inspect.
-
-```mermaid
-flowchart TD
-    M["Merchant backend: phone + interaction context"] --> A["Authenticated Isnad API"]
-    A --> I["Investigator: hypothesis, score and evidence budget"]
-    P["Policy: weights, thresholds and required checks"] --> I
-    I --> E["Evidence provider: mock or NaC"]
-    E -->|"Normalized facts with provenance"| I
-    I --> V["Verdict + ordered evidence + chain grade"]
-    V --> S["Persist and sign with Ed25519"]
-    S --> R["API response + chain ID"]
-    R --> D{"Merchant action"}
-    D -->|ALLOW| Y["Proceed"]
-    D -->|CHALLENGE| C["Run existing step-up"]
-    D -->|DECLINE| N["Stop under merchant policy"]
-    S --> Q["Receipt: inspect evidence and verify signature"]
-```
-
-The **decision** tells the merchant what to do. The **chain grade** describes
-the strength of the evidence behind it. They travel together; an unresolved
-check remains visible even when the investigation can reach a decision.
-
-## Spend evidence where it can change the decision
-
-Calling every available API buys more evidence, but also consumes more budget.
-The default demo runs sequentially, so it can stop buying checks once policy
-permits a decision. Greedy planning is deterministic; optional LLM planning
-selects from affordable actions. Required checks are enforced outside the model.
-
-```mermaid
-flowchart TD
-    A["Form hypothesis, starting score and budget"] --> B["Apply any free local evidence"]
-    B --> C["Run an explicitly required authorized check, if supplied"]
-    C --> D{"Policy requires an affordable check?"}
-    D -->|Yes| E["Deterministic selection: corroboration or network support"]
-    D -->|No| F{"Score decisive or no budget?"}
-    F -->|No| G["Planner selects an unused affordable check or STOP"]
-    G -->|Check| H["Gather evidence"]
-    E --> H
-    H --> J["Append link, apply policy weight, debit budget"]
-    J --> D
-    F -->|Yes| L["If still CHALLENGE, gather one affordable policy step-up check"]
-    G -->|STOP or no candidate| L
-    L --> K["Finalize with evidence-support and unresolved-evidence gates"]
-    K --> V["Decision + score + chain grade"]
-```
-
-An adverse signal can trigger corroborating checks before a decline. A low
-score still needs the configured supporting network evidence for an allow.
-If required support cannot be obtained within budget, the final gates retain
-CHALLENGE. The score is an **uncalibrated policy score**, not observed fraud odds.
-
-## A decision someone else can inspect
-
-Customer support and dispute review need the facts behind a result. Isnad
-keeps them in an Ed25519-signed receipt that travels with the chain ID.
-
-The receipt verifies the **exact stored payload bytes**, avoiding differences
-introduced by rebuilding JSON. Its signed fields include the ordered evidence,
-policy snapshot, decision and keyed subject/request commitments.
-
-```mermaid
-flowchart TD
-    V["Verdict and evidence"] --> P["Serialize signed payload"]
-    P --> S["Ed25519 sign with server private key"]
-    P --> D["Store exact payload bytes, signature and public key"]
-    S --> D
-    D --> R["Receipt API serves verification material"]
-    R --> B["Browser verifies with Ed25519 / WebCrypto"]
-    B --> C{"Signature matches these bytes?"}
-    C -->|Yes| Y["Payload integrity verified"]
-    C -->|No| N["Invalid: changed bytes or mismatched signature/key"]
-    T["Change a byte in the receipt demo"] --> B
-```
-
-Signature validity and signer trust are separate questions: the receipt also
-reports whether its public key is trusted by this Isnad instance. A valid
-signature establishes integrity under that key, not the truth of an operator
-answer or production fraud accuracy.
-
-## Why the demo uses mock responses
-
-**The operator answers are simulated. The investigation and signed decision are actually executed.**
-
-A repeatable demo needs to show a legitimate SIM replacement, an adverse case,
-and an unavailable check on demand. Mock fixtures let judges run those scenarios
-without a supported test SIM, an operator consent setup, or billable network
-calls. They also let us test failure cases reliably.
-
-Both `MockProvider` and the Nokia Network as Code adapter return the **same
-normalized `EvidenceLink` format**. They share the signal vocabulary and the
-functions that describe network facts. Those links pass through the **same
-investigator, policy, budget accounting, chain grading, and signing code**.
-The mock supplies evidence; it does not supply a prewritten verdict.
-
-The stage route adds a **650 ms pause per check** so you can follow each step.
-That is presentation pacing, not a measurement of operator speed. Mock per-link
-latency values are scripted too. Responses are not byte-identical to a live
-call: source labels, consent metadata, timestamps and timings differ, and live
-answers depend on the subscriber and operator.
-
-```mermaid
-flowchart TD
-    F["Scripted scenario facts"] --> M["MockProvider: 650 ms pacing in stage demo"]
-    O["Operator API answers"] --> N["NaC adapter: real network calls"]
-    M --> E["Shared EvidenceLink contract and signal vocabulary"]
-    N --> E
-    E --> I["Same investigator and policy"]
-    I --> B["Same budget accounting and chain grading"]
-    B --> S["Same persistence and signing"]
-```
-
-Only one provider supplies a run. Live failures do not cross over to the mock
-branch. Sharing the contract means equivalent facts can be evaluated by the
-same policy; it does not mean simulated facts establish a real subscriber's state.
-
-You can inspect the [mock provider](app/providers/mock.py),
-[live adapter](app/providers/nac.py), [shared vocabulary](app/providers/vocabulary.py),
-and [stage delay](app/api/routes_console.py). Historical adapter captures are in
-[`docs/nac/`](docs/nac/). Live-mode failures remain unresolved; they never quietly
-turn into fixture answers.
-
-## From a demo phone number to live operator evidence
-
-The Nokia Network as Code adapter and consent APIs are implemented. Live
-Number Verification has an extra authorization step. The merchant backend
-starts the flow; the subscriber follows the operator authorization URL on their
-phone. Credentials and the exchanged access token remain server-side.
-
-```mermaid
-sequenceDiagram
-    participant M as Merchant backend
-    participant I as Isnad
-    participant U as Subscriber phone
-    participant O as Operator authorization / NaC
-    M->>I: POST /v1/consents/number-verification
-    I->>O: Begin authorization with callback and state
-    O-->>I: Authorization URL
-    I-->>M: Consent ID + authorization URL (PENDING)
-    M->>U: Present authorization link
-    U->>O: Open link and approve consent
-    O-->>U: Redirect to registered callback
-    U->>I: Callback with code + state
-    I->>I: Validate state and claim callback
-    I->>O: Exchange authorization code
-    O-->>I: Access token
-    I->>I: Mark AUTHORIZED
-    M->>I: GET /v1/consents/{consent_id}
-    I-->>M: AUTHORIZED
-    M->>I: POST /v1/consents/{consent_id}/verify
-    I->>O: Required Number Verification using granted token
-    O-->>I: Network evidence
-    I->>I: Finish policy investigation, persist and sign
-    I-->>M: Verdict + chain ID (COMPLETED)
-```
-
-This diagram shows the successful path; denied, expired or failed consent does
-not become authorization. Additional checks may follow Number Verification.
-The local contract tests cover this lifecycle, but a **physical handset/operator
-round trip is still to be proven**. See the [live procedure](docs/HANDSET_VALIDATION.md).
-
-## What we can demonstrate today
-
-| Evidence | Result | What it does—and does not—prove |
+| | SIM-replacement checkout | Clean checkout |
 | --- | --- | --- |
-| Latest verified implementation suite | **506 passing tests** | Covers policy gates, consent replay protection and receipt integrity; not production fraud accuracy. |
-| Policy-generated synthetic evaluation | **58 checks vs 119** when running every check: **51% fewer** | Zero declines among ten single-adverse/unavailable customer cases; one of seven two-adverse cases still allowed. |
-| Separately authored synthetic evaluation | **28 checks vs 78** full-evidence checks | Six disagreements with conservative expectations across 13 cases; early stopping can miss later evidence. |
+| **What arrives** | A new account, a high-value order and a SIM change. | The same checkout context, with supporting network facts. |
+| **What Isnad does** | Investigates six checks, retaining adverse and supporting signals. | Gathers two supporting checks and stops. |
+| **Merchant action** | **Ask for additional verification.** | **Proceed.** |
+| **API result** | `CHALLENGE` · `DEGRADED` | `ALLOW` · `ATTESTED_FULL` |
 
-**These are reproducible policy experiments.** The score is uncalibrated;
-real merchant outcomes are still needed to establish accuracy and business impact.
+In the replacement scenario, the number matches and the handset is stable,
+but the SIM warning remains. After all six checks, the policy score is **0.242**,
+between the allow and decline thresholds. Isnad recommends the merchant's
+existing step-up instead of automatically rejecting the order. It does not send
+an OTP itself.
 
-[Inspect the evaluation](docs/INDEPENDENT_EVALUATION.md) · [Understand the score](docs/RISK_SCORE.md)
+The clean scenario reaches **0.096 after two checks**. The same engine stops
+early because policy permits an allow. Both scores are policy-derived and
+uncalibrated; neither is a measured fraud probability.
 
-## Run the demo
+## Try it in 90 seconds
 
-Give the demo about 90 seconds:
+Start the local server below, then open **[Judge Mode](http://127.0.0.1:8010/judge)**.
+No operator credentials are needed.
 
-1. Investigate the SIM replacement and watch each evidence check arrive.
-2. Open the receipt, verify it, and change a byte to see verification fail.
-3. Try the clean checkout and watch the engine stop after two checks.
-
-The [presenter walkthrough](docs/JUDGE_WALKTHROUGH.md) provides a short script.
-No operator credentials are needed. After starting the server below, open
-**[Judge Mode](http://127.0.0.1:8010/judge)**. This is a local address, not a hosted demo.
+1. **Investigate the SIM change.** Follow the evidence as it arrives and see why the result is CHALLENGE.
+2. **Open the signed receipt.** Verify it, change a byte, and watch verification fail.
+3. **Try a clean checkout.** See the investigation end after two supporting checks.
 
 ```bash
 python3.11 -m venv .venv311
 .venv311/bin/pip install -e ".[dev]"
 ISNAD_DEMO_MODE=true ISNAD_PROVIDER=mock ISNAD_PLANNER=greedy \
 ISNAD_MERCHANT_API_KEYS=demo-merchant-key \
+ISNAD_VAULT_TRUSTED_PUBLIC_KEYS=4034e169495122a893d8fe6738c2b0f54655fdfb6ec3c6d0eeb938d1330e7f9f \
   .venv311/bin/python -m uvicorn app.main:app \
   --host 127.0.0.1 --port 8010 --no-access-log --proxy-headers
 ```
 
-The [full console](http://127.0.0.1:8010/console) also demonstrates caller
-verification and simulated trust-session revocation.
+The public key above pins the bundled demo registry; the app creates a separate
+local key for signing receipts. The URL is local to your machine. The [presenter walkthrough](docs/JUDGE_WALKTHROUGH.md)
+provides a short script. The [full console](http://127.0.0.1:8010/console) also
+covers caller verification and simulated trust-session revocation.
 
-## One call at your existing decision point
+## One integration, an explainable action
 
-Send `POST /v1/verify` at checkout, signup, or a sensitive account action. Act on
-`decision`; keep `chain_id` for review. ALLOW proceeds, CHALLENGE invokes the
-merchant's step-up, and DECLINE stops the interaction under merchant policy.
+A merchant backend sends `POST /v1/verify` with the phone number and interaction
+context. Isnad turns the evidence into an action at the merchant's existing
+checkout, signup or sensitive-account decision point.
+
+```mermaid
+flowchart LR
+    M["Merchant backend"] -->|"Phone + context"| I["Isnad investigator"]
+    P["Policy + evidence budget"] --> I
+    I <-->|"Checks and facts"| N["Mock or NaC provider"]
+    I --> D["ALLOW / CHALLENGE / DECLINE"]
+    I --> R["Signed evidence receipt"]
+    D --> A["Merchant proceeds, steps up or stops"]
+```
+
+The **decision** answers “what should happen next?” The **chain grade** answers
+“how strong was the evidence?” Keeping both prevents an incomplete investigation
+from looking like a fully supported result.
+
+For merchants, the useful output is an action plus the facts needed to review
+it. For operators, Isnad connects individual network API answers to that action
+and preserves which checks contributed.
 
 <details>
 <summary><strong>Example request and response</strong></summary>
@@ -283,12 +127,150 @@ Selected fields from the mock/greedy replacement scenario:
 not a measured fraud probability. [Read the score explanation](docs/RISK_SCORE.md).
 Budgets, thresholds and corroboration live in [`policy.yaml`](app/policy/policy.yaml).
 
-The local demo uses deterministic greedy planning. Optional LLM planning chooses
-among affordable checks and falls back to greedy on failures; each verdict
-records which strategy actually ran. Required policy checks cannot be skipped
-by the planner.
-
 </details>
+
+## Every check has a job
+
+The investigator starts with checkout context, a policy score and an evidence
+budget. Each answer becomes an `EvidenceLink`: the check, normalized signal,
+source, consent basis, covered time window and effect on the score. The next
+choice uses the evidence already gathered.
+
+```mermaid
+flowchart TD
+    S["Context, budget and any local or required evidence"] --> B{"Budget remains?"}
+    B -->|Yes| D{"Score decisive?"}
+    D -->|No| P["Planner: affordable check or STOP"]
+    D -->|Yes| G["Policy: required corroboration or network support"]
+    P -->|Check| E["Gather fact, append link, update score and budget"]
+    G -->|Affordable check needed| E
+    E --> B
+    B -->|No| F["Finalize"]
+    P -->|STOP| F
+    G -->|No affordable required check| F
+```
+
+Before finalizing, a CHALLENGE may use one remaining affordable evidence check
+to resolve doubt. Then evidence-support and availability gates apply. This is
+the default sequential path; an optional parallel mode trades more calls for
+lower waiting time.
+
+| Boundary | How the implementation enforces it |
+| --- | --- |
+| **A warning deserves context.** | A decisive SIM-swap decline triggers the configured device/location corroboration when affordable. |
+| **An allow needs network support.** | A low starting score or local registry fact alone cannot satisfy the network-evidence minimum. Missing support retains CHALLENGE. |
+| **Unavailable is not failed.** | Missing consent and provider errors remain evidence gaps. They cannot produce an unconditional allow. |
+| **The planner cannot waive policy.** | Required authorized checks and policy choreography run outside model selection. |
+
+The demo uses deterministic greedy planning. Optional LLM planning can choose
+from affordable checks and falls back to greedy on failure; each verdict records
+what actually ran. Policy lives in [`policy.yaml`](app/policy/policy.yaml), and
+the orchestration is in [`investigator.py`](app/agent/investigator.py).
+The current budget uses normalized cost units, not quoted operator prices.
+
+## A receipt that can be challenged, too
+
+A decision is easier to review when its explanation travels with it. Isnad
+signs the **decision, ordered evidence, issuing thresholds and keyed subject/request
+commitments** with Ed25519. A later policy change cannot rewrite those signed facts.
+
+```mermaid
+flowchart LR
+    V["Decision + evidence + commitments"] --> J["Serialize once"]
+    J --> S["Sign and store exact bytes"]
+    S --> R["Receipt: payload + signature + public key"]
+    R --> B["Browser verifies with WebCrypto"]
+    B --> OK["Original bytes: valid"]
+    B --> BAD["Altered bytes: invalid"]
+```
+
+The receipt checks the stored bytes, rather than rebuilding JSON and hoping it
+matches. It also reports whether this Isnad deployment trusts the signing key.
+**Integrity and signer trust are separate checks; neither proves an upstream
+provider's answer was true.** Each evidence link keeps its source, so a signed
+mock result remains visibly mock.
+
+[Receipt implementation](app/api/routes_receipt.py) · [Signing implementation](app/chain/vault.py)
+
+## Simulated answers. The same investigation.
+
+A judge should be able to reproduce a SIM replacement, a clean checkout and an
+unavailable check on demand. Mock fixtures make those cases repeatable without
+a supported test SIM, operator consent setup or billable API calls.
+
+```mermaid
+flowchart LR
+    M["Mock scenario facts"] --> E["Shared EvidenceLink contract"]
+    N["NaC network answers"] --> E
+    E --> I["Same investigator and policy"]
+    I --> R["Same budget, grading and signed receipt"]
+```
+
+**The mock supplies evidence, not a prewritten verdict.** Both providers use the
+same normalized format and signal vocabulary. The stage route adds a **650 ms
+pause per check** so the trace is readable. That delay and the scripted per-link
+latency values are presentation data, not measurements of operator performance.
+
+Live responses differ in provenance, consent metadata, timestamps, timings and
+subscriber-specific facts. The current replacement fixture also presets a
+location-match result without a location claim in its request; a live request
+must supply the claim. This fixture gap is recorded in the
+[handoff](docs/PHASE2_HANDOFF.md#3-recommended-app-work--not-implemented-in-this-documentation-pass).
+A failed live check never silently substitutes a mock answer.
+
+[Mock provider](app/providers/mock.py) · [NaC adapter](app/providers/nac.py) · [Shared vocabulary](app/providers/vocabulary.py) · [Stage pacing](app/api/routes_console.py)
+
+## The bridge to a real phone is already in the code
+
+The NaC adapter and Number Verification consent lifecycle are implemented.
+The merchant backend starts authorization; the subscriber approves on the
+operator's page; Isnad exchanges the code on the server and uses the granted
+token for the required network check.
+
+```mermaid
+sequenceDiagram
+    participant M as Merchant backend
+    participant I as Isnad
+    participant U as Subscriber phone
+    participant O as Operator / NaC
+    M->>I: Start consent with verification request
+    I->>O: Begin authorization with callback and state
+    O-->>I: Authorization URL
+    I-->>M: Consent ID + URL
+    M->>U: Present authorization link
+    U->>O: Open link and approve
+    O-->>U: Redirect with code + state
+    U->>I: Registered callback
+    I->>O: Validate state, then exchange code
+    O-->>I: Access token
+    M->>I: Poll until AUTHORIZED, then request verification
+    I->>O: Required Number Verification
+    O-->>I: Network evidence
+    I-->>M: Finish investigation and return signed result
+```
+
+The success path above is protected by state validation, replay rejection,
+merchant ownership checks and cached completion responses. Denied or expired
+consent never becomes authorization, and the token stays server-side.
+**The local contract is tested; a physical handset/operator round trip is still
+the next proof.** [Run the handset procedure](docs/HANDSET_VALIDATION.md).
+
+## Evidence you can rerun
+
+The latest implementation verification recorded **506 passing tests**, including
+STOP-capable planner regressions, consent replay protection and receipt checks.
+The experiments below test the evidence-spending strategy against explicit baselines.
+
+| Synthetic evaluation | Evidence calls | Decision tradeoff |
+| --- | --- | --- |
+| Policy-generated cases | **58 vs 119** for running every check: **51% fewer calls**. | Zero declines among ten single-adverse/unavailable customer cases; one of seven two-adverse cases still allowed. |
+| Separately authored 13-case set | **28 vs 78** for full-evidence comparators. | Three CHALLENGEs and six disagreements with conservative scenario expectations; early stopping can miss later evidence. |
+
+These results demonstrate testable behavior and a cost/decision tradeoff.
+They do not establish production fraud accuracy or saved revenue. The score
+needs calibration against real outcomes, and API prices need an operator contract.
+
+[Full evaluation and baselines](docs/INDEPENDENT_EVALUATION.md) · [Score arithmetic and limitations](docs/RISK_SCORE.md)
 
 <details>
 <summary><strong>Run the tests, evidence pack and evaluations</strong></summary>
@@ -308,15 +290,15 @@ The consent contract runs locally; it is not proof of an operator handset flow.
 
 </details>
 
-## What comes next
+## What would make this ready for a merchant pilot?
 
-The immediate milestone is **one supported phone completing consent → usable
-operator evidence → a verifiable receipt**. A controlled HTTPS deployment needs
-operator access, a registered callback, private credentials and persistent
-signing keys. The current in-process state requires one worker and one replica.
+First, complete **consent → usable operator evidence → signed receipt** with a
+supported handset. A controlled HTTPS deployment needs operator access, the
+registered callback, private credentials and persistent signing keys. The
+current in-process state requires one application worker and one replica.
 
-After that proof, evaluate decisions against real merchant outcomes and calibrate
-the score. Operator coverage, commercial API costs and production accuracy are
-still unproven. The [compact handoff](docs/PHASE2_HANDOFF.md) records deployment
-steps and app improvements; the [handset procedure](docs/HANDSET_VALIDATION.md)
-separates local contract testing from live validation.
+Then test the other available network checks and evaluate against merchant
+outcomes. The [compact handoff](docs/PHASE2_HANDOFF.md) tracks the deployment
+plan, fixture correction and app improvements. The next useful collaborators
+are an operator who can enable a supported test subscriber and a merchant who
+can help measure decision quality.
