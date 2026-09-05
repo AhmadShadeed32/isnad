@@ -10,8 +10,11 @@ import pytest
 
 from app.agent.investigator import build_investigator
 from app.domain.enums import Action, Decision
-from app.domain.schemas import Money, RequestContext, VerificationRequest
+from app.domain.schemas import Area, Money, RequestContext, VerificationRequest
 from app.providers.mock import MockProvider
+
+# Demo input claim, not an observed location — see app/api/routes_console.py.
+_CLAIMED_LOCATION = Area(lat=31.9539, lon=35.9106, radius_m=2000)
 
 
 def _investigator():
@@ -43,6 +46,7 @@ async def test_act2_catch_the_ghost_declines_with_chain():
             payment_method="cod",
             account_age_days=0,
             amount=Money(value=4200, currency="USD"),
+            claimed_location=_CLAIMED_LOCATION,
         ),
     )
     verdict = await _investigator().investigate(req)

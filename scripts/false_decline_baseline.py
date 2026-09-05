@@ -59,7 +59,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.agent.investigator import build_investigator
 from app.config import settings
 from app.domain.enums import Action, Decision, Result
-from app.domain.schemas import Money, RequestContext, VerificationRequest
+from app.domain.schemas import Area, Money, RequestContext, VerificationRequest
 from app.policy.engine import get_engine
 from app.providers import mock as mock_mod
 from app.providers.mock import MockProvider
@@ -114,8 +114,19 @@ FRAUD = {
 # The population is then "the customer this product exists for, holding each
 # bad or missing reading in turn", rather than a context chosen to suit the
 # answer. Every case shares it, so only the signal differs.
+#
+# claimed_location is set because the CLEAN baseline and several generated
+# cases script a location_verify answer (AT_CLAIMED_LOCATION or
+# NOT_AT_CLAIMED_LOCATION): without a claim on the request the provider
+# boundary now returns EVIDENCE_UNAVAILABLE regardless of what is scripted
+# here (P1), which would silently turn this population into one that never
+# actually measures the location signal it is supposed to hold constant.
 CONTEXT = RequestContext(
-    event="checkout", payment_method="cod", account_age_days=0, amount=Money(value=1500)
+    event="checkout",
+    payment_method="cod",
+    account_age_days=0,
+    amount=Money(value=1500),
+    claimed_location=Area(lat=31.9539, lon=35.9106, radius_m=2000),
 )
 
 

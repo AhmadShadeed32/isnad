@@ -55,7 +55,7 @@ record any justified change to these contracts here before implementing it.
 
 | Package | Deliverable | Depends on | Status |
 | --- | --- | --- | --- |
-| P1 | Honest location fixtures and provider preconditions | Baseline checks | NOT STARTED |
+| P1 | Honest location fixtures and provider preconditions | Baseline checks | COMPLETE (5 Sep session; see §6) |
 | P2 | Plain-language merchant result and focused demo entry | P1 | NOT STARTED |
 | P4a | Local live-consent journey and current OAuth contract | P1, P2 | NOT STARTED |
 | P3 | Merchant challenge attempt and completion reporting | P2; reuse P4a harness | NOT STARTED |
@@ -522,3 +522,105 @@ retention dependencies and receipt immutability. Updated the entry-point note an
 replaced the handset procedure's untracked runbook reference with this plan.
 Local links/anchors and diff whitespace verified; Graphify refreshed. No app
 implementation, deployment, provider calls, commit or push in this pass.
+
+**P1 implementation — 5 Sep (same day, follow-up session):** Fixed the
+location-evidence provider boundary per §3 P1.
+
+*Defect confirmed before the fix.* Added `tests/test_provider_preconditions.py`
+first and ran it against the unfixed code: `NacProvider` already returned
+INFO/`EVIDENCE_UNAVAILABLE` with no claim and never called the live SDK (it was
+already correct, just used a hand-written detail string); `MockProvider`
+returned its scripted match/mismatch fixture regardless of
+`request.context.claimed_location`, confirmed failing for the intended reason
+(`assert link.result == Result.INFO` saw `PASS`/`FLAG`).
+
+*Fix.* `app/providers/mock.py`: `MockProvider.gather` now checks
+`action == LOCATION_VERIFY and claimed_location is None` before fixture
+selection and returns INFO/`EVIDENCE_UNAVAILABLE` (normal `EvidenceLink`
+wrapper, provenance and accounting intact). `app/providers/nac.py`: aligned its
+existing no-claim branch to `detail_for("EVIDENCE_UNAVAILABLE")` instead of a
+one-off string, for parity with the mock. `RequestContext.claimed_location`
+stayed optional; no schema, policy weight or threshold changed.
+
+*Claim added at request-construction sites whose story assumes one* (a
+synthetic `Area(lat=31.9539, lon=35.9106, radius_m=2000)`, never persisted into
+`EvidenceLink`/receipts/logs — confirmed by grepping the signed verdict JSON):
+`app/api/routes_console.py` (`DEMO_ACTS["act2"]`, `["act6"]`),
+`demo/run_acts.py` (Act II), `tests/scenarios/test_acts.py` (Act II),
+`tests/test_chain_grade.py` (`_ACT6`, both Act-II-shaped tests, the
+`/v1/verify` HTTP body test), `tests/test_parallel_gather.py` (the interleaving
+test's per-scenario request), `scripts/false_decline_baseline.py` (`CONTEXT`,
+since its CLEAN/ADVERSE population scripts location signals), and all 13 cases
+in `tests/fixtures/independent_evaluation.json` (every case scripts a
+`location_verify` entry). Act I, Act V and the Act-VIII/Reverse-Isnad fixtures
+were deliberately left without a claim — their stories never assumed one.
+`scripts/evidence_pack.py` and `scripts/planner_divergence.py` import
+`DEMO_ACTS` directly and needed no edits; `evidence_pack.py` was run and its
+output (below) confirms they still work.
+
+*Metrics reverified, not assumed* (isolated `ISNAD_PROVIDER=mock`,
+`ISNAD_PLANNER=greedy`, matching `tests/conftest.py` — a developer `.env` in
+this repo sets `ISNAD_PLANNER=llm`/`ISNAD_PROVIDER=hybrid`, which will silently
+change ad hoc verification if not overridden):
+- Act VI: CHALLENGE / DEGRADED, confidence 0.242, 6 steps — unchanged, matches
+  the doc and README.
+- Act III: ALLOW / ATTESTED_FULL, confidence 0.096, 2 steps — unchanged.
+  (Act III never reaches `location_verify`: it clears on `number_verify` +
+  `sim_swap` alone, so it needed no claim.)
+- Act II: DECLINE / REFUTED, confidence 0.981, 4 steps
+  (`NUMBER_MATCH, SIM_SWAPPED, DEVICE_SWAPPED, NOT_AT_CLAIMED_LOCATION`) — an
+  adverse/decline demonstration, as required, once given its intended claim.
+- **Act V moved and this is expected, not a regression:** confidence
+  0.105 → 0.28, steps unchanged at 4. Decision (CHALLENGE) and chain_grade
+  (UNRESOLVED) are unchanged. Before the fix, Act V's `location_verify` step
+  silently returned the fabricated `AT_CLAIMED_LOCATION` (delta −1.2) despite
+  Act V's story ("the gap: consent withheld and a provider that cannot
+  answer") never supplying a claim — the same bug this package exists to fix,
+  just not the instance the task named. After the fix it honestly reports
+  `EVIDENCE_UNAVAILABLE`, so the chain now shows two unresolved checks
+  (`device_swap`, `location_verify`) instead of one, and the resulting score
+  is higher. No claim was added for Act V — its story is exactly the
+  intentional-missing-input case the audit was supposed to leave alone.
+- `scripts/false_decline_baseline.py` (no `--sweep`): 58 vs 119 calls, 0/10
+  false declines, 1/7 corroborated-adverse allowed — identical to the figures
+  already recorded in §1. `--sweep`: 0.15→58, 0.10→59, 0.05→82, 0.02→87 calls,
+  also identical to §1's "threshold 0.05 buys 82 calls and allows 0/7."
+  Unaffected because the fix only changes behavior when no claim is present,
+  and this script's `CONTEXT` now carries one.
+- `scripts/independent_evaluation.py`: unit tests unaffected; running it live
+  now gives `isnad-greedy` fidelity to the fixture's scripted `location_verify`
+  answers that it did not reliably have before (13 cases previously risked
+  silently downgrading to `EVIDENCE_UNAVAILABLE` mid-run for any case relying
+  on a location signal). No test pins its exact per-case decisions, only totals
+  and that a named disagreement appears, both of which still hold.
+
+*Signed-receipt compatibility.* Saved a receipt under the pre-fix
+`app/providers/mock.py`/`nac.py` (via `git stash` of just those two files, an
+isolated sqlite DB and vault key, `ISNAD_PROVIDER=mock`), captured its exact
+`verdict_json`, `signature` and `public_key`, restored the fix, and verified:
+`vault.verify_with(public_key, verdict_json, signature)` returns `True`. The
+fix touches only provider evidence-gathering, never `Verdict`/`EvidenceLink`
+shape or the signing path, so this was expected and confirmed.
+
+*Test/lint evidence.* New `tests/test_provider_preconditions.py` (9 tests: both
+providers × {no claim, match, mismatch}, plus NacProvider provider-failure and
+Mock-other-actions-unaffected). Full suite: 506 → 515 passed. Ruff (`app tests
+scripts demo`): clean. README's example curl body and score explanation
+updated from these same verified outputs; the "fixture gap" caveat paragraph
+removed now that the regression passes and both providers agree.
+
+*Known gaps for P2:* no browser/UI click-through of `/console` or `/judge` was
+done in this pass — P1's own "Required evidence" list doesn't call for one
+(only P2 touches the presenter/rendering surface), and `test_console.py`/
+`test_judge.py` continue to pass unmodified. P2 should also decide how (or
+whether) a real merchant integration is expected to supply `claimed_location`
+in practice, since today it is an optional, silently-skippable field with no
+UI affordance to collect it outside the two demo acts wired above.
+
+*Files changed:* `app/providers/mock.py`, `app/providers/nac.py`,
+`app/api/routes_console.py`, `demo/run_acts.py`,
+`scripts/false_decline_baseline.py`,
+`tests/fixtures/independent_evaluation.json`, `tests/scenarios/test_acts.py`,
+`tests/test_chain_grade.py`, `tests/test_parallel_gather.py`,
+`tests/test_provider_preconditions.py` (new), `README.md`, this file, and the
+Graphify outputs.

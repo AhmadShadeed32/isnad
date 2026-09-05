@@ -13,7 +13,7 @@ import time
 import pytest
 
 from app.agent.investigator import build_investigator
-from app.domain.schemas import Money, RequestContext, VerificationRequest
+from app.domain.schemas import Area, Money, RequestContext, VerificationRequest
 from app.providers.mock import MockProvider
 
 _REQ = VerificationRequest(
@@ -195,6 +195,10 @@ async def test_concurrent_runs_do_not_interleave_chains():
                 payment_method="cod",
                 account_age_days=0,
                 amount=Money(value=4200),
+                # Both A and B script a location result, so both need a claim
+                # or the mock's no-claim precondition overrides it with
+                # EVIDENCE_UNAVAILABLE before either scenario is consulted.
+                claimed_location=Area(lat=31.9539, lon=35.9106, radius_m=2000),
             ),
         )
         provider = MockProvider(scenarios={number: _scenario(marker)})

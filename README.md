@@ -106,7 +106,7 @@ With the local demo server running:
 curl http://127.0.0.1:8010/v1/verify \
   -H 'authorization: Bearer demo-merchant-key' \
   -H 'content-type: application/json' \
-  -d '{"phone_number":"+962790000006","context":{"event":"checkout","payment_method":"cod","account_age_days":0,"amount":{"value":1500,"currency":"USD"}}}'
+  -d '{"phone_number":"+962790000006","context":{"event":"checkout","payment_method":"cod","account_age_days":0,"amount":{"value":1500,"currency":"USD"},"claimed_location":{"lat":31.9539,"lon":35.9106,"radius_m":2000}}}'
 ```
 
 Selected fields from the mock/greedy replacement scenario:
@@ -212,11 +212,10 @@ pause per check** so the trace is readable. That delay and the scripted per-link
 latency values are presentation data, not measurements of operator performance.
 
 Live responses differ in provenance, consent metadata, timestamps, timings and
-subscriber-specific facts. The current replacement fixture also presets a
-location-match result without a location claim in its request; a live request
-must supply the claim. This fixture gap is recorded in the
-[handoff](docs/PHASE2_HANDOFF.md#3-recommended-app-work--not-implemented-in-this-documentation-pass).
-A failed live check never silently substitutes a mock answer.
+subscriber-specific facts. Location Verification only ever returns a scripted
+match or mismatch when the request carries a `claimed_location`; with no claim,
+both providers return `EVIDENCE_UNAVAILABLE` rather than fabricating a result
+against nothing. A failed live check never silently substitutes a mock answer.
 
 [Mock provider](app/providers/mock.py) · [NaC adapter](app/providers/nac.py) · [Shared vocabulary](app/providers/vocabulary.py) · [Stage pacing](app/api/routes_console.py)
 

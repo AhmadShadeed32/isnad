@@ -201,7 +201,7 @@ class NacProvider:
         if action == Action.LOCATION_VERIFY:
             claim = request.context.claimed_location
             if claim is None:
-                return Result.INFO, "EVIDENCE_UNAVAILABLE", "claimed location is required"
+                return Result.INFO, "EVIDENCE_UNAVAILABLE", detail_for("EVIDENCE_UNAVAILABLE")
             response = self.client.location.verify_v1(
                 device=device,
                 area={

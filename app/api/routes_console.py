@@ -17,7 +17,7 @@ from app.api.rate_limit import limit_per_ip, limit_per_key
 from app.chain.subject import request_commitment
 from app.config import settings
 from app.db import store
-from app.domain.schemas import Money, RequestContext, VerificationRequest
+from app.domain.schemas import Area, Money, RequestContext, VerificationRequest
 from app.events import current_owner, emit, subscribe
 from app.policy import counterfactual
 from app.providers import mock as mock_provider
@@ -30,6 +30,12 @@ page_router = APIRouter(tags=["console"], dependencies=[Depends(limit_per_ip)])
 
 _CONSOLE_HTML = Path(__file__).parent.parent / "static" / "console.html"
 
+# A synthetic claimed location for demo acts whose story assumes the customer
+# made one. This is a demo INPUT to the location check — what the customer
+# claims — never an observed subscriber location, and it must never be
+# persisted into an EvidenceLink, prompt or receipt.
+_DEMO_CLAIMED_LOCATION = Area(lat=31.9539, lon=35.9106, radius_m=2000)
+
 # The forward demo acts, keyed for the console trigger buttons.
 # (Act IV — Reverse Isnad — is dispatched separately below.)
 DEMO_ACTS: dict[str, VerificationRequest] = {
@@ -37,6 +43,8 @@ DEMO_ACTS: dict[str, VerificationRequest] = {
         phone_number="+99999991001",
         context=RequestContext(event="signup", account_age_days=0),
     ),
+    # Act II — the ghost: a swap inside the window, a new device, and a claimed
+    # location the network places the device somewhere else than.
     "act2": VerificationRequest(
         phone_number="+99999991000",
         context=RequestContext(
@@ -44,6 +52,7 @@ DEMO_ACTS: dict[str, VerificationRequest] = {
             payment_method="cod",
             account_age_days=0,
             amount=Money(value=4200),
+            claimed_location=_DEMO_CLAIMED_LOCATION,
         ),
     ),
     "act3": VerificationRequest(
@@ -76,6 +85,7 @@ DEMO_ACTS: dict[str, VerificationRequest] = {
             payment_method="cod",
             account_age_days=0,
             amount=Money(value=1500),
+            claimed_location=_DEMO_CLAIMED_LOCATION,
         ),
     ),
 }

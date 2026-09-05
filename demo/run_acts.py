@@ -9,8 +9,11 @@ import asyncio
 
 from app.agent.investigator import build_investigator
 from app.chain.builder import render_text
-from app.domain.schemas import Money, RequestContext, VerificationRequest
+from app.domain.schemas import Area, Money, RequestContext, VerificationRequest
 from app.providers.mock import MockProvider
+
+# Demo input claim, not an observed location — see app/api/routes_console.py.
+_CLAIMED_LOCATION = Area(lat=31.9539, lon=35.9106, radius_m=2000)
 
 ACTS = [
     (
@@ -24,7 +27,11 @@ ACTS = [
         VerificationRequest(
             phone_number="+99999991000",
             context=RequestContext(
-                event="checkout", payment_method="cod", account_age_days=0, amount=Money(value=4200)
+                event="checkout",
+                payment_method="cod",
+                account_age_days=0,
+                amount=Money(value=4200),
+                claimed_location=_CLAIMED_LOCATION,
             ),
         ),
     ),

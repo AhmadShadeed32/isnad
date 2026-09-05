@@ -13,9 +13,12 @@ from app.agent.investigator import build_investigator
 from app.agent.planner import Choice, GreedyPlanner
 from app.config import settings
 from app.domain.enums import Action, ChainGrade, Decision, Hypothesis
-from app.domain.schemas import Money, RequestContext, VerificationRequest
+from app.domain.schemas import Area, Money, RequestContext, VerificationRequest
 from app.policy.engine import get_engine
 from app.providers.mock import MockProvider
+
+# Demo input claim, not an observed location — see app/api/routes_console.py.
+_CLAIMED_LOCATION = Area(lat=31.9539, lon=35.9106, radius_m=2000)
 
 
 def _engine():
@@ -35,6 +38,7 @@ _ACT6 = VerificationRequest(
         payment_method="cod",
         account_age_days=0,
         amount=Money(value=1500),
+        claimed_location=_CLAIMED_LOCATION,
     ),
 )
 
@@ -221,6 +225,7 @@ async def test_takeover_declines_and_grades_refuted():
             payment_method="cod",
             account_age_days=0,
             amount=Money(value=4200),
+            claimed_location=_CLAIMED_LOCATION,
         ),
     )
     verdict = await _investigator().investigate(req)
@@ -272,6 +277,7 @@ def test_verify_endpoint_returns_the_grade():
                 "payment_method": "cod",
                 "account_age_days": 0,
                 "amount": {"value": 4200},
+                "claimed_location": {"lat": 31.9539, "lon": 35.9106, "radius_m": 2000},
             },
         },
     )
@@ -383,6 +389,7 @@ async def test_a_real_takeover_still_declines_after_corroboration():
             payment_method="cod",
             account_age_days=0,
             amount=Money(value=4200),
+            claimed_location=_CLAIMED_LOCATION,
         ),
     )
     verdict = await inv.investigate(req)

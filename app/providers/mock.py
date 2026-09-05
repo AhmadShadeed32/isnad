@@ -212,10 +212,28 @@ class MockProvider:
                 latency_ms=40,
                 max_age_hours=window_hours(action),
             )
+        cost_ms = int(45 * (1 + list(Action).index(action) % 3))
+        # A location verdict answers a claim. With no claimed_location on the
+        # request there is nothing to check the network against, so no scripted
+        # match/mismatch may stand in for one — that would be fabricating the
+        # very fact this check exists to attest. Checked before fixture
+        # selection so it applies to every scenario, not only the clean one.
+        if action == Action.LOCATION_VERIFY and request.context.claimed_location is None:
+            return EvidenceLink(
+                step=0,
+                action=action,
+                api=API_LABEL[action],
+                result=Result.INFO,
+                signal="EVIDENCE_UNAVAILABLE",
+                detail=detail_for("EVIDENCE_UNAVAILABLE"),
+                consent_basis=_CONSENT.get(action, "n/a"),
+                source="mock",
+                latency_ms=cost_ms,
+                max_age_hours=window_hours(action),
+            )
         scenario = self.scenarios.get(request.phone_number, _CLEAN)
         result, signal = scenario.get(action, (Result.INFO, "EVIDENCE_UNAVAILABLE"))
         detail = detail_for(signal, connectivity="SMS")
-        cost_ms = int(45 * (1 + list(Action).index(action) % 3))
         return EvidenceLink(
             step=0,  # assigned by the investigator when added to the chain
             action=action,
