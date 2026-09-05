@@ -119,20 +119,20 @@ the last review). Use the current live app recording script instead.
   changes. Exercise the affected UI; greedy-only tests do not validate LLM STOP.
 - Refresh Graphify after changes. When compacting documents, remove stale graph
   concepts tied to the replaced text before rebuilding their headings.
-- Private remote: `AhmadShadeed32/isnad-private`, `main`; last pushed `faf467f`.
+- Private remote: `AhmadShadeed32/isnad-private`, `main`; last pushed `568a828`.
   Public `origin` is a different destination. Do not infer a public push from a
   private publication request.
 
 ## 6. Latest session
 
-**Intent — 5 Sep:** rewrite README for judges, explain verified mock parity and
-650 ms pacing, compact handoff, and record app improvements. User additionally
-asked how to go live; include the staged deployment/operator plan above.
+**Intent — 5 Sep:** make README persuasive for judges while integrating technical
+details into the story. User explicitly rejected numbered pitch-deck sections
+and a separate technical appendix.
 
-**Completion — verified:** README rewritten around customer stakes, value,
-demo, parity and reproducible proof; detailed API commands moved into disclosure
-blocks. This handoff replaces 3,800+ lines while linking preserved Git history.
-All local documentation links resolve; 32 provider-vocabulary/console tests
-pass and the diff whitespace check is clean. Graph navigation is refreshed.
-App changes are recommendations only. No deployment, operator/model call, code
-behavior change, commit or push in this documentation pass.
+**Completion:** customer scenario flows into architecture, budget/policy loop,
+signed receipts, mock/live parity, consent and measured evidence. Diagrams sit
+beside the claims they explain; only API examples and test commands collapse.
+Preserved limitations, 650 ms pacing and live prerequisites. No app behavior
+changed. Local links, anchors and Markdown structure checked; graph refreshed.
+User authorized publication to private/main; this documentation revision includes
+the integrated README, diagrams and refreshed graph.
