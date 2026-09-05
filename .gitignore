@@ -55,3 +55,10 @@ docs/*.md
 docs/mentorship/
 docs/video/
 graphify-out/
+
+# Review deliverables linked from the public README.
+!docs/CURRENT_STATE.md
+!docs/RISK_SCORE.md
+!docs/INDEPENDENT_EVALUATION.md
+!docs/HANDSET_VALIDATION.md
+!docs/JUDGE_WALKTHROUGH.md

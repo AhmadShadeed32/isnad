@@ -8,7 +8,7 @@ from app.agent.belief import Belief
 from app.agent.planner import Choice, GreedyPlanner, Observation, get_planner
 from app.chain.models import Chain, EvidenceLink, Verdict
 from app.config import settings
-from app.domain.enums import API_LABEL, Decision, Hypothesis
+from app.domain.enums import API_LABEL, Action, Decision, Hypothesis
 from app.domain.schemas import VerificationRequest
 from app.events import emit
 from app.policy.engine import PolicyEngine, get_engine
@@ -44,6 +44,7 @@ class Investigator:
         run_id: str | None = None,
         local_evidence: list[EvidenceLink] | None = None,
         parallel: bool | None = None,
+        required_action: Action | None = None,
     ) -> Verdict:
         started = time.perf_counter()
         ctx = request.context
@@ -95,6 +96,49 @@ class Investigator:
                 )
             )
             await self._emit_link(link, belief, run_id)
+
+        # A caller may arrive with authorization for one specific provider
+        # action already granted. That authorization is part of the request's
+        # contract, not a suggestion to the planner: asking the model whether to
+        # use it lets STOP produce a completed consent with no Number
+        # Verification evidence. Run it once, within the same policy budget and
+        # accounting as every other network call, before either planner mode.
+        if required_action is not None:
+            action_cost = self.engine.action_cost(required_action)
+            if action_cost > budget_left:
+                raise ValueError("required evidence action exceeds the policy budget")
+            required = Choice(
+                required_action,
+                "policy: use the provider authorization granted for this request",
+                "policy",
+            )
+            await emit(
+                self._with_run_id(
+                    self._selection_event(
+                        required,
+                        hypothesis,
+                        budget_left,
+                        phase="authorization",
+                    ),
+                    run_id,
+                )
+            )
+            link = await self._call(required_action, request, chain)
+            belief.apply(link.detail, link.delta_logodds)
+            evidence_cost += action_cost
+            budget_left -= action_cost
+            if link.signal in _UNRESOLVED_SIGNALS:
+                unresolved_signals.add(link.signal)
+            used.add(required_action)
+            observations.append(
+                Observation(
+                    action=required_action,
+                    signal=link.signal,
+                    delta_logodds=link.delta_logodds,
+                )
+            )
+            await self._emit_link(link, belief, run_id)
+            choreographed = True
 
         # --- optional parallel batch, for latency-critical callers only ---
         # Fires the top N affordable actions at once instead of one at a time.
@@ -228,12 +272,14 @@ class Investigator:
                 used.add(action)
                 await self._emit_link(link, belief, run_id)
         decision = self.engine.decide(belief.p_fraud)
-        if decision == Decision.ALLOW and unresolved_signals:
+        missing_support = self._needs_a_network_fact(belief, chain)
+        evidence_unresolved = bool(unresolved_signals) or missing_support
+        if decision == Decision.ALLOW and evidence_unresolved:
             decision = Decision.CHALLENGE
 
         grade = self.engine.grade(
             p_fraud=belief.p_fraud,
-            unresolved=bool(unresolved_signals),
+            unresolved=evidence_unresolved,
             link_deltas=[link.delta_logodds for link in chain.links],
             hypothesis=hypothesis,
         )
@@ -249,7 +295,7 @@ class Investigator:
             chain_grade=grade,
             confidence=round(belief.p_fraud, 3),
             hypothesis=hypothesis.value,
-            reason=belief.explain(decision.value, unresolved=bool(unresolved_signals)),
+            reason=belief.explain(decision.value, unresolved=evidence_unresolved),
             chain_id=chain.id,
             chain=chain.links,
             evidence_cost=round(evidence_cost, 2),
@@ -354,13 +400,9 @@ class Investigator:
         """
         if belief.p_fraud > self.engine.allow_below:
             return False
-        local = [link for link in chain.links if link.source == "local"]
-        if not local:
-            # Decisive at the prior with nothing gathered at all. That is a
-            # separate, deliberate outcome ("no selection was made, so none is
-            # the honest planner label") and this rule is not about it — the
-            # concern here is local evidence acting as a free pass.
-            return False
+        # A clean prior is not evidence either. Apply the same minimum to
+        # empty chains and local-only chains; otherwise low-risk context can
+        # bypass the very provider check the ALLOW claims to rest on.
         # Counted SUPPORTING, not merely present. A network link that came back
         # adverse is not the fact the gate is asking for: an announcement worth
         # -2.5 outweighs a NUMBER_MISMATCH worth +1.5, so a chain of

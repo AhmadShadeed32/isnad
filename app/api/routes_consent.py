@@ -11,6 +11,7 @@ from app.chain.vault import vault
 from app.config import settings
 from app.consent import ConsentCapacityExceeded, ConsentRecord, consents
 from app.db import store
+from app.domain.enums import Action
 from app.domain.schemas import (
     NumberVerificationConsentResponse,
     VerificationRequest,
@@ -210,7 +211,11 @@ async def complete_number_verification(
 
     try:
         investigator = build_investigator(get_live_provider(token_or_response))
-        verdict = await investigator.investigate(record.request, run_id=console_run_id)
+        verdict = await investigator.investigate(
+            record.request,
+            run_id=console_run_id,
+            required_action=Action.NUMBER_VERIFY,
+        )
         await store.save_async(
             verdict,
             subject=record.request.phone_number,

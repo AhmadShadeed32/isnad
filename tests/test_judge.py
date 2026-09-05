@@ -36,7 +36,8 @@ def _page_body() -> str:
 def test_judge_page_is_a_checkout_to_signed_receipt_story():
     page = _page_body()
 
-    assert "Verify securely — no OTP" in page
+    assert "Investigate the SIM change" in page
+    assert "Try a clean checkout" in page
     assert "Evidence decision trace" in page
     assert "Open signed receipt" in page
     assert "Ed25519" in page
@@ -55,12 +56,13 @@ def test_judge_route_is_mounted_with_the_console_page_hardening():
 def test_judge_page_uses_the_existing_authenticated_console_fixture_only():
     """Judge Mode is not a second route for arbitrary provider calls.
 
-    It must keep using the fixed Act III fixture, which is a deterministic
-    checkout case.  The route has no user-controlled request fields.
+    It must use the fixed Act VI replacement and Act III clean fixtures.  The route has no user-controlled request fields.
     """
     page = _page_body()
 
     assert "/v1/console/run/act3" in page
+    assert "/v1/console/run/act6" in page
+    assert "addEventListener('click', () => runCheckout('replacement'))" in page
     assert "/v1/console/stream?stream_token=" in page
     assert "/v1/console/stream-token" in page
     assert "/v1/chains/" in page  # existing vault verification endpoint

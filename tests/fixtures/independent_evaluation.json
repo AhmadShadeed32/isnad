@@ -1,0 +1,215 @@
+{
+  "schema_version": 1,
+  "authorship": "Fixed synthetic cases authored separately from app/policy/policy.yaml.",
+  "limitations": "These cases are reviewer-authored scenarios, not sampled production traffic or independent real-world validation.",
+  "cases": [
+    {
+      "id": "established_clean_checkout",
+      "category": "clean",
+      "phone_number": "+999770000001",
+      "context": {"event": "checkout", "payment_method": "card", "account_age_days": 730, "amount": {"value": 80, "currency": "USD"}},
+      "expected_safe_decision": "ALLOW",
+      "rationale": "An established low-value account with every available network check corroborating it should proceed without a step-up.",
+      "scenario": {
+        "number_verify": {"result": "PASS", "signal": "NUMBER_MATCH", "independence_group": "number_association"},
+        "sim_swap": {"result": "PASS", "signal": "SIM_STABLE", "independence_group": "subscriber_change"},
+        "device_swap": {"result": "PASS", "signal": "DEVICE_STABLE", "independence_group": "subscriber_change"},
+        "location_verify": {"result": "PASS", "signal": "AT_CLAIMED_LOCATION", "independence_group": "location"},
+        "reachability": {"result": "PASS", "signal": "REACHABLE_NORMAL", "independence_group": "reachability"},
+        "roaming": {"result": "PASS", "signal": "HOME_NETWORK", "independence_group": "mobility"}
+      }
+    },
+    {
+      "id": "clean_new_signup",
+      "category": "clean",
+      "phone_number": "+999770000002",
+      "context": {"event": "signup", "account_age_days": 0},
+      "expected_safe_decision": "ALLOW",
+      "rationale": "A new account is thin history rather than adverse evidence when every available network fact is clean.",
+      "scenario": {
+        "number_verify": {"result": "PASS", "signal": "NUMBER_MATCH", "independence_group": "number_association"},
+        "sim_swap": {"result": "PASS", "signal": "SIM_STABLE", "independence_group": "subscriber_change"},
+        "device_swap": {"result": "PASS", "signal": "DEVICE_STABLE", "independence_group": "subscriber_change"},
+        "location_verify": {"result": "PASS", "signal": "AT_CLAIMED_LOCATION", "independence_group": "location"},
+        "reachability": {"result": "PASS", "signal": "REACHABLE_NORMAL", "independence_group": "reachability"},
+        "roaming": {"result": "PASS", "signal": "HOME_NETWORK", "independence_group": "mobility"}
+      }
+    },
+    {
+      "id": "legitimate_sim_replacement",
+      "category": "legitimate_change",
+      "phone_number": "+999770000003",
+      "context": {"event": "checkout", "payment_method": "cod", "account_age_days": 0, "amount": {"value": 1500, "currency": "USD"}},
+      "expected_safe_decision": "CHALLENGE",
+      "rationale": "A recent SIM replacement warrants a step-up, while the same device, claimed location, and number association make an outright decline unsafe.",
+      "scenario": {
+        "number_verify": {"result": "PASS", "signal": "NUMBER_MATCH", "independence_group": "number_association"},
+        "sim_swap": {"result": "FLAG", "signal": "SIM_SWAPPED", "independence_group": "subscriber_change"},
+        "device_swap": {"result": "PASS", "signal": "DEVICE_STABLE", "independence_group": "subscriber_change"},
+        "location_verify": {"result": "PASS", "signal": "AT_CLAIMED_LOCATION", "independence_group": "location"},
+        "reachability": {"result": "PASS", "signal": "REACHABLE_NORMAL", "independence_group": "reachability"},
+        "roaming": {"result": "INFO", "signal": "ROAMING_NETWORK", "independence_group": "mobility"}
+      }
+    },
+    {
+      "id": "number_consent_unavailable",
+      "category": "unavailable_evidence",
+      "phone_number": "+999770000004",
+      "context": {"event": "checkout", "payment_method": "card", "account_age_days": 45, "amount": {"value": 250, "currency": "USD"}},
+      "expected_safe_decision": "CHALLENGE",
+      "rationale": "Withheld consent leaves the number association unanswered; the safe outcome exposes that gap and asks for a step-up.",
+      "scenario": {
+        "number_verify": {"result": "INFO", "signal": "CONSENT_REQUIRED", "independence_group": "number_association"},
+        "sim_swap": {"result": "PASS", "signal": "SIM_STABLE", "independence_group": "subscriber_change"},
+        "device_swap": {"result": "PASS", "signal": "DEVICE_STABLE", "independence_group": "subscriber_change"},
+        "location_verify": {"result": "PASS", "signal": "AT_CLAIMED_LOCATION", "independence_group": "location"},
+        "reachability": {"result": "PASS", "signal": "REACHABLE_NORMAL", "independence_group": "reachability"},
+        "roaming": {"result": "PASS", "signal": "HOME_NETWORK", "independence_group": "mobility"}
+      }
+    },
+    {
+      "id": "sim_provider_unavailable",
+      "category": "unavailable_evidence",
+      "phone_number": "+999770000005",
+      "context": {"event": "profile_change", "payment_method": "card", "account_age_days": 120},
+      "expected_safe_decision": "CHALLENGE",
+      "rationale": "A dark SIM-swap provider is missing evidence, so clean answers elsewhere should not be promoted to a fully resolved allow.",
+      "scenario": {
+        "number_verify": {"result": "PASS", "signal": "NUMBER_MATCH", "independence_group": "number_association"},
+        "sim_swap": {"result": "INFO", "signal": "PROVIDER_UNAVAILABLE", "independence_group": "subscriber_change"},
+        "device_swap": {"result": "PASS", "signal": "DEVICE_STABLE", "independence_group": "subscriber_change"},
+        "location_verify": {"result": "PASS", "signal": "AT_CLAIMED_LOCATION", "independence_group": "location"},
+        "reachability": {"result": "PASS", "signal": "REACHABLE_NORMAL", "independence_group": "reachability"},
+        "roaming": {"result": "PASS", "signal": "HOME_NETWORK", "independence_group": "mobility"}
+      }
+    },
+    {
+      "id": "location_could_not_resolve",
+      "category": "unavailable_evidence",
+      "phone_number": "+999770000006",
+      "context": {"event": "payout", "payment_method": "card", "account_age_days": 365, "amount": {"value": 600, "currency": "USD"}},
+      "expected_safe_decision": "CHALLENGE",
+      "rationale": "An unknown claimed location is an unanswered check rather than a mismatch, and should remain visible as a step-up outcome.",
+      "scenario": {
+        "number_verify": {"result": "PASS", "signal": "NUMBER_MATCH", "independence_group": "number_association"},
+        "sim_swap": {"result": "PASS", "signal": "SIM_STABLE", "independence_group": "subscriber_change"},
+        "device_swap": {"result": "PASS", "signal": "DEVICE_STABLE", "independence_group": "subscriber_change"},
+        "location_verify": {"result": "INFO", "signal": "LOCATION_UNKNOWN", "independence_group": "location"},
+        "reachability": {"result": "PASS", "signal": "REACHABLE_NORMAL", "independence_group": "reachability"},
+        "roaming": {"result": "PASS", "signal": "HOME_NETWORK", "independence_group": "mobility"}
+      }
+    },
+    {
+      "id": "single_number_mismatch",
+      "category": "single_adverse",
+      "phone_number": "+999770000007",
+      "context": {"event": "checkout", "payment_method": "card", "account_age_days": 60, "amount": {"value": 300, "currency": "USD"}},
+      "expected_safe_decision": "CHALLENGE",
+      "rationale": "One number-association contradiction deserves friction, but one source alone is not enough for an irreversible decline.",
+      "scenario": {
+        "number_verify": {"result": "FLAG", "signal": "NUMBER_MISMATCH", "independence_group": "number_association"},
+        "sim_swap": {"result": "PASS", "signal": "SIM_STABLE", "independence_group": "subscriber_change"},
+        "device_swap": {"result": "PASS", "signal": "DEVICE_STABLE", "independence_group": "subscriber_change"},
+        "location_verify": {"result": "PASS", "signal": "AT_CLAIMED_LOCATION", "independence_group": "location"},
+        "reachability": {"result": "PASS", "signal": "REACHABLE_NORMAL", "independence_group": "reachability"},
+        "roaming": {"result": "PASS", "signal": "HOME_NETWORK", "independence_group": "mobility"}
+      }
+    },
+    {
+      "id": "correlated_sim_and_device_change",
+      "category": "correlated_adverse",
+      "phone_number": "+999770000008",
+      "context": {"event": "password_reset", "payment_method": "card", "account_age_days": 180},
+      "expected_safe_decision": "CHALLENGE",
+      "rationale": "SIM and device changes may be two API answers about one replacement event; stable location and number association make a step-up safer than double-counting them into a decline.",
+      "scenario": {
+        "number_verify": {"result": "PASS", "signal": "NUMBER_MATCH", "independence_group": "number_association"},
+        "sim_swap": {"result": "FLAG", "signal": "SIM_SWAPPED", "independence_group": "subscriber_change"},
+        "device_swap": {"result": "FLAG", "signal": "DEVICE_SWAPPED", "independence_group": "subscriber_change"},
+        "location_verify": {"result": "PASS", "signal": "AT_CLAIMED_LOCATION", "independence_group": "location"},
+        "reachability": {"result": "PASS", "signal": "REACHABLE_NORMAL", "independence_group": "reachability"},
+        "roaming": {"result": "PASS", "signal": "HOME_NETWORK", "independence_group": "mobility"}
+      }
+    },
+    {
+      "id": "replacement_plus_location_mismatch",
+      "category": "independent_adverse",
+      "phone_number": "+999770000009",
+      "context": {"event": "password_reset", "payment_method": "card", "account_age_days": 180},
+      "expected_safe_decision": "DECLINE",
+      "rationale": "A subscriber change corroborated by an independently mismatched claimed location supports declining the sensitive event.",
+      "scenario": {
+        "number_verify": {"result": "PASS", "signal": "NUMBER_MATCH", "independence_group": "number_association"},
+        "sim_swap": {"result": "FLAG", "signal": "SIM_SWAPPED", "independence_group": "subscriber_change"},
+        "device_swap": {"result": "FLAG", "signal": "DEVICE_SWAPPED", "independence_group": "subscriber_change"},
+        "location_verify": {"result": "FLAG", "signal": "NOT_AT_CLAIMED_LOCATION", "independence_group": "location"},
+        "reachability": {"result": "PASS", "signal": "REACHABLE_NORMAL", "independence_group": "reachability"},
+        "roaming": {"result": "PASS", "signal": "HOME_NETWORK", "independence_group": "mobility"}
+      }
+    },
+    {
+      "id": "number_and_location_mismatch",
+      "category": "independent_adverse",
+      "phone_number": "+999770000010",
+      "context": {"event": "checkout", "payment_method": "cod", "account_age_days": 0, "amount": {"value": 1800, "currency": "USD"}},
+      "expected_safe_decision": "DECLINE",
+      "rationale": "Independent contradictions in number association and claimed location justify declining a high-risk checkout.",
+      "scenario": {
+        "number_verify": {"result": "FLAG", "signal": "NUMBER_MISMATCH", "independence_group": "number_association"},
+        "sim_swap": {"result": "PASS", "signal": "SIM_STABLE", "independence_group": "subscriber_change"},
+        "device_swap": {"result": "PASS", "signal": "DEVICE_STABLE", "independence_group": "subscriber_change"},
+        "location_verify": {"result": "FLAG", "signal": "NOT_AT_CLAIMED_LOCATION", "independence_group": "location"},
+        "reachability": {"result": "PASS", "signal": "REACHABLE_NORMAL", "independence_group": "reachability"},
+        "roaming": {"result": "PASS", "signal": "HOME_NETWORK", "independence_group": "mobility"}
+      }
+    },
+    {
+      "id": "travel_with_recent_sim_change",
+      "category": "legitimate_change",
+      "phone_number": "+999770000011",
+      "context": {"event": "checkout", "payment_method": "card", "account_age_days": 400, "amount": {"value": 450, "currency": "USD"}},
+      "expected_safe_decision": "CHALLENGE",
+      "rationale": "Roaming and a recent SIM change can describe legitimate travel; matching number, device, and claimed location argue for a step-up rather than a decline.",
+      "scenario": {
+        "number_verify": {"result": "PASS", "signal": "NUMBER_MATCH", "independence_group": "number_association"},
+        "sim_swap": {"result": "FLAG", "signal": "SIM_SWAPPED", "independence_group": "subscriber_change"},
+        "device_swap": {"result": "PASS", "signal": "DEVICE_STABLE", "independence_group": "subscriber_change"},
+        "location_verify": {"result": "PASS", "signal": "AT_CLAIMED_LOCATION", "independence_group": "location"},
+        "reachability": {"result": "PASS", "signal": "REACHABLE_NORMAL", "independence_group": "reachability"},
+        "roaming": {"result": "INFO", "signal": "ROAMING_NETWORK", "independence_group": "mobility"}
+      }
+    },
+    {
+      "id": "broad_takeover_pattern",
+      "category": "independent_adverse",
+      "phone_number": "+999770000012",
+      "context": {"event": "payout", "payment_method": "cod", "account_age_days": 0, "amount": {"value": 5000, "currency": "USD"}},
+      "expected_safe_decision": "DECLINE",
+      "rationale": "Independent number, subscriber-change, location, and reachability contradictions strongly support declining the payout.",
+      "scenario": {
+        "number_verify": {"result": "FLAG", "signal": "NUMBER_MISMATCH", "independence_group": "number_association"},
+        "sim_swap": {"result": "FLAG", "signal": "SIM_SWAPPED", "independence_group": "subscriber_change"},
+        "device_swap": {"result": "FLAG", "signal": "DEVICE_SWAPPED", "independence_group": "subscriber_change"},
+        "location_verify": {"result": "FLAG", "signal": "NOT_AT_CLAIMED_LOCATION", "independence_group": "location"},
+        "reachability": {"result": "FLAG", "signal": "REACHABLE_UNAVAILABLE", "independence_group": "reachability"},
+        "roaming": {"result": "INFO", "signal": "ROAMING_NETWORK", "independence_group": "mobility"}
+      }
+    },
+    {
+      "id": "multiple_provider_gaps",
+      "category": "unavailable_evidence",
+      "phone_number": "+999770000013",
+      "context": {"event": "checkout", "payment_method": "cod", "account_age_days": 0, "amount": {"value": 1400, "currency": "USD"}},
+      "expected_safe_decision": "CHALLENGE",
+      "rationale": "Several unavailable checks reduce coverage but supply no adverse fact, so the decision should remain an explicit challenge.",
+      "scenario": {
+        "number_verify": {"result": "INFO", "signal": "CONSENT_REQUIRED", "independence_group": "number_association"},
+        "sim_swap": {"result": "INFO", "signal": "PROVIDER_UNAVAILABLE", "independence_group": "subscriber_change"},
+        "device_swap": {"result": "INFO", "signal": "EVIDENCE_UNAVAILABLE", "independence_group": "subscriber_change"},
+        "location_verify": {"result": "INFO", "signal": "LOCATION_UNKNOWN", "independence_group": "location"},
+        "reachability": {"result": "PASS", "signal": "REACHABLE_NORMAL", "independence_group": "reachability"},
+        "roaming": {"result": "PASS", "signal": "HOME_NETWORK", "independence_group": "mobility"}
+      }
+    }
+  ]
+}

@@ -7,9 +7,12 @@ from app.policy.engine import logodds_to_p
 
 @dataclass
 class Belief:
-    """The agent's running belief that this interaction is fraudulent.
+    """The agent's running policy risk score.
 
-    Tracked in log-odds so evidence combines additively (a naive-Bayes update).
+    Configured weights add in log-odds space, then a logistic transform maps
+    the sum to 0..1. This resembles naive Bayes but is not calibrated against
+    observed outcomes; correlated signals can count the same event twice.
+    ``p_fraud`` is retained as an internal compatibility name.
     """
 
     logodds: float

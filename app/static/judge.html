@@ -38,22 +38,23 @@
   </header>
 
   <section class="lead">
-    <div><div class="eyebrow">A merchant checkout, not another OTP</div><h1>Trust the interaction with the minimum necessary network evidence.</h1><p>Isnad’s agent chooses evidence, explains its decisions, and issues a receipt that either side can verify independently.</p></div>
+    <div><div class="eyebrow">One SIM change. A customer worth investigating.</div><h1>A replaced SIM should start a check, not end a customer relationship.</h1><p>Isnad investigates a risky checkout, gathers corroborating network evidence, and gives the merchant a decision with a signed receipt.</p></div>
     <div class="trust-note">This judge flow uses a deterministic stage fixture when the environment says <strong>SIMULATOR</strong>. Every evidence item carries its own provenance—nothing scripted is presented as live network evidence.</div>
   </section>
 
   <section class="grid" aria-label="Isnad customer checkout demonstration">
     <article class="card checkout">
       <div class="merchant"><div style="display:flex;align-items:center;gap:10px"><span class="merchant-badge">N</span><div><div class="merchant-name">Noura Market</div><div class="merchant-meta">Cross-border COD checkout</div></div></div><span class="provenance">merchant demo</span></div>
-      <h2>Complete checkout</h2>
-      <p>A new customer has no merchant history. Instead of interrupting them with an OTP, Noura asks Isnad for only the evidence needed to make this decision.</p>
+      <h2 id="customerTitle">New SIM. Same customer.</h2>
+      <p id="customerStory">Her SIM was replaced, but her handset is unchanged. A rule that declines every SIM change loses her order. Isnad checks the surrounding evidence before deciding.</p>
       <div class="summary"><div class="summary-line"><span class="subdued">Basket</span><span>Home essentials</span></div><div class="summary-line"><span class="subdued">Payment</span><span>Cash on delivery</span></div><div class="summary-line total"><span>Total</span><span>1,500 USD</span></div></div>
-      <button id="checkout" class="primary" type="button">Verify securely — no OTP</button>
-      <div id="checkoutFoot" class="checkout-foot"><strong>Consent-first:</strong> this stage fixture is safe to run repeatedly and never calls a live operator API.</div>
+      <button id="checkout" class="primary" type="button">Investigate the SIM change</button>
+      <button id="cleanCheckout" class="primary" style="margin-top:10px;background:var(--surface2);color:var(--text);box-shadow:none" type="button">Try a clean checkout</button>
+      <div id="checkoutFoot" class="checkout-foot"><strong>Expected: CHALLENGE.</strong> Ask for the merchant’s step-up instead of automatically declining. Both examples use simulated operator answers.</div>
     </article>
 
     <article class="card journey">
-      <div class="journey-head"><div><h2>Evidence decision trace</h2><p class="caption">The agent’s selection rationale and the proof it received.</p></div><span id="planner" class="provenance">planner: —</span></div>
+      <div class="journey-head"><div><h2>Evidence decision trace</h2><p class="caption">The selected checks, their sources, and the evidence behind the decision.</p></div><span id="planner" class="provenance">planner: —</span></div>
       <div id="statusline" class="statusline">Ready for checkout.</div>
       <div class="steps" aria-hidden="true"><span id="s1" class="step"></span><span id="s2" class="step"></span><span id="s3" class="step"></span><span id="s4" class="step"></span></div>
       <div id="trace" class="trace"><p class="empty">Start the checkout to see exactly what the agent considers, what it asks the network, and why it stops.</p></div>
@@ -68,6 +69,7 @@
     <article class="card"><h3>VERIFIABLE AFTER THE SALE</h3><p>The final decision is stored as an <b>Ed25519-signed evidence receipt</b>. A merchant, customer, or dispute team can verify it later.</p></article>
   </section>
   <div id="fallback" class="fallback"></div>
+  <p class="technical">Risk scores are policy-derived and uncalibrated, not measured fraud probabilities. Signed receipts prove issuance by Isnad.</p>
   <p class="technical">Need the full test console? <a href="/console">Open Isnad Live Agent Console</a></p>
 </main>
 <script>
@@ -77,6 +79,8 @@
 // new provider-call or state-changing route.
 const DEMO_TOKEN = '__ISNAD_JUDGE_TOKEN__';
 const checkout = document.getElementById('checkout');
+const cleanCheckout = document.getElementById('cleanCheckout');
+let activeScenario = 'replacement';
 const mode = document.getElementById('mode');
 const planner = document.getElementById('planner');
 const statusline = document.getElementById('statusline');
@@ -143,7 +147,7 @@ function setMode(data){
   mode.textContent = providerLabel + (demoMode ? ' · stage mode' : '');
   mode.className = 'mode ' + (configuredProvider === 'nac' && !demoMode ? 'live' : 'sim');
   planner.textContent = 'planner: ' + (data.planner || 'unknown');
-  if (!demoMode){ checkout.disabled = true; document.getElementById('checkoutFoot').textContent = 'Stage checkout is disabled outside demo mode. Use the authenticated production API for live customer requests.'; }
+  if (!demoMode){ checkout.disabled = true; cleanCheckout.disabled = true; document.getElementById('checkoutFoot').textContent = 'Stage checkout is disabled outside demo mode. Use the authenticated production API for live customer requests.'; }
 }
 function scheduleStreamReconnect(){
   if (streamReconnectTimer || !key()) return;
@@ -164,7 +168,7 @@ async function connectStream(){
     eventSource.onerror = () => {
       if (eventSource) eventSource.close();
       eventSource = null; streamCredential = null;
-      if (activeRunId) setStatus('Connection interrupted; reconnecting to the evidence stream…');
+      if (activeRunId && decision.textContent === 'VERIFYING') setStatus('Connection interrupted; reconnecting to the evidence stream…');
       scheduleStreamReconnect();
     };
   }catch(err){
@@ -177,7 +181,7 @@ function onEvent(event){
   if (event.type === 'session'){
     handleSessionEvent(event);
   } else if (event.type === 'start'){
-    setStep(0); setStatus('Agent formed a ' + String(event.hypothesis || 'checkout') + ' hypothesis. Prior P(fraud): ' + event.prior_p_fraud + '.');
+    setStep(0); setStatus('Agent formed a ' + String(event.hypothesis || 'checkout') + ' hypothesis. Prior risk score: ' + event.prior_p_fraud + '.');
   } else if (event.type === 'decision'){
     setStep(1); const label = event.action === 'stop' ? 'Agent stops' : 'Agent selects ' + (event.api || event.action);
     appendTrace('info', label, event.rationale || 'No rationale returned.', null, (event.planner || 'policy') + ' · budget ' + event.budget_left);
@@ -186,7 +190,7 @@ function onEvent(event){
   } else if (event.type === 'evidence'){
     setStep(2); const kind = event.result === 'PASS' ? 'pass' : event.result === 'FLAG' ? 'flag' : 'info';
     const windowText = typeof event.max_age_hours === 'number' ? ' · window ' + event.max_age_hours + 'h' : '';
-    appendTrace(kind, event.api || event.signal || 'Network evidence', event.detail || event.signal || '', event.source, 'P(fraud) ' + event.p_fraud + windowText);
+    appendTrace(kind, event.api || event.signal || 'Network evidence', event.detail || event.signal || '', event.source, 'risk score ' + event.p_fraud + windowText);
     setStatus('Evidence received with its source and result.');
   } else if (event.type === 'verdict'){
     stepEls.forEach((s, index) => s.className = 'step ' + (index === 3 ? (event.decision === 'DECLINE' ? 'bad' : 'good') : 'good'));
@@ -205,28 +209,39 @@ function renderVerdict(data){
   receiptLink.href = '/r/' + encodeURIComponent(latestChainId);
   receipt.classList.add('visible'); vault.textContent = '';
   sessionId = null; simulateSwap.disabled = true;
-  sessionBeat.classList.add('visible');
-  const canSimulate = demoMode && configuredProvider === 'mock';
+  const isCleanAllow = activeScenario === 'clean' && data.decision === 'ALLOW';
+  sessionBeat.classList.toggle('visible', isCleanAllow);
+  const canSimulate = isCleanAllow && demoMode && configuredProvider === 'mock';
   startTrust.disabled = !canSimulate;
   sessionCopy.textContent = canSimulate
     ? 'Start a short trust session for this fixed checkout fixture, then simulate a SIM change. A live deployment waits for a real network signal instead.'
     : 'This continuity drill is intentionally disabled: simulated swaps are available only in demo mode with the mock provider. Live deployments wait for real network changes.';
   setSessionState(canSimulate ? 'Ready for a demo-only continuity check.' : 'Simulator continuity drill unavailable in this environment.');
 }
-async function runCheckout(){
+async function runCheckout(scenario = 'replacement'){
   if (!demoMode || !key()) return;
-  checkout.disabled = true; fallback.classList.remove('visible'); latestChainId = null; streamedVerdict = null; receipt.classList.remove('visible');
+  activeScenario = scenario;
+  const clean = scenario === 'clean';
+  document.getElementById('customerTitle').textContent = clean ? 'A clean checkout.' : 'New SIM. Same customer.';
+  document.getElementById('customerStory').textContent = clean
+    ? 'A new customer has no merchant history. Supporting network evidence can let this checkout proceed without another step-up.'
+    : 'Her SIM was replaced, but her handset is unchanged. A rule that declines every SIM change loses her order. Isnad checks the surrounding evidence before deciding.';
+  document.getElementById('checkoutFoot').textContent = clean
+    ? 'Expected: ALLOW. Supporting evidence clears this fixed example. Operator answers are simulated.'
+    : 'Expected: CHALLENGE. Ask for the merchant’s step-up instead of automatically declining. Operator answers are simulated.';
+  checkout.disabled = true; cleanCheckout.disabled = true; sessionBeat.classList.remove('visible'); fallback.classList.remove('visible'); latestChainId = null; streamedVerdict = null; receipt.classList.remove('visible');
   trace.replaceChildren(); clearSteps(); decision.textContent = 'VERIFYING'; decision.className = 'decision'; reason.textContent = 'The agent is deciding what evidence it needs.'; grade.textContent = '';
   activeRunId = newRunId(); setStatus('Starting a deterministic, simulated checkout fixture…');
   try{
-    const data = await apiJson('/v1/console/run/act3', {method:'POST', headers:{'X-Console-Run-Id':activeRunId}});
+    const fixturePath = scenario === 'clean' ? '/v1/console/run/act3' : '/v1/console/run/act6';
+    const data = await apiJson(fixturePath, {method:'POST', headers:{'X-Console-Run-Id':activeRunId}});
     // SSE normally draws the outcome first; rendering the response too makes a
     // successful decision resilient to an event stream reconnect.
     renderVerdict({...data, ...(streamedVerdict || {})});
   }catch(err){
     fallback.textContent = 'Checkout fixture could not run: ' + safeError(err) + '. Reload for a fresh demo session, then try again.';
     fallback.classList.add('visible'); setStatus('Checkout did not complete.');
-  }finally{ checkout.disabled = !demoMode; }
+  }finally{ checkout.disabled = !demoMode; cleanCheckout.disabled = !demoMode; }
 }
 async function checkSignature(){
   if (!latestChainId) return;
@@ -280,13 +295,14 @@ async function simulateTrustSwap(){
     setSessionState('SIM change injected; monitor is still checking.', 'flag');
   }catch(err){ setSessionState('Could not simulate the change: ' + safeError(err), 'flag'); simulateSwap.disabled = false; }
 }
-checkout.addEventListener('click', runCheckout);
+checkout.addEventListener('click', () => runCheckout('replacement'));
+cleanCheckout.addEventListener('click', () => runCheckout('clean'));
 verifySignature.addEventListener('click', checkSignature);
 startTrust.addEventListener('click', startTrustSession);
 simulateSwap.addEventListener('click', simulateTrustSwap);
 (async function configure(){
   try { setMode(await apiJson('/v1/console/mode')); await connectStream(); }
-  catch(err){ mode.textContent = 'SERVER MODE UNKNOWN'; mode.className = 'mode sim'; checkout.disabled = true; fallback.textContent = 'Could not read the secure demo mode: ' + safeError(err); fallback.classList.add('visible'); }
+  catch(err){ mode.textContent = 'SERVER MODE UNKNOWN'; mode.className = 'mode sim'; checkout.disabled = true; cleanCheckout.disabled = true; fallback.textContent = 'Could not read the secure demo mode: ' + safeError(err); fallback.classList.add('visible'); }
 }());
 </script>
 </body>

@@ -281,10 +281,11 @@
       </div>
 
       <div class="card">
-        <h2>Belief · P(fraud)</h2>
+        <h2>Policy risk score</h2>
         <div class="meterlab"><span>allow ≤ 0.15</span><span>decline ≥ 0.80</span></div>
         <div class="meter"><div class="fill" id="fill"></div></div>
         <div class="pval" id="pval">—</div>
+        <p class="reason">Policy-derived, uncalibrated score. Higher means more risk; this is not a measured fraud probability.</p>
       </div>
 
       <div class="card">
@@ -508,7 +509,7 @@ function setMeter(p){
   const pct = Math.max(4, Math.min(100, p * 100));
   fill.style.width = pct + '%';
   fill.style.background = p >= 0.80 ? 'var(--red)' : p <= 0.15 ? 'var(--green)' : 'var(--amber)';
-  pval.textContent = 'P(fraud) = ' + p.toFixed(3);
+  pval.textContent = 'risk score = ' + p.toFixed(3);
 }
 const GRADE_NOTE = {
   ATTESTED_FULL:    'every link resolved and corroborating',
@@ -561,7 +562,7 @@ function renderCounterfactual(alt){
   table.appendChild(cfRow('cost (' + alt.currency + ')',
     unpriced(alt.isnad_cost_usd, 'not priced — operator contract'),
     unpriced(alt.otp_cost_usd, 'not priced — merchant-specific')));
-  table.appendChild(cfRow('expected drop-off', '0%',
+  table.appendChild(cfRow('expected drop-off', 'not measured',
     alt.otp_dropoff_rate.value === null ? '—'
       : Math.round(alt.otp_dropoff_rate.value * 100) + '%'));
   // The price of getting it wrong. Both are null unless the merchant has
@@ -722,7 +723,7 @@ function onStreamMessage(e){
   if (ev.type === 'start'){
     t0 = Date.now();
     sessionLabel.textContent = `isnad-agent · hypothesis: ${ev.hypothesis}`;
-    addRow(clock(), 'hypothesis', `${ev.hypothesis} — prior P(fraud)=${ev.prior_p_fraud}`, 'pfrag');
+    addRow(clock(), 'hypothesis', `${ev.hypothesis} — prior risk score=${ev.prior_p_fraud}`, 'pfrag');
     setMeter(ev.prior_p_fraud);
   } else if (ev.type === 'evidence'){
     const cls = ev.result === 'PASS' ? 'pass' : ev.result === 'FLAG' ? 'flag' : 'info';
@@ -731,7 +732,7 @@ function onStreamMessage(e){
     // event — CAMARA returns a boolean with no timestamp.
     const asked = typeof ev.max_age_hours === 'number' ? ` · asked over last ${ev.max_age_hours}h` : '';
     addRow(clock(), ev.api, `[${mark}] ${ev.detail}  `, cls,
-      `→ P(fraud)=${ev.p_fraud} · ${ev.source||'provider'}${asked}`);
+      `→ risk score=${ev.p_fraud} · ${ev.source||'provider'}${asked}`);
     setMeter(ev.p_fraud);
   } else if (ev.type === 'decision'){
     // The rationale is whoever decided's own sentence, rendered verbatim as

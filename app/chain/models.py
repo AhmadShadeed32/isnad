@@ -63,7 +63,12 @@ class Verdict(BaseModel):
     # a chain signed before the field existed would then be served a grade the
     # vault never attested, beside a signature that still reports valid.
     chain_grade: ChainGrade | None = None
-    confidence: float  # P(fraud) at decision time, 0..1
+    # Keep the legacy signed field name for receipt/API compatibility. Values
+    # are policy-derived scores, not empirically calibrated probabilities.
+    confidence: float = Field(description=(
+        "Policy-derived risk score from 0 to 1; higher is riskier. "
+        "Uncalibrated, not a measured fraud probability. Legacy field name."
+    ))
     # Where the belief started, in log-odds. Published so a receipt can be
     # recomputed rather than believed: prior + every link's delta = the final
     # log-odds, and 1/(1+e^-total) = confidence. Without it the deltas are

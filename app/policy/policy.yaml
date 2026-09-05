@@ -1,14 +1,16 @@
+# Scores and signal weights are heuristic, not calibrated fraud probabilities.
+# Correlated signals may compound one event; validate on outcomes before tuning.
 # Isnad policy / evidence-cost model.
 # This single file is the tuning surface for the whole agent: change costs,
 # signal weights, and thresholds here — no code changes needed.
 
 thresholds:
-  allow_below: 0.15      # P(fraud) at/below this -> ALLOW
-  decline_above: 0.80    # P(fraud) at/above this -> DECLINE
+  allow_below: 0.15      # policy risk score at/below this -> ALLOW
+  decline_above: 0.80    # policy risk score at/above this -> DECLINE
   # strictly between the two -> CHALLENGE
 
 prior:
-  base_p: 0.08           # baseline fraud probability with no context signals
+  base_p: 0.08           # configured starting score, not an observed fraud rate
   reverse_base_p: 0.25   # Reverse Isnad: an unverified inbound caller starts uncertain
   new_account_logodds: 0.9        # account_age_days <= 1
   cod_logodds: 0.6                # payment_method == "cod"
@@ -146,8 +148,8 @@ grading:
   #
   # The mirror of `corroboration` on the decline side: one link is not a chain,
   # whichever way it points.
-  # Applies only when local evidence is in the chain. A run that is decisive at
-  # the prior with nothing gathered is a different, deliberate outcome.
+  # Applies to all ALLOW candidates, including a clean prior with no links.
+  # If the budget cannot buy support, retain CHALLENGE.
   min_network_links_for_allow: 1
 
 # Evidence gathering mode.

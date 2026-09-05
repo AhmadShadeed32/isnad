@@ -7,7 +7,8 @@ def render_text(verdict: Verdict) -> str:
     """Render a verdict's chain as the human-readable 'isnad' — the ordered,
     timestamped links a judge or auditor reads top to bottom."""
     lines = [
-        f"VERDICT: {verdict.decision.value} / {verdict.chain_grade.value if verdict.chain_grade else 'UNGRADED'}  (P(fraud)={verdict.confidence})",
+        f"VERDICT: {verdict.decision.value} / {verdict.chain_grade.value if verdict.chain_grade else 'UNGRADED'}  (risk score={verdict.confidence})",
+        "Score: policy-derived and uncalibrated; not a measured fraud probability.",
         f"Hypothesis: {verdict.hypothesis}",
         f"Evidence: {len(verdict.chain)} checks · cost={verdict.evidence_cost} · latency={verdict.latency_ms}ms",
         f"Reason: {verdict.reason}",

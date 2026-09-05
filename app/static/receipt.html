@@ -54,7 +54,8 @@
   <div class="card" id="summaryCard" hidden>
     <div class="row"><span class="k">decision</span><span id="decision"></span></div>
     <div class="row"><span class="k">chain grade</span><span id="grade"></span></div>
-    <div class="row"><span class="k">P(fraud)</span><span id="confidence"></span></div>
+    <div class="row"><span class="k">risk score</span><span id="confidence"></span></div>
+    <p class="note">Policy-derived, uncalibrated score from 0 to 1. It is not a measured fraud probability.</p>
     <div class="row"><span class="k">hypothesis</span><span id="hypothesis"></span></div>
     <div class="row"><span class="k">planner</span><span id="planner"></span></div>
     <div class="row"><span class="k">signed at</span><span id="signedAt"></span></div>
@@ -76,7 +77,7 @@
     <div class="row"><span class="k">prior (log-odds)</span><span id="mPrior"></span></div>
     <div class="row"><span class="k">+ evidence above</span><span id="mDeltas"></span></div>
     <div class="row"><span class="k">= total</span><span id="mTotal"></span></div>
-    <div class="row"><span class="k">P(fraud) = 1/(1+e<sup>-total</sup>)</span><span id="mP"></span></div>
+    <div class="row"><span class="k">risk score = 1/(1+e<sup>-total</sup>)</span><span id="mP"></span></div>
     <div class="row"><span class="k">policy thresholds</span><span id="mThresholds"></span></div>
     <div class="row"><span class="k">signed decision</span><span id="mVerdict"></span></div>
     <div class="mono" id="mNote" style="margin-top:10px"></div>
@@ -89,7 +90,7 @@
     <div class="mono" id="signature"></div>
     <div class="note">
       This page contains no phone number. Verification runs in your browser
-      against the exact bytes the server signed — nothing here is taken on trust.
+      against the exact bytes the server signed. A valid signature proves issuance by the signing key; it does not establish that the underlying evidence is true.
     </div>
   </div>
 </main>

@@ -48,3 +48,21 @@ async def test_evidence_pack_is_offline_and_verifies_the_stored_chain(
     assert "deterministic local MockProvider" in markdown
     assert "Scripted fixture latency" in markdown
     assert "valid=True" in markdown
+
+
+def test_evidence_pack_command_works_without_pytest_database_setup(tmp_path):
+    import json
+    import os
+    import subprocess
+    import sys
+
+    env = os.environ.copy()
+    env["ISNAD_DATABASE_URL"] = "sqlite://"
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "--output-dir", str(tmp_path)],
+        capture_output=True, text=True, env=env, check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    report = json.loads((tmp_path / "evidence-pack.json").read_text())
+    assert len(report["scenarios"]) == 5
+    assert all(row["signed_chain_verification"]["valid"] for row in report["scenarios"])

@@ -354,16 +354,16 @@ def test_the_verdict_records_which_planner_ran():
     assert response.json()["planner"] == "greedy"
 
 
-def test_a_run_that_needed_no_evidence_says_so_rather_than_naming_a_planner():
-    """Decisive at the prior: no selection was made, so none is the honest label."""
+def test_a_clean_prior_still_records_the_policy_required_network_check():
+    """A low prior now triggers the same evidence gate as local-only support."""
     response = client.post(
         "/v1/verify",
         headers=AUTH,
         json={"phone_number": "+99999991001", "context": {"event": "signup"}},
     )
 
-    assert response.json()["evidence_steps"] == 0
-    assert response.json()["planner"] == "none"
+    assert response.json()["planner"] == "policy"
+    assert response.json()["evidence_steps"] >= 1
 
 
 def test_a_partial_fallback_is_labelled_honestly(monkeypatch):

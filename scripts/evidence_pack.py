@@ -29,7 +29,7 @@ from typing import Any
 # Set before importing app.config (which reads environment settings once).
 os.environ["ISNAD_PROVIDER"] = "mock"
 os.environ["ISNAD_PLANNER"] = "greedy"
-os.environ.setdefault("ISNAD_DATABASE_URL", "sqlite://")
+os.environ["ISNAD_DATABASE_URL"] = "sqlite://"
 # ``python scripts/evidence_pack.py`` puts scripts/, rather than the repository
 # root, on sys.path. Make the documented command work without requiring install.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -38,6 +38,7 @@ from app.agent.investigator import build_engine_for_pricing, build_investigator
 from app.api.routes_console import DEMO_ACTS
 from app.chain.vault import vault
 from app.db import store
+from app.db.database import init_db
 from app.domain.schemas import VerificationRequest
 from app.policy import counterfactual
 from app.providers.mock import MockProvider
@@ -287,6 +288,8 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    # Standalone execution does not enter the app lifespan or pytest setup.
+    init_db()
     report = asyncio.run(build_report())
     json_path, markdown_path = write_report(report, args.output_dir)
     print(f"Wrote local scripted evidence pack: {json_path}")
