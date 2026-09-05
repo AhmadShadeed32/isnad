@@ -68,8 +68,10 @@ phone number into this document, a ticket, a chat, or a screen recording.
 
 ## Live procedure
 
-First start the hardened public deployment using the production checklist in
-`docs/PHASE2_AGENT_RUNBOOK.md`. Confirm `/readyz` returns 200 and confirm the
+Before a live run, complete the current OAuth contract checks in
+[P4a of the handoff](PHASE2_HANDOFF.md#p4a--build-the-live-consent-journey-locally).
+Start the controlled deployment using the [live deployment checklist](PHASE2_HANDOFF.md#4-path-to-a-live-product).
+Confirm `/readyz` returns 200 and confirm the
 registered callback matches `ISNAD_NAC_REDIRECT_URI` byte for byte.
 
 On the laptop that will display the QR code, enter the test inputs through hidden prompts so their values do not appear in

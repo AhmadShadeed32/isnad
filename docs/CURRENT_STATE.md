@@ -4,7 +4,8 @@ Updated 5 September 2026.
 
 - **Judges:** [README](../README.md) → [90-second walkthrough](JUDGE_WALKTHROUGH.md).
 - **Next developer session:** [compact handoff](PHASE2_HANDOFF.md). It holds the
-  current evidence, prioritized app work, live rollout plan and working rules.
+  current evidence, the step-by-step P1–P5 implementation contract (all not started),
+  live rollout plan and working rules.
 - **Score interpretation:** [risk score](RISK_SCORE.md).
 - **Harder scenarios:** [fixed synthetic evaluation](INDEPENDENT_EVALUATION.md).
 - **Real operator consent:** [handset validation](HANDSET_VALIDATION.md).
