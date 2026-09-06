@@ -20,6 +20,7 @@ from app.db import store
 from app.domain.schemas import Area, Money, RequestContext, VerificationRequest
 from app.events import current_owner, emit, subscribe
 from app.policy import counterfactual
+from app.presentation import present
 from app.providers import mock as mock_provider
 from app.providers.mock import MockProvider
 from app.screening import screen_call
@@ -305,6 +306,13 @@ async def console_run(
         "chain_grade": verdict.chain_grade.value,
         "chain_id": verdict.chain_id,
         "alternative": alternative,
+        # Same projection as the SSE 'verdict' event and /v1/verify (P2). Kept
+        # here too, in addition to the emit in investigator.py, so a judge.html
+        # run that never sees a stream event (a dropped connection before the
+        # first byte, or a venue proxy that buffers SSE) still gets the
+        # plain-language layer from this HTTP response, which is confirmed
+        # persisted by the time it returns.
+        "presentation": present(verdict).model_dump(mode="json"),
     }
 
 

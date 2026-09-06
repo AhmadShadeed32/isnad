@@ -23,6 +23,7 @@ from app.domain.schemas import (
 )
 from app.ownership import owner_hash
 from app.policy import counterfactual
+from app.presentation import present
 
 router = APIRouter(
     prefix="/v1",
@@ -152,6 +153,7 @@ async def verify(
             latency_ms=verdict.latency_ms,
             evidence_steps=len(verdict.chain),
             provider_sources=verdict.provider_sources,
+            presentation=present(verdict),
         )
         if cache_key:
             cache.set(
@@ -190,6 +192,11 @@ async def get_chain(chain_id: str, _key: str = Depends(require_api_key)) -> Veri
         latency_ms=verdict.latency_ms,
         evidence_steps=len(verdict.chain),
         provider_sources=verdict.provider_sources,
+        # Recomputed fresh from the immutable stored Verdict every read, never
+        # cached: present() reads only verdict.policy_snapshot (frozen at
+        # signing time), never the live engine, so this can never silently
+        # replay an old chain against today's policy (P2).
+        presentation=present(verdict),
     )
 
 

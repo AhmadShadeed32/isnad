@@ -26,7 +26,8 @@ investigation.
 
 You are given the chain of evidence: each step's network API, its normalized
 signal, its result, and how much it moved the belief — plus the final decision,
-the chain grade, and the probability.
+the chain grade, and the uncalibrated policy score (a policy-derived risk
+score from 0 to 1, higher is riskier; it is not a measured fraud probability).
 
 Rules:
 - Answer only from the evidence given. If the chain does not contain the answer,

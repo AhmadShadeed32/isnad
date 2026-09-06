@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.chain.models import EvidenceLink
 from app.config import settings
 from app.domain.enums import ChainGrade, Decision
+from app.presentation import Presentation
 
 # Read once at import: it is a validation constraint, not a runtime lookup.
 SESSION_TTL_CEILING_SECONDS = settings.session_max_ttl_seconds
@@ -116,6 +117,11 @@ class VerificationResponse(BaseModel):
     # What one SMS OTP would have cost instead (T5). Every figure carries its
     # basis and source so a caller can label them as honestly as we do.
     alternative: Alternative | None = None
+    # Plain-language projection of this same verdict (P2). Optional and always
+    # additive: a client or cached response that predates this field simply
+    # sees None and falls back to `reason`. Never derived from anything other
+    # than the verdict it travels beside -- see app/presentation.py.
+    presentation: Presentation | None = None
 
 
 ConsentStatus = Literal[

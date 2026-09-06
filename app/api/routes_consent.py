@@ -18,6 +18,7 @@ from app.domain.schemas import (
     VerificationResponse,
 )
 from app.policy import counterfactual
+from app.presentation import present
 
 router = APIRouter(prefix="/v1", tags=["consent"], dependencies=[Depends(limit_per_key)])
 
@@ -43,6 +44,7 @@ def _verification_response(verdict: Verdict, request: VerificationRequest) -> Ve
         alternative=counterfactual.compute(
             verdict, request.phone_number, build_engine_for_pricing()
         ),
+        presentation=present(verdict),
     )
 
 

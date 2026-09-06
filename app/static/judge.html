@@ -23,7 +23,8 @@
   button{font:inherit}.primary{border:0;border-radius:10px;padding:14px 16px;color:#17162b;background:linear-gradient(110deg,#f4cf71,var(--gold));font-weight:800;cursor:pointer;box-shadow:0 8px 20px rgba(229,187,89,.18);transition:transform .16s,opacity .16s}.primary:hover:not(:disabled){transform:translateY(-1px)}button:disabled{opacity:.5;cursor:not-allowed}.checkout-foot{margin-top:13px;font-size:11px;line-height:1.45;color:var(--muted)}.checkout-foot strong{color:var(--text)}
   .journey{padding:22px 24px 20px;min-height:525px;display:flex;flex-direction:column}.journey-head{display:flex;justify-content:space-between;align-items:start;gap:14px}.journey h2{font-size:15px;margin:0;letter-spacing:.01em}.journey .caption{font-size:12px;color:var(--muted);margin:5px 0 0}.statusline{font:11px var(--mono);color:var(--muted);padding:8px 0 14px;border-bottom:1px solid var(--line);min-height:38px}.steps{display:flex;gap:5px;margin:17px 0}.step{height:5px;flex:1;background:#26325b;border-radius:8px;transition:.25s}.step.active{background:var(--gold)}.step.good{background:var(--green)}.step.bad{background:var(--red)}
   .trace{flex:1;display:flex;flex-direction:column;gap:8px;overflow:auto;max-height:275px;padding-right:2px}.empty{margin:auto;color:var(--muted);font-size:13px;text-align:center;line-height:1.55;max-width:350px}.trace-row{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:10px;align-items:start;border:1px solid #26325b;background:#0c1230;border-radius:10px;padding:10px 12px;font-size:12px}.trace-row .mark{font-weight:800;text-align:center}.trace-row.pass .mark{color:var(--green)}.trace-row.flag .mark{color:var(--red)}.trace-row.info .mark{color:var(--amber)}.trace-title{font-weight:700}.trace-detail{margin-top:3px;color:var(--muted);line-height:1.4}.trace-meta{font:10px var(--mono);color:var(--muted);text-align:right;white-space:nowrap}.provenance{display:inline-block;margin-top:4px;border:1px solid #43527f;border-radius:999px;padding:2px 5px;font:9px var(--mono);letter-spacing:.02em;color:var(--muted)}.provenance.sim{border-color:#946f2e;color:var(--amber)}.provenance.live{border-color:#317b61;color:var(--green)}
-  .outcome{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;border-top:1px solid var(--line);margin-top:15px;padding-top:15px}.decision{font:800 23px var(--mono);letter-spacing:.04em}.decision.ALLOW{color:var(--green)}.decision.CHALLENGE{color:var(--amber)}.decision.DECLINE{color:var(--red)}.reason{font-size:12px;color:var(--muted);line-height:1.4;margin-top:4px;max-width:470px}.grade{font:10px var(--mono);color:var(--muted);margin-top:6px}.receipt{display:none;text-align:right}.receipt.visible{display:block}.receipt a{display:inline-block;border:1px solid var(--gold);color:var(--gold);padding:8px 10px;border-radius:8px;font-size:11px;text-decoration:none;font-weight:700}.receipt button{display:block;margin:7px 0 0 auto;border:0;background:none;color:var(--muted);font-size:10px;text-decoration:underline;cursor:pointer}.vault{font:10px var(--mono);color:var(--green);margin-top:5px;min-height:12px}
+  .outcome{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:start;border-top:1px solid var(--line);margin-top:15px;padding-top:15px}.decision{font:800 23px var(--mono);letter-spacing:.04em}.decision.ALLOW{color:var(--green)}.decision.CHALLENGE{color:var(--amber)}.decision.DECLINE{color:var(--red)}.reason{font-size:12px;color:var(--muted);line-height:1.4;max-width:520px}.grade{font:10px var(--mono);color:var(--muted);margin-top:6px}.receipt{display:none;text-align:right}.receipt.visible{display:block}.receipt a{display:inline-block;border:1px solid var(--gold);color:var(--gold);padding:8px 10px;border-radius:8px;font-size:11px;text-decoration:none;font-weight:700}.receipt button{display:block;margin:7px 0 0 auto;border:0;background:none;color:var(--muted);font-size:10px;text-decoration:underline;cursor:pointer}.vault{font:10px var(--mono);color:var(--green);margin-top:5px;min-height:12px}
+  .presentation-summary{font-size:13px;color:var(--text);line-height:1.5;margin:6px 0 0;max-width:560px}.fact-group{margin-top:10px}.fact-label{font:10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}.facts{list-style:none;margin:0;padding:0;max-width:560px}.facts li{font-size:12px;line-height:1.5;color:var(--muted);padding:4px 0 4px 16px;position:relative}.facts li::before{content:"";position:absolute;left:2px;top:11px;width:6px;height:6px;border-radius:50%;background:var(--line)}.facts.adverse li::before{background:var(--red)}.facts.supporting li::before{background:var(--green)}.facts.unresolved li::before{background:var(--amber)}.next-action{font-size:13px;color:var(--text);font-weight:600;margin-top:12px;max-width:520px;line-height:1.45}.audit{margin-top:16px;border-top:1px dashed var(--line);padding-top:12px}.audit summary{cursor:pointer;font:10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}.audit summary:focus-visible{outline:2px solid var(--gold);outline-offset:2px}.audit .decision.small{font-size:14px;margin-top:8px}
   .session-beat{display:none;margin-top:14px;border:1px solid #38556d;background:#0c1832;border-radius:11px;padding:12px}.session-beat.visible{display:block}.session-title{display:flex;gap:8px;align-items:center;font-size:12px;font-weight:700}.session-title .provenance{margin:0}.session-copy{font-size:11px;line-height:1.45;color:var(--muted);margin:6px 0 10px}.session-actions{display:flex;gap:8px;flex-wrap:wrap}.session-actions button{border:1px solid #526695;border-radius:7px;background:#152448;color:var(--text);font-size:11px;font-weight:700;padding:8px 9px;cursor:pointer}.session-actions button:hover:not(:disabled){border-color:var(--gold);color:var(--gold)}.session-state{font:10px var(--mono);color:var(--muted);margin-top:9px;min-height:14px}.session-state.ok{color:var(--green)}.session-state.flag{color:var(--red)}
   .proof{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:20px}.proof .card{padding:17px}.proof h3{font-size:12px;margin:0 0 7px;color:var(--gold);letter-spacing:.04em}.proof p{font-size:12px;line-height:1.48;color:var(--muted);margin:0}.proof b{color:var(--text)}
   .fallback{display:none;margin-top:18px;border:1px solid #70404b;border-radius:11px;color:#ffc4c4;background:#321d2a;padding:12px;font-size:12px;line-height:1.45}.fallback.visible{display:block}.technical{margin-top:20px;text-align:center;color:var(--muted);font-size:11px}.technical a{color:var(--gold)}
@@ -50,7 +51,8 @@
       <div class="summary"><div class="summary-line"><span class="subdued">Basket</span><span>Home essentials</span></div><div class="summary-line"><span class="subdued">Payment</span><span>Cash on delivery</span></div><div class="summary-line total"><span>Total</span><span>1,500 USD</span></div></div>
       <button id="checkout" class="primary" type="button">Investigate the SIM change</button>
       <button id="cleanCheckout" class="primary" style="margin-top:10px;background:var(--surface2);color:var(--text);box-shadow:none" type="button">Try a clean checkout</button>
-      <div id="checkoutFoot" class="checkout-foot"><strong>Expected: CHALLENGE.</strong> Ask for the merchant’s step-up instead of automatically declining. Both examples use simulated operator answers.</div>
+      <button id="gapCheckout" class="primary" style="margin-top:10px;background:var(--surface2);color:var(--text);box-shadow:none" type="button">Show an unresolved-evidence case</button>
+      <div id="checkoutFoot" class="checkout-foot"><strong>Expected: CHALLENGE.</strong> Ask for the merchant’s step-up instead of automatically declining. All three examples use simulated operator answers.</div>
     </article>
 
     <article class="card journey">
@@ -58,7 +60,23 @@
       <div id="statusline" class="statusline">Ready for checkout.</div>
       <div class="steps" aria-hidden="true"><span id="s1" class="step"></span><span id="s2" class="step"></span><span id="s3" class="step"></span><span id="s4" class="step"></span></div>
       <div id="trace" class="trace"><p class="empty">Start the checkout to see exactly what the agent considers, what it asks the network, and why it stops.</p></div>
-      <div class="outcome"><div><div id="decision" class="decision">—</div><div id="reason" class="reason">No evidence chain yet.</div><div id="grade" class="grade"></div></div><div id="receipt" class="receipt"><a id="receiptLink" href="#">Open signed receipt ↗</a><button id="verifySignature" type="button">Check Ed25519 signature</button><div id="vault" class="vault"></div></div></div>
+      <div class="outcome">
+        <div>
+          <div id="presentationTitle" class="decision">—</div>
+          <p id="presentationSummary" class="presentation-summary">Start a checkout to see the plain-language result here.</p>
+          <div id="supportingGroup" class="fact-group" hidden><div class="fact-label">Supporting evidence</div><ul id="supportingFacts" class="facts supporting"></ul></div>
+          <div id="adverseGroup" class="fact-group" hidden><div class="fact-label">Adverse evidence</div><ul id="adverseFacts" class="facts adverse"></ul></div>
+          <div id="unresolvedGroup" class="fact-group" hidden><div class="fact-label">Could not be checked</div><ul id="unresolvedFacts" class="facts unresolved"></ul></div>
+          <div id="presentationAction" class="next-action"></div>
+          <details class="audit">
+            <summary>Technical and audit details</summary>
+            <div id="decision" class="decision small">—</div>
+            <div id="reason" class="reason">No evidence chain yet.</div>
+            <div id="grade" class="grade"></div>
+          </details>
+        </div>
+        <div id="receipt" class="receipt"><a id="receiptLink" href="#">Open signed receipt ↗</a><button id="verifySignature" type="button">Check Ed25519 signature</button><div id="vault" class="vault"></div></div>
+      </div>
       <div id="sessionBeat" class="session-beat"><div class="session-title">Continue trust after checkout <span class="provenance sim">DEMO-ONLY · simulator</span></div><p id="sessionCopy" class="session-copy">Start a short trust session for this fixed checkout fixture, then simulate a SIM change. A live deployment waits for a real network signal instead.</p><div class="session-actions"><button id="startTrust" type="button">Continue trust</button><button id="simulateSwap" type="button" disabled>Simulate SIM swap</button></div><div id="sessionState" class="session-state">No live trust session.</div></div>
     </article>
   </section>
@@ -80,6 +98,7 @@
 const DEMO_TOKEN = '__ISNAD_JUDGE_TOKEN__';
 const checkout = document.getElementById('checkout');
 const cleanCheckout = document.getElementById('cleanCheckout');
+const gapCheckout = document.getElementById('gapCheckout');
 let activeScenario = 'replacement';
 const mode = document.getElementById('mode');
 const planner = document.getElementById('planner');
@@ -88,6 +107,15 @@ const trace = document.getElementById('trace');
 const decision = document.getElementById('decision');
 const reason = document.getElementById('reason');
 const grade = document.getElementById('grade');
+const presentationTitle = document.getElementById('presentationTitle');
+const presentationSummary = document.getElementById('presentationSummary');
+const presentationAction = document.getElementById('presentationAction');
+const supportingGroup = document.getElementById('supportingGroup');
+const supportingFacts = document.getElementById('supportingFacts');
+const adverseGroup = document.getElementById('adverseGroup');
+const adverseFacts = document.getElementById('adverseFacts');
+const unresolvedGroup = document.getElementById('unresolvedGroup');
+const unresolvedFacts = document.getElementById('unresolvedFacts');
 const receipt = document.getElementById('receipt');
 const receiptLink = document.getElementById('receiptLink');
 const verifySignature = document.getElementById('verifySignature');
@@ -102,6 +130,11 @@ const stepEls = [1,2,3,4].map(n => document.getElementById('s' + n));
 let demoMode = false;
 let configuredProvider = 'unknown';
 let activeRunId = null;
+// The run_id whose verdict has already been rendered from a persistence-
+// confirmed response (the receipt is visible). A stream reconnect or a
+// duplicate SSE 'verdict' delivery for that same run must not re-render over
+// it with an earlier, not-yet-confirmed SSE-only snapshot.
+let completedRunId = null;
 let latestChainId = null;
 let eventSource = null;
 let streamCredential = null;
@@ -147,7 +180,7 @@ function setMode(data){
   mode.textContent = providerLabel + (demoMode ? ' · stage mode' : '');
   mode.className = 'mode ' + (configuredProvider === 'nac' && !demoMode ? 'live' : 'sim');
   planner.textContent = 'planner: ' + (data.planner || 'unknown');
-  if (!demoMode){ checkout.disabled = true; cleanCheckout.disabled = true; document.getElementById('checkoutFoot').textContent = 'Stage checkout is disabled outside demo mode. Use the authenticated production API for live customer requests.'; }
+  if (!demoMode){ checkout.disabled = true; cleanCheckout.disabled = true; gapCheckout.disabled = true; document.getElementById('checkoutFoot').textContent = 'Stage checkout is disabled outside demo mode. Use the authenticated production API for live customer requests.'; }
 }
 function scheduleStreamReconnect(){
   if (streamReconnectTimer || !key()) return;
@@ -193,21 +226,55 @@ function onEvent(event){
     appendTrace(kind, event.api || event.signal || 'Network evidence', event.detail || event.signal || '', event.source, 'risk score ' + event.p_fraud + windowText);
     setStatus('Evidence received with its source and result.');
   } else if (event.type === 'verdict'){
+    if (event.run_id === completedRunId) return; // already rendered from a persistence-confirmed response
     stepEls.forEach((s, index) => s.className = 'step ' + (index === 3 ? (event.decision === 'DECLINE' ? 'bad' : 'good') : 'good'));
     streamedVerdict = event;
-    renderVerdict(event); setStatus('Decision complete. The receipt below contains the signed evidence chain.');
+    // Not yet persisted: this event fires from inside the server's investigation,
+    // before the caller has saved the chain. persisted stays false so the
+    // receipt link does not appear before there is a receipt to open.
+    renderVerdict(event, {persisted:false}); setStatus('Decision complete. Saving the signed evidence chain…');
   }
 }
-function renderVerdict(data){
+function setFactGroup(group, list, items){
+  group.hidden = items.length === 0;
+  list.replaceChildren();
+  items.forEach(text => { const li = document.createElement('li'); li.textContent = text; list.appendChild(li); });
+}
+function applyPresentation(data){
+  const p = data.presentation;
+  if (p && typeof p === 'object'){
+    presentationTitle.textContent = p.title || (data.decision || '—');
+    presentationSummary.textContent = p.summary || '';
+    presentationAction.textContent = p.next_action || '';
+    setFactGroup(supportingGroup, supportingFacts, Array.isArray(p.supporting_facts) ? p.supporting_facts : []);
+    setFactGroup(adverseGroup, adverseFacts, Array.isArray(p.adverse_facts) ? p.adverse_facts : []);
+    setFactGroup(unresolvedGroup, unresolvedFacts, Array.isArray(p.unresolved_checks) ? p.unresolved_checks : []);
+    return;
+  }
+  // Backward-compatible fallback: an older cached response or an in-flight SSE
+  // snapshot with no presentation attached yet. Falls back to the existing
+  // reason text rather than showing nothing.
+  presentationTitle.textContent = data.decision || '—';
+  presentationSummary.textContent = data.reason || 'No evidence chain yet.';
+  presentationAction.textContent = '';
+  setFactGroup(supportingGroup, supportingFacts, []);
+  setFactGroup(adverseGroup, adverseFacts, []);
+  setFactGroup(unresolvedGroup, unresolvedFacts, []);
+}
+function renderVerdict(data, {persisted = true} = {}){
   latestChainId = data.chain_id;
-  decision.textContent = data.decision || '—'; decision.className = 'decision ' + (data.decision || '');
+  decision.textContent = data.decision || '—'; decision.className = 'decision small ' + (data.decision || '');
+  presentationTitle.className = 'decision ' + (data.decision || '');
+  applyPresentation(data);
   reason.textContent = data.reason || '';
   const steps = data.evidence_steps ?? '—';
-  const latency = data.latency_ms ?? '—';
-  grade.textContent = 'chain grade: ' + (data.chain_grade || 'not recorded') + ' · ' + steps + ' evidence steps · ' + latency + ' ms';
+  // "Demo duration", not a latency claim: the console paces each check at
+  // roughly 650 ms so the trace is readable on stage. It is presentational
+  // pacing, never a measurement of real network latency.
+  const duration = data.latency_ms ?? '—';
+  grade.textContent = 'chain grade: ' + (data.chain_grade || 'not recorded') + ' · ' + steps + ' evidence steps · demo duration ' + duration + ' ms (paced ~650 ms per check for readability, not a latency measurement)';
   if (data.planner) planner.textContent = 'planner: ' + data.planner;
-  receiptLink.href = '/r/' + encodeURIComponent(latestChainId);
-  receipt.classList.add('visible'); vault.textContent = '';
+  vault.textContent = '';
   sessionId = null; simulateSwap.disabled = true;
   const isCleanAllow = activeScenario === 'clean' && data.decision === 'ALLOW';
   sessionBeat.classList.toggle('visible', isCleanAllow);
@@ -217,31 +284,65 @@ function renderVerdict(data){
     ? 'Start a short trust session for this fixed checkout fixture, then simulate a SIM change. A live deployment waits for a real network signal instead.'
     : 'This continuity drill is intentionally disabled: simulated swaps are available only in demo mode with the mock provider. Live deployments wait for real network changes.';
   setSessionState(canSimulate ? 'Ready for a demo-only continuity check.' : 'Simulator continuity drill unavailable in this environment.');
+  if (persisted && latestChainId){
+    // Only now, confirmed saved by the server that returned this response,
+    // does a receipt actually exist to open.
+    receiptLink.href = '/r/' + encodeURIComponent(latestChainId);
+    receipt.classList.add('visible');
+    completedRunId = activeRunId;
+    setStatus('Decision complete. The receipt below contains the signed evidence chain.');
+  }
 }
+const SCENARIO_COPY = {
+  replacement: {
+    title: 'New SIM. Same customer.',
+    story: 'Her SIM was replaced, but her handset is unchanged. A rule that declines every SIM change loses her order. Isnad checks the surrounding evidence before deciding.',
+    foot: 'Expected: CHALLENGE. Ask for the merchant’s step-up instead of automatically declining. Operator answers are simulated.',
+    path: '/v1/console/run/act6',
+  },
+  clean: {
+    title: 'A clean checkout.',
+    story: 'A new customer has no merchant history. Supporting network evidence can let this checkout proceed without another step-up.',
+    foot: 'Expected: ALLOW. Supporting evidence clears this fixed example. Operator answers are simulated.',
+    path: '/v1/console/run/act3',
+  },
+  gap: {
+    title: 'Consent withheld, one operator gone quiet.',
+    story: 'The customer has not granted Number Verification consent, and one operator check comes back unavailable rather than pass or fail. The chain has a real gap in it, not a contradiction.',
+    foot: 'Expected: CHALLENGE, evidence unresolved. This is "we could not check," not "the check failed."',
+    path: '/v1/console/run/act5',
+  },
+};
 async function runCheckout(scenario = 'replacement'){
   if (!demoMode || !key()) return;
   activeScenario = scenario;
-  const clean = scenario === 'clean';
-  document.getElementById('customerTitle').textContent = clean ? 'A clean checkout.' : 'New SIM. Same customer.';
-  document.getElementById('customerStory').textContent = clean
-    ? 'A new customer has no merchant history. Supporting network evidence can let this checkout proceed without another step-up.'
-    : 'Her SIM was replaced, but her handset is unchanged. A rule that declines every SIM change loses her order. Isnad checks the surrounding evidence before deciding.';
-  document.getElementById('checkoutFoot').textContent = clean
-    ? 'Expected: ALLOW. Supporting evidence clears this fixed example. Operator answers are simulated.'
-    : 'Expected: CHALLENGE. Ask for the merchant’s step-up instead of automatically declining. Operator answers are simulated.';
-  checkout.disabled = true; cleanCheckout.disabled = true; sessionBeat.classList.remove('visible'); fallback.classList.remove('visible'); latestChainId = null; streamedVerdict = null; receipt.classList.remove('visible');
-  trace.replaceChildren(); clearSteps(); decision.textContent = 'VERIFYING'; decision.className = 'decision'; reason.textContent = 'The agent is deciding what evidence it needs.'; grade.textContent = '';
+  const copy = SCENARIO_COPY[scenario] || SCENARIO_COPY.replacement;
+  document.getElementById('customerTitle').textContent = copy.title;
+  document.getElementById('customerStory').textContent = copy.story;
+  document.getElementById('checkoutFoot').textContent = copy.foot;
+  checkout.disabled = true; cleanCheckout.disabled = true; gapCheckout.disabled = true;
+  sessionBeat.classList.remove('visible'); fallback.classList.remove('visible');
+  latestChainId = null; streamedVerdict = null; receipt.classList.remove('visible'); completedRunId = null;
+  trace.replaceChildren(); clearSteps();
+  decision.textContent = 'VERIFYING'; decision.className = 'decision small';
+  presentationTitle.textContent = 'VERIFYING'; presentationTitle.className = 'decision';
+  presentationSummary.textContent = 'The agent is deciding what evidence it needs.';
+  presentationAction.textContent = '';
+  setFactGroup(supportingGroup, supportingFacts, []); setFactGroup(adverseGroup, adverseFacts, []); setFactGroup(unresolvedGroup, unresolvedFacts, []);
+  reason.textContent = 'The agent is deciding what evidence it needs.'; grade.textContent = '';
   activeRunId = newRunId(); setStatus('Starting a deterministic, simulated checkout fixture…');
   try{
-    const fixturePath = scenario === 'clean' ? '/v1/console/run/act3' : '/v1/console/run/act6';
-    const data = await apiJson(fixturePath, {method:'POST', headers:{'X-Console-Run-Id':activeRunId}});
-    // SSE normally draws the outcome first; rendering the response too makes a
-    // successful decision resilient to an event stream reconnect.
-    renderVerdict({...data, ...(streamedVerdict || {})});
+    const data = await apiJson(copy.path, {method:'POST', headers:{'X-Console-Run-Id':activeRunId}});
+    // The HTTP response returns only after the server has persisted the chain,
+    // so this call, not the earlier SSE 'verdict' event, is what confirms a
+    // receipt actually exists. SSE normally draws the outcome first for
+    // responsiveness; merging its fields here just fills in anything the
+    // slightly-earlier stream event carried that this response also confirms.
+    renderVerdict({...data, ...(streamedVerdict && streamedVerdict.run_id === activeRunId ? streamedVerdict : {})}, {persisted:true});
   }catch(err){
     fallback.textContent = 'Checkout fixture could not run: ' + safeError(err) + '. Reload for a fresh demo session, then try again.';
     fallback.classList.add('visible'); setStatus('Checkout did not complete.');
-  }finally{ checkout.disabled = !demoMode; cleanCheckout.disabled = !demoMode; }
+  }finally{ checkout.disabled = !demoMode; cleanCheckout.disabled = !demoMode; gapCheckout.disabled = !demoMode; }
 }
 async function checkSignature(){
   if (!latestChainId) return;
@@ -297,12 +398,13 @@ async function simulateTrustSwap(){
 }
 checkout.addEventListener('click', () => runCheckout('replacement'));
 cleanCheckout.addEventListener('click', () => runCheckout('clean'));
+gapCheckout.addEventListener('click', () => runCheckout('gap'));
 verifySignature.addEventListener('click', checkSignature);
 startTrust.addEventListener('click', startTrustSession);
 simulateSwap.addEventListener('click', simulateTrustSwap);
 (async function configure(){
   try { setMode(await apiJson('/v1/console/mode')); await connectStream(); }
-  catch(err){ mode.textContent = 'SERVER MODE UNKNOWN'; mode.className = 'mode sim'; checkout.disabled = true; cleanCheckout.disabled = true; fallback.textContent = 'Could not read the secure demo mode: ' + safeError(err); fallback.classList.add('visible'); }
+  catch(err){ mode.textContent = 'SERVER MODE UNKNOWN'; mode.className = 'mode sim'; checkout.disabled = true; cleanCheckout.disabled = true; gapCheckout.disabled = true; fallback.textContent = 'Could not read the secure demo mode: ' + safeError(err); fallback.classList.add('visible'); }
 }());
 </script>
 </body>

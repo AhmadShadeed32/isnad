@@ -97,8 +97,17 @@ def create_app() -> FastAPI:
 
     @app.get("/", include_in_schema=False)
     async def root() -> RedirectResponse:
-        # Land visitors on the live console.
-        return RedirectResponse(url="/console")
+        """Land a visitor on the right entry point (P2).
+
+        In demo mode, `/judge` is the focused, plain-language demonstration —
+        the entry point this package exists to make honest. Read from
+        `settings` at request time, not captured at app-creation time, so a
+        test that monkeypatches `settings.demo_mode` sees the change without
+        rebuilding the app. Outside demo mode this is unchanged from before:
+        the full authenticated console, with its existing credential gating
+        untouched.
+        """
+        return RedirectResponse(url="/judge" if settings.demo_mode else "/console")
 
     @app.get("/favicon.ico", include_in_schema=False)
     async def favicon() -> Response:

@@ -1,7 +1,7 @@
 # Isnad — compact handoff
 
-Updated 5 September 2026. **Read this file first.** It replaces the long running
-log with current facts and an implementation plan. Read the ledger in §3 to resume. The complete earlier log is preserved
+Updated 6 September 2026. **Read this file first.** It replaces the long running
+log with current facts and an implementation plan. Read §6 first for the hackathon deadline; use the ledger in §3 for product work. The complete earlier log is preserved
 in [commit faf467f](https://github.com/AhmadShadeed32/isnad-private/blob/faf467ffd1150127a0f16de3a1bea7936d60794e/docs/PHASE2_HANDOFF.md).
 
 ## 1. Current product and evidence
@@ -22,9 +22,13 @@ at checkout; keep caller verification and session revocation for follow-up quest
 - Fixed 13-case set: 28 versus 78 calls, 3/13 CHALLENGE, six conservative
   expectation disagreements. These are synthetic judgments, not observed fraud
   outcomes. [Full evaluation](INDEPENDENT_EVALUATION.md).
-- Last implementation verification: **506 tests passed**, Ruff and JS syntax
-  clean. Browser verified both judge outcomes and valid → tampered-invalid →
-  restored receipt signatures. A receipt proves issuance/integrity, not provider truth.
+- P1 implementation record reports **516 tests passed** and Ruff clean. The
+  earlier 506-test review also browser-verified both judge outcomes and valid →
+  tampered-invalid → restored receipt signatures; P1 did not repeat that browser check. A receipt proves issuance/integrity, not provider truth.
+- P2 (6 Sep, see §7) added a plain-language presenter (`app/presentation.py`)
+  and re-verified all of the above by browser: ALLOW, CHALLENGE (both the
+  DEGRADED-corroboration and UNRESOLVED-provider shapes), and tamper detection,
+  at desktop and 375 px width. **541 tests passed**, Ruff clean.
 
 ## 2. Mock parity — exact wording to preserve
 
@@ -46,23 +50,24 @@ Sources: `app/providers/mock.py`, `nac.py`, `vocabulary.py`, and
 
 ## 3. Recommended app work — not implemented in this documentation pass
 
-This is the implementation contract for the five product suggestions. **Every
-package below is NOT STARTED.** Named new files/routes/models are proposals, not
-existing functionality. Inspect the current checkout before applying the plan;
+This is the implementation contract for the five product suggestions. **Use the
+status ledger below; P1 has been implemented.** New files/routes/models in unfinished
+packages remain proposals until their implementation is verified. Inspect the current checkout before applying the plan;
 record any justified change to these contracts here before implementing it.
 
 ### Execution order and completion ledger
 
 | Package | Deliverable | Depends on | Status |
 | --- | --- | --- | --- |
-| P1 | Honest location fixtures and provider preconditions | Baseline checks | COMPLETE (5 Sep session; see §6) |
-| P2 | Plain-language merchant result and focused demo entry | P1 | NOT STARTED |
+| P1 | Honest location fixtures and provider preconditions | Baseline checks | COMPLETE (implementation record in §7) |
+| P2 | Plain-language merchant result and focused demo entry | P1 | PARTIAL (6 Sep implementation session; see §7) |
 | P4a | Local live-consent journey and current OAuth contract | P1, P2 | NOT STARTED |
 | P3 | Merchant challenge attempt and completion reporting | P2; reuse P4a harness | NOT STARTED |
 | P5 | Merchant outcome collection and evaluation report | P3 event/ownership conventions | NOT STARTED |
 | P4b | Physical handset/operator proof | P4a + external prerequisites in §4 | NOT STARTED |
 
-Build in table order. P4b can run as soon as its prerequisites exist; an absent
+For the full product roadmap, build in table order; §6 gives a smaller submission scope.
+P4b can run as soon as its prerequisites exist; an absent
 SIM or operator setup must not prevent local P3/P5 work. Do not label P4 complete
 until P4b passes. One agent owns schema/migration integration; agents can review
 or work on separate files, but must not independently allocate migration numbers
@@ -508,20 +513,229 @@ the last review). Use the current live app recording script instead.
   Public `origin` is a different destination. Do not infer a public push from a
   private publication request.
 
-## 6. Latest session
+## 6. MENA Ignite submission priorities — reviewed 6 September 2026
 
-**Intent — 5 Sep:** add a source-checked, step-by-step implementation plan for
-all five product recommendations, including dependency order, proposed contracts,
-file ownership, failure tests and completion evidence. This request is for the
-plan only; app changes, deployment and provider calls are not part of this pass.
+**Read this section before executing the full P1–P5 roadmap.** This is a
+competition delivery plan, not a claim that these changes guarantee a win.
+All H-items below are recommendations and NOT STARTED. Preserve the larger
+merchant pilot plan; do not attempt to finish its entire scope before submission.
 
-**Completion — documentation only:** all five recommendations now have ordered
-packages, dependency/status ledger, source files, proposed contracts, failure tests
-and objective exit criteria. A second review checked auth/callback compatibility,
-retention dependencies and receipt immutability. Updated the entry-point note and
-replaced the handset procedure's untracked runbook reference with this plan.
-Local links/anchors and diff whitespace verified; Graphify refreshed. No app
-implementation, deployment, provider calls, commit or push in this pass.
+### Verified event facts and unresolved requirements
+
+- The [HackerEarth event page](https://www.hackerearth.com/community/challenges/hackathon/mena-ignite-hackathon/)
+  lists prototype close as **13 Sep 2026, 18:29 UTC / 21:29 Asia/Riyadh** and
+  teams of 1–5. Its detailed judging/rules/submission tabs could not be reliably
+  retrieved in this review; their weights, file limits and access rules are **unverified**.
+- [GSMA's announcement](https://www.gsma.com/solutions-and-impact/gsma-open-gateway/gsma_events/gsma-mena-ignite-open-gateway-hackathon/)
+  requires CAMARA APIs and AI applied to regional problems. It describes telecom
+  executive judges and a later winners' showcase. Its overall event window extends
+  beyond the prototype deadline; do not treat that as an extension for submission.
+- The [organizer's event post](https://www.linkedin.com/posts/hackerearth_menaignitehackathon-opengateway-camaraapis-activity-7480246882603270144-QrtM)
+  names Nokia NaC, agent orchestration, and themes including digital identity and
+  fintech. Isnad fits those themes; confirm the exact selected track in the team's form.
+
+**Deadline conflict:** the older local `docs/PROJECT_BRIEF.md` says 11 September,
+while the public portal says 13 September. The former is an internal note, not
+fresh official evidence. Ask for the team's Phase 2 email/form and resolve the
+conflict. Until resolved, plan delivery by **11 September** and aim for an internal
+artifact freeze on **10 September**. These are conservative planning targets,
+not newly invented official deadlines. Exact evaluation weights, video length,
+required deck/template, repository visibility, AI/tool restrictions, simulator
+acceptability and any existing-code disclosure rules must be checked in the
+current team submission instructions. Do not guess them from Phase 1 material.
+
+### H0 — Confirm the submission contract before building more
+
+1. Obtain/read the authenticated Phase 2 instructions or organizer email without
+   submitting or messaging anyone automatically. Record deadline/timezone, rubric,
+   required files, length/size limits, repo/demo access, track and tool requirements.
+   Resolve the 11/13 Sep conflict. Replace the unknowns above only with a dated source.
+2. Prepare one submission manifest: artifact name, local path, delivery URL,
+   revision, access-test result and requirement satisfied. Proposed path:
+   `docs/submission/SUBMISSION_MANIFEST.md`. Do not add inaccessible local-only
+   runbooks or an old video just because those files already exist.
+3. Verify that judges can access the **private** repository through the permitted
+   sharing mechanism. A private GitHub URL alone does not grant access. Do not
+   make `origin` public, invite accounts, upload files or submit on the user's
+   behalf without the applicable authorization.
+
+**Pass:** every required artifact/access rule is sourced and the submission
+manifest has no unknown mandatory field. Current portal-tab access trouble is a
+verification gap, not evidence that no requirements exist.
+
+### H1 — Make the AI contribution visible and measurable
+
+**Why this changes priority:** the README launch command explicitly uses greedy
+planning. That is a reproducible baseline, but it does not demonstrate the
+existing model planner. This review does not establish that an LLM is mandatory
+or that greedy disqualifies the entry; it recommends showing the implemented AI
+rather than leaving the judges to infer it from an “agent” label.
+
+1. Confirm the completed P1 regression still passes and finish essential P2 result copy. Review
+   `app/agent/planner.py`, `app/agent/gemini.py`, `app/agent/investigator.py`,
+   `scripts/planner_divergence.py` and `tests/test_llm_planner.py`.
+2. Use a separately configured, operator-controlled LLM demo process with the
+   model key only on the server. Do not mutate global `settings.planner` per
+   browser request or turn a public toggle into unrestricted model spend.
+   Keep the greedy baseline available as a clearly labelled separate run.
+3. Show the model's actual next-check selection, concise selection rationale,
+   remaining evidence budget and stop decision. These are observable outputs,
+   not hidden chain-of-thought. One scenario button starts the merchant intent;
+   the user must not choose each network API by hand.
+4. Compare LLM and greedy on the same fixed requests, evidence fixtures and policy.
+   Use the divergence script with an explicitly bounded model-call budget when
+   authorized. Report answer/fallback rate, evidence path, calls, verdict/grade
+   disagreements and model waiting time. Do not reuse the older untracked brief's
+   “18% fewer checks” claim or select only favorable trials.
+5. The comparison script does not persist/sign its investigation results. Record
+   a separate actual API/UI run for a signed AI-planned receipt. Each receipt and
+   trace must retain the actual `llm`, `greedy`, mixed or policy-only label.
+   A fallback is never presented as a successful model decision.
+6. Exercise timeout, malformed model output and a STOP-capable planner against
+   required-check gates. Do not loosen policy or remove fallback to manufacture
+   visible divergence. If the model adds no measured benefit, report that result
+   and explain its bounded role rather than claiming superior accuracy.
+
+**Pass:** a judge can see which action the AI selected, verify that policy still
+controls safety boundaries, and inspect a genuine run plus an honest baseline.
+Do not make the whole submission depend on a model request succeeding on stage.
+
+### H2 — Show verifiable Nokia NaC integration, with precise scope
+
+1. Create a small API evidence inventory using `docs/nac/`,
+   `scripts/t1_probe.py`, `scripts/t1_capture.py` and `tests/test_nac_contract.py`.
+   For each used action record SDK/API version, test date, environment,
+   normalized result and reproduction path. Identify adapter reports as such;
+   a JSON key called `raw` is not proof that it contains a raw operator response.
+2. Separate three claims in the UI and recording: local MockProvider fixtures,
+   requests to a vendor simulator through NaC, and actual supported-subscriber
+   operator evidence. A historical NaC capture is useful integration evidence,
+   but is not today's live run or a physical handset consent proof.
+3. After confirming permitted tools/simulation with H0, prefer a narrowly scoped
+   authorized NaC demonstration using an API the team can actually exercise.
+   Keep SDK keys, test identifiers and transient authorization values out of
+   screenshots/logs. Never count `CONSENT_REQUIRED` as working Number Verification.
+4. Complete P4a/P4b if the supported handset, operator registration and time are
+   available. Otherwise preserve that milestone as unproven and use accurately
+   labelled evidence; do not bypass OAuth to finish a recording.
+5. `routes_console.py` explicitly constructs `MockProvider(step_delay_ms=650)`:
+   setting a provider environment variable alone does not turn Judge Mode into
+   a live demo. Use the authenticated provider path or P4 harness for that proof.
+   Do not expose arbitrary live requests through fixed stage controls.
+6. Do not use `HybridProvider` as proof that no fallback occurred: it intentionally
+   substitutes a mock link after a live exception. Any mixed run must show sources
+   per link and be called mixed. Use strict NaC mode for a claimed live proof.
+
+**Pass:** judges can distinguish fixture execution from sponsor-platform access
+and physical operator proof. Every claimed working API has inspectable evidence.
+
+### H3 — Make one MENA customer problem specific
+
+1. Choose one initial buyer and workflow: for example, a Jordanian merchant
+   reviewing a high-value cash-on-delivery order. Keep caller attestation and
+   session monitoring for questions; avoid presenting three businesses at once.
+2. Make the product action concrete with P2: hold for merchant verification,
+   proceed, or stop. Show the warning, supporting facts and remaining uncertainty.
+   Do not frame a COD example as a card chargeback workflow.
+3. Add Arabic/English action labels and a tested RTL layout to the judge/receipt
+   presentation if the team can review the translation. Keep source/signed enum
+   values unchanged and test phone widths, digits and mixed-direction API names.
+   This is a proposed usability improvement, not a published scoring requirement.
+4. Keep monetary inputs consistent. Relabelling USD as JOD/SAR would change the
+   meaning of a model that currently compares raw amounts to a fixed threshold.
+   Preserve existing synthetic amounts/currency until currency handling is designed
+   and tested; localize the story without inventing financial comparisons.
+5. Prepare three discovery questions for a merchant/mentor: what currently triggers
+   manual review, what evidence would justify releasing the hold, and what outcome
+   data they can supply for evaluation. Conduct contact only with explicit permission.
+   Record actual feedback with attribution permission; never invent a pilot, quote,
+   regional market statistic or saved-revenue figure.
+
+**Pass:** a judge understands who buys Isnad, where it fits, and what the customer
+experiences. At least one real feedback item is desirable, not falsely mandatory.
+
+### H4 — Demonstrate the benefit without hiding the tradeoff
+
+1. Put the replaced-SIM CHALLENGE and clean ALLOW beside a clearly defined baseline.
+   A “decline every SIM change” rule is an illustrative baseline, not a claim about
+   all banks. Use the existing authored evaluation/full-evidence comparators for
+   quantitative statements; P1 may change their inputs and requires a fresh run.
+2. Show decision, evidence-call count, evidence strength and unavailable checks.
+   Include adverse and unavailable cases as well as favorable ones. Keep the known
+   expectation disagreements visible; do not equate fewer calls with higher accuracy.
+3. Present network/model cost as unpriced or normalized until actual contracted
+   prices exist. Separate 650 ms stage pacing from measured provider/model latency.
+4. Explain the receipt's advantage by verifying it and altering a byte. This is
+   a demonstrable integrity benefit; it does not establish provider truth, regulatory
+   acceptance or a “fraud-proof” system.
+5. Explain how merchant-reported outcomes in P5 would validate business impact.
+   For this submission, a concrete evaluation plan is preferable to building the
+   entire analytics subsystem without any real merchant labels.
+
+**Pass:** every number on screen can be reproduced, scoped and challenged.
+
+### H5 — Ship one coherent, remotely accessible demonstration
+
+1. Review H0's delivery format before deciding video/deck duration. The previous
+   `docs/demo/isnad-demo.mp4` is obsolete; the corrected video sources have not
+   established that the shipped binary matches the app. Do not reuse it blindly.
+2. Record the actual current application: customer problem → AI selection →
+   evidence/provenance → merchant action → receipt verification/tampering →
+   clean-case early stop. Include NaC evidence as its own accurately labelled beat.
+   Use the allowed runtime and keep a shorter backup cut only if useful.
+3. Use the operator-controlled demo/harness with a remote access setup already
+   reviewed for its exposed routes. A localhost README link cannot be opened by a
+   remote judge. Test delivery from a separate device/session with no developer
+   login or cached secrets. If hosting is not ready, provide an accessible recording
+   and reproducible setup where the submission rules permit it.
+4. Keep the demo bounded: fixed synthetic requests, rate limits, no merchant/model
+   keys in browser code, no arbitrary billable API surface, and no live-mode fixture
+   injection. An unlisted URL is not authentication for paid operations.
+5. Freeze one commit and reconcile README, screen labels, video, idea-capture form,
+   any required deck and benchmark report against it. Check all links and judge
+   access. Record artifacts and access tests in H0's manifest. Prepare a replay
+   recording for network/model failure; identify replay as recorded.
+
+**Pass:** a remote judge can see the product and supporting proof without local
+setup surprises, contradictory metrics, stale footage or missing permissions.
+
+### Recommended time allocation, not the official rubric
+
+- **6–7 Sep:** H0 confirmation; verify P1 and finish essential P2; prepare H1's model comparison.
+- **7–9 Sep:** H1 bounded run and H2 proof that is feasible with available access;
+  H3 focused merchant story/translation; rehearse H4's evidence comparison.
+- **10 Sep:** freeze, record, reconcile artifacts and test judge access under H5.
+- **By 11 Sep:** target delivery until the conflicting internal deadline is resolved.
+  Use any confirmed remaining time for defects and rehearsal, not new product branches.
+
+Defer full P3 challenge persistence, P5 outcome analytics, multi-replica state,
+new network products and broad merchant onboarding until after submission unless
+H0 explicitly makes one essential. P4 live proof is valuable but must not consume
+the entire window if operator inputs are unavailable. These priorities supersede
+§3's execution order **for the hackathon submission only**; they do not mark any
+unfinished product package complete.
+
+## 7. Latest session
+
+**Intent — 6 Sep:** compare Isnad with the MENA Ignite event's public materials
+and add a competition-specific delivery plan. Preserve P1–P5 as the product
+roadmap, distinguish verified event facts from recommendations, and avoid
+inventing unavailable rubric weights or submission requirements.
+
+**Completion — documentation only:** added §6 with verified source links, an
+explicit unknown-rubric warning, the 11/13 September deadline discrepancy and
+H0–H5 submission work. It prioritizes honest AI-planner proof, NaC provenance,
+one regional buyer, reproducible comparisons and remotely accessible artifacts;
+full P3/P5 work is deferred for the submission. Preserved the detailed product
+plan and refreshed its entry point. Links/anchors and diff whitespace checked;
+Graphify refreshed. No product code, model/provider run, outreach, upload,
+deployment, commit or push was performed by this research pass. Concurrent
+implementation work was left intact; its committed P1 record is preserved below.
+
+### Preserved P1 implementation record
+
+The following record is preserved from the implementation agent's committed
+handoff; this research pass did not rerun its tests.
 
 **P1 implementation — 5 Sep (same day, follow-up session):** Fixed the
 location-evidence provider boundary per §3 P1.
@@ -627,4 +841,170 @@ UI affordance to collect it outside the two demo acts wired above.
 `tests/fixtures/independent_evaluation.json`, `tests/scenarios/test_acts.py`,
 `tests/test_chain_grade.py`, `tests/test_parallel_gather.py`,
 `tests/test_provider_preconditions.py` (new), `README.md`, this file, and the
+Graphify outputs.
+
+### P2 implementation — 6 Sep (follow-up session)
+
+Built the plain-language merchant presenter and focused demo entry per §3 P2.
+Status: **PARTIAL** — every numbered step below has concrete evidence, but two
+items are flagged as known gaps rather than claimed complete (keyboard-Tab
+traversal, and a pre-existing receipt-table overflow at 375 px). Never claim
+COMPLETE on a happy-path screenshot; see the checklist this ledger asks for.
+
+*What changed.* New `app/presentation.py`: a pure function
+`present(verdict: Verdict) -> Presentation` with no I/O, no LLM call, and no
+import of `app.config`/`app.policy` (so it can never compare an old chain
+against today's live policy — only against whatever `policy_snapshot` that
+chain itself carries, or nothing for a chain signed before that field
+existed). It maps ALLOW/CHALLENGE/DECLINE to "Proceed" / "Additional
+verification needed" / "Do not proceed", derives supporting/adverse/unresolved
+facts as `f"{link.api}: {link.detail}"` for actual chain links only (capped at
+`MAX_FACTS = 5` each), and writes two genuinely different CHALLENGE summaries:
+the DEGRADED case (Act VI-shaped: every check resolved, one came back adverse,
+score lands between thresholds) explicitly says this is not a failed identity
+check or withheld consent; the UNRESOLVED case (Act V-shaped) names each
+specific unavailable check by API label, and when neither an unresolved
+signal nor any link is present to blame, the summary says only that
+corroboration was insufficient rather than guessing at a cause. Every
+`next_action` for CHALLENGE states plainly that Isnad has not sent a one-time
+code, per the done bar.
+
+`presentation: Presentation | None = None` was added to `VerificationResponse`
+only (never to the signed `Verdict`/`EvidenceLink`) and wired into four
+callers of the same `present()`: `routes_verify.verify`, `routes_verify.get_chain`
+(recomputed fresh from the immutable stored Verdict every read — safe, since
+`present()` never touches the live engine), `routes_consent._verification_response`,
+and the SSE `"verdict"` event emitted from inside
+`app/agent/investigator.py` (the only place that event is built — this was
+the one line touching that file, adding the field to the emitted dict, not
+altering any decision/budget/planner logic). `app/api/routes_console.py`'s
+`console_run` endpoint (the judge page's fixture path) also got the same field
+in its HTTP response, as a resilience fallback for when a stream drops before
+the first byte.
+
+`app/static/judge.html`: outcome now renders action (plain title) → explanation
+(summary, supporting/adverse/unresolved fact lists, next action) → a collapsed
+`<details>` "Technical and audit details" panel (raw enum, reason, chain grade)
+last, in that order. Added a third fixed control, "Show an unresolved-evidence
+case," wired to the existing `/v1/console/run/act5` fixture (demo-gated, no new
+provider surface) so Act V's UNRESOLVED shape has a UI path, not just an API
+one. Fixed a real bug found while wiring this: the SSE `'verdict'` event fires
+*before* the caller (`routes_console.py`) calls `store.save_async`, so the
+receipt link/button used to appear before a receipt necessarily existed.
+`renderVerdict(data, {persisted})` now only reveals the receipt once the
+*HTTP response* (which is only returned after persistence) confirms it, and a
+`completedRunId` guard drops a duplicate/late SSE verdict for an
+already-persisted run rather than re-rendering over it. Grade line now reads
+"demo duration NNN ms (paced ~650 ms per check for readability, not a latency
+measurement)". `app/static/receipt.html` got one small addition outside the
+originally listed file set: a same-origin "← Back to the checkout demo" link
+to `/judge`, since there was previously no way back from a receipt except the
+browser back button.
+
+`app/main.py`: `/` now redirects to `/judge` only when `settings.demo_mode` is
+true (read at request time, so a monkeypatched test sees the change); the
+non-demo route (`/console`) and its existing credential gating are unchanged.
+`app/agent/explain.py`: the LLM system prompt now says "uncalibrated policy
+score" instead of "the probability"; the `chain_facts()` JSON key stayed
+`p_fraud` because `tests/test_t4_ask_the_agent.py` asserts that key directly
+and only the prompt vocabulary was in scope.
+
+*Deviations from the listed file set, justified here per this doc's own
+"record any justified change to these contracts" rule:* `app/api/routes_console.py`
+(added `presentation` to `console_run`'s response — SSE-drop resilience),
+`app/static/receipt.html` (back link — step 8 explicitly requires checking
+"a clear way to return from the receipt view," which did not exist before),
+and the new Act V button in `judge.html` (needed so step 8's
+"provider-unavailable outcome" browser check has a UI path at all, not only
+`/v1/console/run/act5` called directly).
+
+*Test/lint evidence.* New `tests/test_presentation.py` (25 tests): real
+synthetic Verdicts run through `build_investigator(MockProvider())` over the
+console's own `DEMO_ACTS` (act2 → DECLINE/REFUTED, act3 → ALLOW/ATTESTED_FULL,
+act5 → CHALLENGE/UNRESOLVED, act6 → CHALLENGE/DEGRADED) plus hand-built
+`Verdict`s for combinations the fixed acts do not produce (an ungraded legacy
+chain, a chain with no `policy_snapshot`, DECLINE paired with UNRESOLVED —
+`grade()` checks `unresolved` before `decline_above`, so that combination is
+real and must not claim "directly contradicted"). Assertions include: every
+displayed fact traces to an actual chain link (no invented facts); the two
+CHALLENGE cases produce different summaries; no temporal phrase ("days ago",
+"recently") is ever produced from a bounded window; `"presentation"` never
+appears in `Verdict.model_fields` or in `verdict.model_dump_json()`
+(byte-for-byte: the signed model was never touched); an HTTP `/v1/verify` call
+and its concurrently-subscribed SSE `"verdict"` event carry identical
+`presentation` dicts for the same run; a `VerificationResponse` built from a
+dict missing `presentation` still validates with the field defaulting to
+`None`. Full suite: **516 → 541 passed** (`.venv311/bin/python -m pytest -q`).
+Ruff (`app tests scripts demo`): clean. `scripts/evidence_pack.py` reproduced
+unchanged: Act VI CHALLENGE/DEGRADED/6 steps/0.242, Act III ALLOW/ATTESTED_FULL/
+2 steps/0.096, Act V CHALLENGE/UNRESOLVED/4 steps, Act II DECLINE/REFUTED/4
+steps, all signatures valid — none of P2's changes touch provider/policy
+behavior.
+
+*Browser evidence, actually performed (not assumed).* Ran the app locally with
+`ISNAD_PROVIDER=mock ISNAD_PLANNER=greedy ISNAD_DEMO_MODE=true` (the repo
+`.env`'s `llm`/`hybrid` would have silently mislabeled the mode pill and run
+the wrong planner). Confirmed: `/` redirects to `/judge` in demo mode; Act VI
+("Investigate the SIM change") renders "Additional verification needed" with
+the DEGRADED-specific explanation and correct supporting/adverse fact lists at
+both 1280 px and 375 px, wrapping cleanly with no clipping; Act III ("Try a
+clean checkout") renders "Proceed" with its supporting facts and the
+continuity-session beat; the new Act V button ("Show an unresolved-evidence
+case") renders "Additional verification needed" naming all four unavailable
+checks by API label, at both widths; the receipt link only appears after the
+HTTP response returns (persistence-confirmed) and the status line updates
+correctly; the Ed25519 tamper control still flips to "✗ signature INVALID" and
+back at both widths; the new "← Back to the checkout demo" link on the receipt
+page returns to `/judge`; no `innerHTML`/`outerHTML`/`insertAdjacentHTML` was
+introduced anywhere in `judge.html`, and no JS console errors were observed
+during any run.
+
+*Known gaps, stated plainly rather than glossed over:*
+1. **Keyboard-Tab traversal was not confirmed by an automated keystroke.** The
+   browser automation tool used for this session could not reliably dispatch
+   synthetic Tab/Enter key events that the page's focus/activation model
+   registered (a tooling limitation observed on this session's `<summary>`
+   toggle, not something specific to code written for P2). Every new
+   interactive element is a native `<button>`, `<a>`, or `<details>/<summary>`
+   with no `tabindex` override and no `outline` suppression anywhere in
+   `judge.html`'s CSS, plus one added `:focus-visible` style for the new
+   details toggle — so keyboard operability rests on standard HTML semantics
+   that were not independently exercised end-to-end with a real keystroke in
+   this pass. A follow-up session with working Tab-key automation (or a human
+   pass) should confirm this directly before calling P2 fully done.
+2. **`receipt.html`'s evidence table can overflow horizontally at 375 px.**
+   Observed during this session's mobile check; the table has no
+   `overflow-x: auto` wrapper and was not part of this package's listed file
+   set or the presenter it exists to test. Pre-existing, not introduced by
+   P2. Flagged here rather than fixed, since `receipt.html`'s layout was out
+   of P2's scope beyond the one added back-link.
+3. P2 does not resolve the open question P1 raised: how a real merchant
+   integration is meant to supply `claimed_location` in practice (see below).
+
+*The P1-flagged `claimed_location` question, carried forward for P4a:* today
+`RequestContext.claimed_location` is populated only inside the two wired demo
+acts (`act2`, `act6`) as a hardcoded synthetic `Area`; there is still no UI
+affordance — in `judge.html`, the P4a merchant harness, or anywhere else — for
+a real merchant to supply an actual claimed address/geofence per transaction.
+P2 did not add one, deliberately: the judge page's controls must stay scoped
+to the fixed demo acts (§3 P2 step 6), and a general "enter a location" field
+belongs to a real verification request path, not the fixed public
+demonstration. P4a's `demo/merchant_pilot` harness is the right place to
+decide this, since it is the first place a real (if synthetic) merchant
+request gets built server-side: it should either (a) collect a claimed address
+from the operator and geocode it before constructing `RequestContext`, or (b)
+explicitly document that location verification is out of scope for the pilot
+until a merchant integration contract defines how a claim is captured
+(checkout address? a separate attestation step?). Either way, P4a should reuse
+`app/presentation.py`'s `present()` unchanged for its own result display — it
+was built as a shared, decision/session-agnostic projection for exactly this
+reuse, and `_verification_response` in `routes_consent.py` already calls it,
+so P4a's harness calling the same consent-completion endpoint gets the
+presentation for free.
+
+*Files changed:* `app/presentation.py` (new), `tests/test_presentation.py`
+(new), `app/domain/schemas.py`, `app/api/routes_verify.py`,
+`app/api/routes_consent.py`, `app/api/routes_console.py`,
+`app/agent/investigator.py`, `app/agent/explain.py`, `app/main.py`,
+`app/static/judge.html`, `app/static/receipt.html`, this file, and the
 Graphify outputs.

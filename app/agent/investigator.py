@@ -12,6 +12,7 @@ from app.domain.enums import API_LABEL, Action, Decision, Hypothesis
 from app.domain.schemas import VerificationRequest
 from app.events import emit
 from app.policy.engine import PolicyEngine, get_engine
+from app.presentation import present
 from app.providers.base import EvidenceProvider
 
 _UNRESOLVED_SIGNALS = {"CONSENT_REQUIRED", "PROVIDER_UNAVAILABLE", "EVIDENCE_UNAVAILABLE"}
@@ -322,6 +323,13 @@ class Investigator:
                     "evidence_steps": len(verdict.chain),
                     "evidence_cost": verdict.evidence_cost,
                     "latency_ms": verdict.latency_ms,
+                    # Same projection HTTP responses carry (P2), computed from
+                    # this same already-finalized verdict object -- not a
+                    # second decision, just the plain-language view of the one
+                    # already made above. Emitted here, before the caller has
+                    # persisted anything, is why judge.html must not treat the
+                    # SSE 'verdict' event alone as proof of a saved receipt.
+                    "presentation": present(verdict).model_dump(mode="json"),
                 },
                 run_id,
             )
