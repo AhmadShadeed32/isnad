@@ -24,11 +24,15 @@ fake operator) is done locally with 596 tests passing; P4b (a real
 handset/operator) remains unproven. P3 (merchant CHALLENGE followup and
 completion reporting, reusing the P4a harness) is also done locally, with 627
 tests passing and a real browser pass proving the public receipt is unchanged
-by a followup. This documentation revision changes no application behavior
-beyond what the P3 and P4a implementation records describe.
+by a followup. P5 (merchant order-status/fraud-assessment outcome reporting
+and an owner-scoped offline report) is also done locally, with 659 tests
+passing and the same kind of browser pass on the same chain P3 verified.
+This documentation revision changes no application behavior beyond what the
+P3, P4a and P5 implementation records describe.
 [Prior validation records](P1_P2_IMPLEMENTATION_RECORDS.md), the
-[P4a record](P4A_IMPLEMENTATION_RECORD.md) and the
-[P3 record](P3_IMPLEMENTATION_RECORD.md) remain available.
+[P4a record](P4A_IMPLEMENTATION_RECORD.md), the
+[P3 record](P3_IMPLEMENTATION_RECORD.md) and the
+[P5 record](P5_IMPLEMENTATION_RECORD.md) remain available.
 
 Earlier detailed history is preserved in
 [the previously pushed handoff](https://github.com/AhmadShadeed32/isnad-private/blob/faf467ffd1150127a0f16de3a1bea7936d60794e/docs/PHASE2_HANDOFF.md).

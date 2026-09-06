@@ -171,4 +171,12 @@ confirmed rather than assumed).
 4. Postgres was not exercised directly; `_assert_schema_current()` was
    verified against a migrated SQLite database, which is dialect-independent
    SQLAlchemy inspection but not a substitute for a real Postgres run.
-5. P5 ("collect outcomes before calibrating scores") is not started.
+5. `ChallengeEventRow` does not itself carry `idempotency_key`/
+   `request_fingerprint` columns — only the shared `idempotency_records` table
+   does, which is TTL-purged. Functionally correct (no replay/conflict
+   behavior depends on it), but an audit that outlives that TTL loses the
+   original request's fingerprint. P5's `MerchantOutcomeEventRow` carries both
+   as columns for exactly this reason; retrofitting `ChallengeEventRow` the
+   same way was not done here to avoid re-touching P3 code after it shipped.
+6. P5 ("collect outcomes before calibrating scores") is now also DONE
+   LOCALLY — see [P5_IMPLEMENTATION_RECORD.md](P5_IMPLEMENTATION_RECORD.md).

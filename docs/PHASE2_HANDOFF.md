@@ -65,7 +65,7 @@ record any justified change to these contracts here before implementing it.
 | P2 | Plain-language merchant result and focused demo entry | P1 | PARTIAL (6 Sep implementation session; see §8) |
 | P4a | Local live-consent journey and current OAuth contract | P1, P2 | DONE LOCALLY (6 Sep implementation session; see §8) |
 | P3 | Merchant challenge attempt and completion reporting | P2; reuse P4a harness | DONE LOCALLY (6 Sep implementation session; see §8) |
-| P5 | Merchant outcome collection and evaluation report | P3 event/ownership conventions | NOT STARTED |
+| P5 | Merchant outcome collection and evaluation report | P3 event/ownership conventions | DONE LOCALLY (6 Sep implementation session; see §8) |
 | P4b | Physical handset/operator proof | P4a + external prerequisites in §4 | NOT STARTED |
 
 For the full product roadmap, build in table order; §6 gives a smaller submission scope.
@@ -1359,3 +1359,30 @@ the public receipt's signed payload is untouched by the followup. Full suite
 623 → 627 passed, Ruff clean, `scripts/handset_validation.py contract` still
 passes. Status: **DONE LOCALLY**. Full record:
 [P3_IMPLEMENTATION_RECORD.md](P3_IMPLEMENTATION_RECORD.md).
+
+**P5 implementation — 6 Sep (same day, follow-up session):** built merchant
+outcome reporting (order status, fraud assessment) per §3 P5. Challenge
+execution, the third dimension the handoff names, is deliberately not
+reported through this API at all — it is read fresh from P3's own attempt/
+event tables whenever a report is assembled, so there is exactly one place
+that fact can come from. No decision gate, unlike P3: an outcome may be
+reported on any owned chain, including ALLOW/DECLINE. Exactly one current
+event per (owner, chain, dimension) is enforced by a partial unique index
+(`superseded_by IS NULL`), not just a read-then-write check; a correction
+must name the current head or the write is a 409, and two concurrent first
+reports on the same dimension resolve the same way via the same index.
+`FraudAssessmentReport`'s schema itself (a Pydantic discriminated union with
+`extra="forbid"`) requires a basis for CONFIRMED_FRAUD/CONFIRMED_LEGITIMATE
+and forbids one otherwise, so a weak signal can never carry a confirmed
+label. New migration `0003_outcomes`; new owner-scoped offline report
+(`scripts/merchant_outcome_report.py`) excludes synthetic (mock/nac_fake)
+runs and separates missing from explicit UNKNOWN per dimension. Extended the
+merchant-pilot harness with order-status/fraud-assessment reporting, ran all
+three processes again continuing the exact CHALLENGE chain P3's own pass
+proved, and found (and fixed) a real live-only defect: the fraud-assessment
+basis field's visibility only reacted to a `change` event a default
+selection never fires. Confirmed by direct `curl` that the public receipt
+remains untouched, and that the offline report correctly excludes the
+`nac_fake` chain used for the browser pass itself. Full suite 627 → 659
+passed, Ruff clean. Status: **DONE LOCALLY**. Full record:
+[P5_IMPLEMENTATION_RECORD.md](P5_IMPLEMENTATION_RECORD.md).
