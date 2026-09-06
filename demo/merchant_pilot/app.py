@@ -155,6 +155,12 @@ login_throttle = LoginThrottle()
 @dataclass
 class FlowRecord:
     flow_id: str
+    # R1: the operator session that created this flow. Every read/write must
+    # check this before touching the flow at all — authentication alone (any
+    # valid operator session) is not the same as authorization (this flow's
+    # own creator), and a second valid session must never silently inherit
+    # the first's in-flight consent, challenge or outcome state.
+    owner_session_id: str
     consent_id: str
     phone_number: str
     context_event: str
@@ -172,6 +178,12 @@ class FlowRecord:
     # Current outcome label per dimension (P5), keyed "order_status" /
     # "fraud_assessment" — available regardless of decision, unlike `challenge`.
     outcomes: dict[str, Any] = field(default_factory=dict)
+    # R6: the last attempted outcome-report operation per dimension, frozen
+    # (including its `occurred_at`) before it is ever sent. A retry of the
+    # same logical action reuses this verbatim instead of generating a fresh
+    # timestamp that Isnad's own idempotency fingerprint would then see as a
+    # conflicting reuse of the same key.
+    pending_outcome_ops: dict[str, dict[str, Any]] = field(default_factory=dict)
     # I8: the trust session bound to this order, plus this harness's own
     # fulfillment decision. `session["status"]` is only ever a snapshot from
     # the last check against Isnad — release-order re-checks it fresh rather
@@ -192,8 +204,23 @@ class FlowStore:
             self._flows[flow.flow_id] = flow
 
     def get(self, flow_id: str) -> FlowRecord | None:
+        """Internal, unauthorized lookup — background completion polling
+        only. Every request handler must use `get_owned` instead."""
         with self._lock:
             return self._flows.get(flow_id)
+
+    def get_owned(self, flow_id: str, session_id: str) -> FlowRecord | None:
+        """R1 + R3: sweeps expired flows first (retention enforced on every
+        read, not only at creation), then returns the flow only if it exists
+        and belongs to `session_id` — the same 404 either way from the
+        caller's side, so a foreign session cannot distinguish "no such
+        flow" from "not yours"."""
+        with self._lock:
+            self._sweep()
+            flow = self._flows.get(flow_id)
+            if flow is None or not secrets.compare_digest(flow.owner_session_id, session_id):
+                return None
+            return flow
 
     def _sweep(self) -> None:
         cutoff = _now() - timedelta(seconds=self.retention_seconds)
@@ -379,7 +406,7 @@ async def flow_page(flow_id: str, pilot_session: str | None = Cookie(default=Non
     session = sessions.get(pilot_session)
     if session is None:
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
-    if flows.get(flow_id) is None:
+    if flows.get_owned(flow_id, session.session_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no such flow")
     html = (_STATIC_DIR / "flow.html").read_text(encoding="utf-8")
     html = html.replace("__FLOW_ID__", flow_id).replace("__CSRF_TOKEN__", session.csrf_token)
@@ -404,7 +431,22 @@ async def create_flow(
     _require_csrf(request, session, x_csrf_token)
 
     try:
-        body = NewFlowRequest.model_validate(await request.json())
+        raw = await request.json()
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="malformed JSON body") from exc
+    try:
+        body = NewFlowRequest.model_validate(raw)
+        # R7: validated by the SAME domain constraints RequestContext itself
+        # enforces (its Literal event values, its account_age_days >= 0),
+        # constructed inside this same try so a rejection here is also a 422
+        # instead of an unhandled ValidationError escaping as a 500 — never a
+        # second, looser copy of those rules on NewFlowRequest.
+        context = RequestContext(
+            event=body.event,
+            account_age_days=body.account_age_days,
+            claimed_location=body.claimed_location,
+            amount=body.amount,
+        )
     except ValidationError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.errors())
     if not _PHONE_PATTERN.match(body.phone_number):
@@ -414,13 +456,6 @@ async def create_flow(
             status_code=422,
             detail=f"unsupported currency {body.amount.currency!r}; only {sorted(SUPPORTED_CURRENCIES)} for now",
         )
-
-    context = RequestContext(
-        event=body.event,
-        account_age_days=body.account_age_days,
-        claimed_location=body.claimed_location,
-        amount=body.amount,
-    )
 
     async with httpx.AsyncClient(base_url=ISNAD_BASE_URL, timeout=15.0) as client:
         response = await client.post(
@@ -442,6 +477,7 @@ async def create_flow(
 
     flow = FlowRecord(
         flow_id="flw_" + secrets.token_urlsafe(16),
+        owner_session_id=session.session_id,
         consent_id=payload["consent_id"],
         phone_number=body.phone_number,
         context_event=body.event,
@@ -476,10 +512,20 @@ async def _poll_and_maybe_complete(flow: FlowRecord) -> None:
             consent_status = status_response.json().get("status")
             flow.status = consent_status
 
-            if consent_status != "AUTHORIZED":
+            # R2: a COMPLETED consent with no locally cached result means an
+            # earlier /verify call from this harness committed upstream but
+            # its response never arrived here (a lost read, a restart). Isnad
+            # caches the completed result and returns the SAME one on a
+            # repeat call (routes_consent.complete_number_verification) rather
+            # than investigating again, so recovering it here can never start
+            # a second investigation or buy a second chain/charge.
+            should_fetch_result = consent_status == "AUTHORIZED" or (
+                consent_status == "COMPLETED" and flow.result is None
+            )
+            if not should_fetch_result:
                 return
             # Compare-and-swap-by-lock: a flow's own httpx round trip to
-            # Isnad's single-use /verify must happen at most once from this
+            # Isnad's /verify must happen at most once at a time from this
             # harness, even if two browser tabs poll the same flow
             # concurrently.
             with flow.lock:
@@ -494,6 +540,9 @@ async def _poll_and_maybe_complete(flow: FlowRecord) -> None:
                 if verify_response.status_code == 200:
                     flow.result = verify_response.json()
                     flow.status = "COMPLETED"
+                # A 409 here means Isnad's own consent is mid-verification
+                # from the call that just lost its response; the next poll
+                # retries rather than treating this as a hard failure.
             finally:
                 flow.verifying = False
     except httpx.HTTPError:
@@ -505,8 +554,8 @@ async def get_flow(
     flow_id: str,
     pilot_session: str | None = Cookie(default=None),
 ) -> dict:
-    _require_session(pilot_session)
-    flow = flows.get(flow_id)
+    session = _require_session(pilot_session)
+    flow = flows.get_owned(flow_id, session.session_id)
     if flow is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no such flow")
 
@@ -542,7 +591,7 @@ async def open_trust_session(
     can only ever check *this* session, never a caller-supplied one."""
     session = _require_session(pilot_session)
     _require_csrf(request, session, x_csrf_token)
-    flow = flows.get(flow_id)
+    flow = flows.get_owned(flow_id, session.session_id)
     if flow is None or flow.result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no such flow")
 
@@ -574,7 +623,7 @@ async def simulate_flow_swap(
     drill: inject a mid-session SIM swap on this flow's own bound session."""
     session = _require_session(pilot_session)
     _require_csrf(request, session, x_csrf_token)
-    flow = flows.get(flow_id)
+    flow = flows.get_owned(flow_id, session.session_id)
     if flow is None or flow.session is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no open trust session for this flow")
 
@@ -603,7 +652,7 @@ async def release_order(
     simulation racing it in this same process."""
     session = _require_session(pilot_session)
     _require_csrf(request, session, x_csrf_token)
-    flow = flows.get(flow_id)
+    flow = flows.get_owned(flow_id, session.session_id)
     if flow is None or flow.session is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no open trust session for this flow")
 
@@ -659,7 +708,7 @@ async def report_flow_outcome(
     """
     session = _require_session(pilot_session)
     _require_csrf(request, session, x_csrf_token)
-    flow = flows.get(flow_id)
+    flow = flows.get_owned(flow_id, session.session_id)
     if flow is None or flow.result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no such flow")
 
@@ -672,31 +721,62 @@ async def report_flow_outcome(
 
     chain_id = flow.result["chain_id"]
     current = flow.outcomes.get(body.dimension)
-    payload: dict[str, Any] = {
-        "dimension": body.dimension,
-        "value": body.value,
-        "occurred_at": _now().isoformat(),
-    }
-    if body.basis is not None:
-        payload["basis"] = body.basis
     supersedes = current["event_id"] if current is not None else "none"
-    if current is not None:
-        payload["supersedes_event_id"] = current["event_id"]
+    wants = (body.value, body.basis, supersedes)
 
-    async with httpx.AsyncClient(base_url=ISNAD_BASE_URL, timeout=15.0) as client:
-        response = await client.post(
-            f"/v1/chains/{chain_id}/outcomes",
-            headers={
-                "Authorization": f"Bearer {ISNAD_MERCHANT_API_KEY}",
-                "Idempotency-Key": f"pilot-outcome-{flow_id}-{body.dimension}-{supersedes}-{body.value}",
-            },
-            json=payload,
-        )
+    with flow.lock:
+        pending = flow.pending_outcome_ops.get(body.dimension)
+        if pending is not None and pending["wants"] == wants:
+            # The exact same logical action as the last attempt (a button
+            # retry after a lost response, a double-click): replay the
+            # frozen key and body verbatim, including its original
+            # occurred_at, rather than minting a fresh timestamp.
+            idempotency_key = pending["key"]
+            payload = pending["body"]
+        else:
+            payload = {
+                "dimension": body.dimension,
+                "value": body.value,
+                "occurred_at": _now().isoformat(),
+            }
+            if body.basis is not None:
+                payload["basis"] = body.basis
+            if current is not None:
+                payload["supersedes_event_id"] = current["event_id"]
+            idempotency_key = f"pilot-outcome-{flow_id}-{body.dimension}-{supersedes}-{body.value}"
+            flow.pending_outcome_ops[body.dimension] = {
+                "key": idempotency_key,
+                "body": payload,
+                "wants": wants,
+            }
+
+    try:
+        async with httpx.AsyncClient(base_url=ISNAD_BASE_URL, timeout=15.0) as client:
+            response = await client.post(
+                f"/v1/chains/{chain_id}/outcomes",
+                headers={
+                    "Authorization": f"Bearer {ISNAD_MERCHANT_API_KEY}",
+                    "Idempotency-Key": idempotency_key,
+                },
+                json=payload,
+            )
+    except httpx.HTTPError as exc:
+        # A transport failure here must not surface as an unhandled 500: the
+        # write may already have committed upstream (R2's own lesson), and
+        # the frozen operation above is exactly what lets a retry recover it
+        # safely instead of racing a fresh body against it.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Isnad was unreachable; retry the same action to recover",
+        ) from exc
+
     if response.status_code == status.HTTP_409_CONFLICT:
         raise HTTPException(status_code=409, detail=response.json().get("detail"))
     if response.status_code != status.HTTP_201_CREATED:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Isnad rejected the outcome report")
     flow.outcomes[body.dimension] = response.json()
+    with flow.lock:
+        flow.pending_outcome_ops.pop(body.dimension, None)
     return flow.outcomes[body.dimension]
 
 
@@ -715,7 +795,7 @@ async def create_flow_challenge(
     """
     session = _require_session(pilot_session)
     _require_csrf(request, session, x_csrf_token)
-    flow = flows.get(flow_id)
+    flow = flows.get_owned(flow_id, session.session_id)
     if flow is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no such flow")
     if flow.result is None or flow.result.get("decision") != "CHALLENGE":
@@ -751,7 +831,7 @@ async def report_flow_challenge_event(
     forwarded from Isnad, not silently accepted."""
     session = _require_session(pilot_session)
     _require_csrf(request, session, x_csrf_token)
-    flow = flows.get(flow_id)
+    flow = flows.get_owned(flow_id, session.session_id)
     if flow is None or flow.challenge is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no open challenge attempt for this flow")
 

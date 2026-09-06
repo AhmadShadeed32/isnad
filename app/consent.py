@@ -128,7 +128,17 @@ class ConsentStore:
             self._states[record.state] = record.consent_id
         return record
 
-    def _sweep(self) -> None:
+    def _past_terminal_retention(self, record: ConsentRecord, now: datetime) -> bool:
+        if record.status not in _TERMINAL:
+            return False
+        retain_until = (record.terminal_at or now) + timedelta(seconds=self.terminal_retention_seconds)
+        return now >= retain_until
+
+    def _drop(self, consent_id: str, record: ConsentRecord) -> None:
+        del self._records[consent_id]
+        self._states.pop(record.state, None)
+
+    def _sweep(self) -> int:
         """Drop terminal records once their retention window has passed.
 
         Caller holds the lock. Every record is offered to _expire() first, so
@@ -138,30 +148,48 @@ class ConsentStore:
         record must survive being terminal for `terminal_retention_seconds`:
         completing consent B must not make consent A's just-issued result
         vanish mid-poll because A also happened to be terminal.
+
+        R4: this used to be the ONLY place terminal retention was enforced,
+        and its only caller was `create()` — a merchant polling a long-idle
+        terminal consent with no one else creating new consents would get it
+        back forever. `owned()`/`by_state()` now apply the same predicate
+        inline on every read (see `_past_terminal_retention`), and this sweep
+        is also exposed as `purge_expired()` for the periodic retention
+        service, so an otherwise-idle process still reclaims these records.
         """
         now = _now()
+        deleted = 0
         for consent_id, record in list(self._records.items()):
             self._expire(record, now=now)
-            if record.status not in _TERMINAL:
-                continue
-            retain_until = (record.terminal_at or now) + timedelta(
-                seconds=self.terminal_retention_seconds
-            )
-            if now >= retain_until:
-                del self._records[consent_id]
-                self._states.pop(record.state, None)
+            if self._past_terminal_retention(record, now):
+                self._drop(consent_id, record)
+                deleted += 1
+        return deleted
+
+    def purge_expired(self) -> int:
+        """Lock-safe entry point for `app.retention`'s periodic sweeper."""
+        with self._lock:
+            return self._sweep()
 
     def by_state(self, state: str) -> ConsentRecord | None:
         with self._lock:
             consent_id = self._states.get(state)
             record = self._records.get(consent_id) if consent_id else None
-            self._expire(record)
+            now = _now()
+            self._expire(record, now=now)
+            if record is not None and self._past_terminal_retention(record, now):
+                self._drop(consent_id, record)
+                return None
             return record
 
     def owned(self, consent_id: str, api_key: str) -> ConsentRecord | None:
         with self._lock:
             record = self._records.get(consent_id)
-            self._expire(record)
+            now = _now()
+            self._expire(record, now=now)
+            if record is not None and self._past_terminal_retention(record, now):
+                self._drop(consent_id, record)
+                record = None
             if record is None or not secrets.compare_digest(
                 record.owner_hash, _owner_hash(api_key)
             ):

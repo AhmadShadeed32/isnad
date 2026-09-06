@@ -100,12 +100,29 @@ class FakeNumberVerification:
     def exchange_code_for_token(self, code, redirect_uri):
         assert code == "operator-code"
         assert redirect_uri == "https://merchant.test/callback"
-        return "one-time-access-token"
+        # R5: the SDK branch now validates this id_token the same way the
+        # manual path does — a bare access token is no longer accepted (see
+        # test_sdk_exchange_rejects_a_bare_access_token_response below).
+        return {
+            "access_token": "one-time-access-token",
+            "id_token": _manual_id_token("nonce-abc", audience="sdk-client-id"),
+        }
 
     def verify(self, token, **kwargs):
         assert token == "one-time-access-token"
         assert kwargs["phone_number"] == "+99999991000"
         return {"device_phone_number_verified": True}
+
+
+class FakeNumberVerificationBareToken:
+    """R5's own reproduction: an SDK (or a stub) whose exchange returns only
+    an access token, with no id_token to bind the nonce to at all."""
+
+    def get_oidc_url(self, **kwargs):
+        return "https://consent.test/authorize?state=state-123"
+
+    def exchange_code_for_token(self, code, redirect_uri):
+        return {"access_token": "unvalidated"}
 
 
 def _consent_provider() -> NacProvider:
@@ -114,8 +131,21 @@ def _consent_provider() -> NacProvider:
     return provider
 
 
+def _jwks_handler(request: httpx.Request) -> httpx.Response:
+    jwk = RSAAlgorithm.to_jwk(_MANUAL_KEY.public_key(), as_dict=True)
+    jwk["kid"] = _MANUAL_KID
+    return httpx.Response(200, json={"keys": [jwk]})
+
+
 @pytest.mark.asyncio
-async def test_nac_provider_starts_and_completes_number_consent():
+async def test_nac_provider_starts_and_completes_number_consent(monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "nac_client_id", "sdk-client-id")
+    monkeypatch.setattr(settings, "nac_issuer", "https://fake-operator.test")
+    monkeypatch.setattr(settings, "nac_jwks_uri", "https://fake-operator.test/jwks.json")
+    _patch_httpx_to_mock_transport(monkeypatch, _jwks_handler)
+
     provider = _consent_provider()
 
     url = await provider.begin_number_verification(
@@ -133,6 +163,22 @@ async def test_nac_provider_starts_and_completes_number_consent():
     assert token == "one-time-access-token"
     assert link.result == Result.PASS
     assert link.signal == "NUMBER_MATCH"
+
+
+@pytest.mark.asyncio
+async def test_sdk_exchange_rejects_a_bare_access_token_response(monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "nac_issuer", "https://fake-operator.test")
+    monkeypatch.setattr(settings, "nac_jwks_uri", "https://fake-operator.test/jwks.json")
+
+    provider = _provider()
+    provider.client.number_verification = FakeNumberVerificationBareToken()
+
+    with pytest.raises(RuntimeError, match="id_token"):
+        await provider.exchange_number_verification_code(
+            "operator-code", "https://merchant.test/callback", "nonce-abc"
+        )
 
 
 class FakeNumberVerificationRejectsNonce:

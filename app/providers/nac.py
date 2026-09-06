@@ -13,7 +13,7 @@ from app.chain.models import EvidenceLink
 from app.config import settings
 from app.domain.enums import API_LABEL, Action, Result
 from app.domain.schemas import VerificationRequest
-from app.oidc import IdTokenError
+from app.oidc import IdTokenError, validate_id_token
 from app.providers import oidc_flow
 from app.providers.vocabulary import detail_for, window_hours
 
@@ -116,15 +116,46 @@ class NacProvider:
             for method_name in ("exchange_code_for_token", "create_camara_token"):
                 method = getattr(number_api, method_name, None)
                 if callable(method):
-                    # The vendor SDK's own OIDC client, if this method exists,
-                    # owns id_token validation internally — this adapter does
-                    # not re-validate a token it never sees. See H2 in the
-                    # handoff for what that leaves unverified.
+                    # R5: this used to trust that "the vendor SDK's own OIDC
+                    # client owns id_token validation internally" from the
+                    # method's mere existence — never confirmed, and a stub
+                    # (or a future SDK version) returning only an access
+                    # token was accepted with no nonce binding at all, the
+                    # exact replay protection this whole contract exists for
+                    # (P4a's own OIDC review). This branch now validates the
+                    # id_token itself through the SAME shared validator the
+                    # manual path uses, with THIS request's nonce, rather
+                    # than inferring safety from a method name existing.
                     token = await asyncio.wait_for(
                         self._in_pool(method, code, redirect_uri),
                         timeout=settings.nac_timeout_seconds,
                     )
-                    return self._extract_access_token(token)
+                    access_token = self._extract_access_token(token)
+                    id_token = self._value_any(token, "id_token", "idToken")
+                    if not isinstance(id_token, str) or not id_token:
+                        raise RuntimeError(
+                            "Network as Code's SDK token exchange returned no id_token; "
+                            "an access-token-only response cannot be nonce-validated"
+                        )
+                    if not settings.nac_issuer or not settings.nac_jwks_uri:
+                        raise RuntimeError(
+                            "ISNAD_NAC_ISSUER and ISNAD_NAC_JWKS_URI are required to validate "
+                            "the id_token the SDK token exchange returns"
+                        )
+                    try:
+                        async with httpx.AsyncClient(timeout=settings.nac_timeout_seconds) as client:
+                            await validate_id_token(
+                                id_token,
+                                issuer=settings.nac_issuer,
+                                audience=settings.nac_client_id or "",
+                                nonce=nonce,
+                                jwks_uri=settings.nac_jwks_uri,
+                                http_client=client,
+                                leeway_seconds=settings.nac_id_token_leeway_seconds,
+                            )
+                    except IdTokenError as exc:
+                        raise RuntimeError(str(exc)) from exc
+                    return access_token
 
         client_id = settings.nac_client_id
         client_secret = settings.nac_client_secret

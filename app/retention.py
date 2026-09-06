@@ -19,6 +19,7 @@ import logging
 
 from app import announce, velocity
 from app.config import settings
+from app.consent import consents
 from app.db import challenges, outcomes, proof_shares, run_events
 
 log = logging.getLogger("isnad")
@@ -34,6 +35,10 @@ def purge_once() -> dict[str, int]:
         "outcome_events": outcomes.purge_outcomes(),
         "proof_shares": proof_shares.purge_expired_shares(),
         "run_events": run_events.purge_older_than(settings.run_event_retention_seconds),
+        # R4: terminal consent retention used to be enforced only as a side
+        # effect of create() elsewhere creating traffic; an idle process now
+        # reclaims these on its own timer too.
+        "terminal_consents": consents.purge_expired(),
     }
 
 
