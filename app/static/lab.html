@@ -89,7 +89,12 @@
   .decision.ALLOW{color:var(--green)} .decision.CHALLENGE{color:var(--amber)} .decision.DECLINE{color:var(--red)}
   .kv{display:flex;justify-content:space-between;gap:12px;font-size:12px;padding:3px 0;text-align:start}
   .kv .k{color:var(--muted)}
-  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  /* `overflow-x:auto` alone does not contain a wide table: a grid or flex item
+     defaults to min-width:auto, so the wrapper grows to its content instead of
+     scrolling, and the whole page ends up 400px wider than the phone. The
+     min-width:0 is what makes the scroll container actually a scroll container. */
+  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;min-width:0;max-width:100%}
+  .grid2>*,.panel,.replay{min-width:0}
   table{width:100%;min-width:520px;border-collapse:collapse;font-size:12px;margin-top:6px}
   th{text-align:start;color:var(--muted);font-weight:500;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
   td{padding:6px 8px;border-bottom:1px solid #1d2749;text-align:start}

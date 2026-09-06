@@ -33,10 +33,16 @@ def _free_port() -> int:
         return sock.getsockname()[1]
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def server(tmp_path_factory):
-    """One isolated instance: its own port, database, signing key and merchant
-    credential. Nothing it writes touches the developer's checkout."""
+    """One isolated instance per test file: its own port, database, signing key
+    and merchant credential. Nothing it writes touches the developer's checkout.
+
+    Per module rather than per session because this build keeps a small, evicted
+    pool of demo credentials and a bounded set of event subscribers. A file that
+    renders dozens of pages exhausts both, and the next file's journey then
+    fails for a reason that has nothing to do with it.
+    """
     workdir = tmp_path_factory.mktemp("browser-server")
     port = _free_port()
     env = {
@@ -50,6 +56,10 @@ def server(tmp_path_factory):
         "ISNAD_MERCHANT_API_KEYS": BROWSER_KEY,
         "ISNAD_SUBJECT_PEPPER": "browser-test-pepper",
         "ISNAD_RATE_LIMIT_ENABLED": "false",
+        # The provider is the mock, so no operator is contacted. The value only
+        # has to exist and be HTTPS for the network-conditions panel to be
+        # reachable at all — creation is refused without one, by design.
+        "ISNAD_NAC_CONGESTION_CALLBACK_URL": "https://callbacks.invalid/congestion",
     }
     process = subprocess.Popen(
         [
