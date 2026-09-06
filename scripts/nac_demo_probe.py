@@ -316,7 +316,7 @@ class Runner:
             if not args.callback_url:
                 raise ProbeError(
                     "no congestion callback is configured "
-                    "(ISNAD_NAC_CONGESTION_CALLBACK_URL); refusing to point an "
+                    "(ISNAD_NAC_CONGESTION_CALLBACK_BASE_URL); refusing to point an "
                     "operator at an unowned destination"
                 )
             if not args.callback_url.startswith("https://"):
@@ -481,7 +481,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     # the shell history and in any screenshot of the terminal.
     from app.config import settings
 
-    args.callback_url = settings.nac_congestion_callback_url or ""
+    args.callback_url = settings.nac_congestion_callback_base_url or ""
     args.callback_token = settings.nac_congestion_callback_token or ""
     args.expire_time = (
         dt.datetime.now(dt.UTC)

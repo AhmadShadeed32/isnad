@@ -56,10 +56,13 @@ def server(tmp_path_factory):
         "ISNAD_MERCHANT_API_KEYS": BROWSER_KEY,
         "ISNAD_SUBJECT_PEPPER": "browser-test-pepper",
         "ISNAD_RATE_LIMIT_ENABLED": "false",
-        # The provider is the mock, so no operator is contacted. The value only
+        # The provider is the mock, so no operator is contacted. The base only
         # has to exist and be HTTPS for the network-conditions panel to be
-        # reachable at all — creation is refused without one, by design.
-        "ISNAD_NAC_CONGESTION_CALLBACK_URL": "https://callbacks.invalid/congestion",
+        # reachable at all — creation is refused without one, by design. The
+        # subscription id is appended to this, so it names the real receiver.
+        "ISNAD_NAC_CONGESTION_CALLBACK_BASE_URL": (
+            "https://isnad.invalid/v1/network-conditions/callbacks"
+        ),
     }
     process = subprocess.Popen(
         [

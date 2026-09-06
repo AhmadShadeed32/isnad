@@ -24,6 +24,9 @@ dependencies = [
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
+    # tests/browser. `python -m playwright install chromium` fetches the
+    # browser itself; the package alone cannot launch one.
+    "playwright>=1.62",
     "ruff>=0.4",
     "pip-audit>=2.10",
     "alembic>=1.14",

@@ -357,13 +357,23 @@ class NetworkConditionSubscriptionRow(Base):
     # reconciled by listing rather than repeated blindly.
     provider_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     device_hash: Mapped[str] = mapped_column(String(64), index=True)
-    # "hosted_simulator" or "live_operator". Never inferred from a successful
-    # call: it is what the configured provider actually is.
+    # Which provider created this. A later configuration change must not let a
+    # provider id minted by one backend be handed to another as if it were its
+    # own — a mock id sent to Nokia is at best a 404 and at worst a delete of
+    # somebody else's resource.
+    provider_kind: Mapped[str] = mapped_column(String(24), default="")
+    # "mock", "nac_fake", "hosted_simulator" or a separately verified live
+    # scope. Never inferred from a successful call: it is what the configured
+    # provider actually is, recorded when the subscription was created.
     scope: Mapped[str] = mapped_column(String(32), default="hosted_simulator")
     status: Mapped[str] = mapped_column(String(24), default="pending", index=True)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime)
     expires_at: Mapped[datetime] = mapped_column(UtcDateTime, index=True)
     deleted_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    # When this subscription last reached the provider for a reading. Queries
+    # are paced against it: without one, a page that repeats a click bills the
+    # operator once per click.
+    last_query_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
     # sha256 of the bearer token this subscription's callbacks must present.
     # Per subscription, so one leaked token cannot authenticate another's events.
     callback_token_digest: Mapped[str] = mapped_column(String(64))

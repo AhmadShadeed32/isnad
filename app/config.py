@@ -150,12 +150,16 @@ class Settings(BaseSettings):
     nac_id_token_leeway_seconds: int = 60
 
     # --- Congestion Insights callback (server-configured, never client-supplied) ---
-    # A subscription tells Nokia where to POST. That destination is ours to
-    # choose once, here: accepting one from a request would let a caller point
-    # an operator at any host. Empty (the default) means no subscription may be
-    # created at all, which is the honest state until a reachable HTTPS
-    # endpoint exists.
-    nac_congestion_callback_url: str = ""
+    # The BASE of the callback the operator will POST to. This service appends
+    # the subscription's own id, so each subscription is told about at a URL
+    # that names it — a single static URL cannot identify which of several
+    # subscriptions an event belongs to, and the token alone should not have to.
+    #
+    # The destination is ours to choose once, here: accepting one from a request
+    # would let a caller point an operator at any host. Empty (the default)
+    # means no subscription may be created at all, which is the honest state
+    # until a reachable HTTPS endpoint exists.
+    nac_congestion_callback_base_url: str = ""
     # Bearer token the callback route requires, compared in constant time.
     nac_congestion_callback_token: str = ""
     # Short by design: a demo subscription that outlives the demo is a leak.

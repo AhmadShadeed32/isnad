@@ -22,6 +22,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import secrets
+import threading
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -42,9 +43,33 @@ LEVELS = {"low": "Low", "medium": "Medium", "high": "High"}
 FORECAST = "forecast"
 HISTORY = "history"
 
+# A response is a reading, not a data export. An operator array longer than this
+# is truncated rather than rendered.
+MAX_INTERVALS = 96
+
+# Clock skew between the caller and this server. A window starting a moment from
+# now is a rounding difference; one starting tomorrow is a mistake.
+FUTURE_PERIOD_TOLERANCE_SECONDS = 300
+
 # Terminal states. A subscription in one of these makes no further provider
 # calls and stops any polling a page is doing.
+#
+# `unknown` is deliberately NOT terminal. A create whose answer never arrived
+# may have succeeded at the operator, so the row keeps consuming this device's
+# capacity until somebody reconciles it — otherwise a timeout is an invitation
+# to create a second remote subscription nobody will ever clean up.
 TERMINAL = {"deleted", "expired", "failed"}
+
+# Serializes the read-then-insert that enforces the per-owner and per-device
+# caps, and the read-then-call that paces queries. Both are check-then-act, and
+# the routes run them in worker threads, so two requests interleaved between the
+# count and the insert produced two active subscriptions for one device.
+#
+# A process-local lock is the right scope for the documented single-worker
+# deployment (see the Makefile's `serve` target) and no more: a multi-process
+# deployment needs a database-level reservation, and this comment is here so
+# that is a decision somebody makes rather than one they inherit.
+_reservation = threading.Lock()
 
 
 class NetworkConditionError(RuntimeError):
@@ -123,6 +148,13 @@ def validate_period(start: datetime | None, end: datetime | None) -> str:
             )
     if end <= start:
         raise NetworkConditionError("period_not_chronological", "end must be after start")
+    if start > _now() + timedelta(seconds=FUTURE_PERIOD_TOLERANCE_SECONDS):
+        # Two ordered bounds in the future are not history. Nokia's forecast is
+        # the no-bounds call; asking for "history" that has not happened yet is
+        # a question with no answer, and it should be refused rather than sent.
+        raise NetworkConditionError(
+            "period_in_the_future", "a historical window must start in the past"
+        )
     span = end - start
     if span > timedelta(hours=settings.network_conditions_max_query_hours):
         raise NetworkConditionError(
@@ -185,10 +217,42 @@ def as_public(row: NetworkConditionSubscriptionRow, now: datetime | None = None)
     }
 
 
-@dataclass
-class CreatedSubscription:
-    row_id: str
-    callback_token: str
+def callback_url_for(subscription_id: str) -> str:
+    """Where the operator should POST events for THIS subscription.
+
+    The configured value is a base; the subscription's own id is appended. A
+    single static URL cannot say which subscription an event belongs to, which
+    left the receiving route unable to find the row a real operator's POST was
+    about — the tests passed only because they called the handler with an id
+    they already knew.
+    """
+    return settings.nac_congestion_callback_base_url.rstrip("/") + "/" + subscription_id
+
+
+def _require_callback() -> None:
+    base = settings.nac_congestion_callback_base_url
+    if not base:
+        raise NetworkConditionError(
+            "callback_not_configured",
+            "no server-configured HTTPS callback exists for network conditions",
+            status_code=503,
+        )
+    if not base.startswith("https://"):
+        raise NetworkConditionError(
+            "callback_not_https", "the configured callback must be HTTPS", status_code=503
+        )
+
+
+def _definitely_rejected(exc: Exception) -> bool:
+    """Did the operator answer "no", or did we simply never hear back?
+
+    A 4xx is an answer: nothing was created and nothing needs reconciling. A
+    timeout, a connection failure or a 5xx is not — the subscription may exist
+    at the operator, and treating that as a clean failure is how a demo leaks a
+    subscription and then creates a second one on retry.
+    """
+    status = getattr(exc, "status_code", None)
+    return isinstance(status, int) and 400 <= status < 500
 
 
 def create(
@@ -205,16 +269,7 @@ def create(
     entirely and the usual "fix" is to create another one.
     """
     now = now or _now()
-    if not settings.nac_congestion_callback_url:
-        raise NetworkConditionError(
-            "callback_not_configured",
-            "no server-configured HTTPS callback exists for network conditions",
-            status_code=503,
-        )
-    if not settings.nac_congestion_callback_url.startswith("https://"):
-        raise NetworkConditionError(
-            "callback_not_https", "the configured callback must be HTTPS", status_code=503
-        )
+    _require_callback()
 
     if not hasattr(provider, "create_congestion_subscription"):
         raise NetworkConditionError(
@@ -228,7 +283,10 @@ def create(
     subscription_id = "ncs_" + uuid.uuid4().hex[:20]
     callback_token = secrets.token_urlsafe(32)
 
-    with SessionLocal() as session:
+    # Counting and inserting under one lock. Separately, two requests for the
+    # same device interleaved between the count and the insert and both passed
+    # a limit of one.
+    with _reservation, SessionLocal() as session:
         per_owner, per_device = _active_counts(session, owner_hash, device_hash, now)
         if per_owner >= settings.network_conditions_max_active_per_owner:
             raise NetworkConditionError(
@@ -244,6 +302,7 @@ def create(
                 owner_hash=owner_hash,
                 provider_id=None,
                 device_hash=device_hash,
+                provider_kind=settings.provider,
                 scope=_scope(),
                 status="pending",
                 created_at=now,
@@ -256,7 +315,7 @@ def create(
     try:
         provider_id = provider.create_congestion_subscription(
             phone_number=phone_number,
-            callback_url=settings.nac_congestion_callback_url,
+            callback_url=callback_url_for(subscription_id),
             callback_token=callback_token,
             expires_at=now + ttl,
         )
@@ -271,22 +330,64 @@ def create(
             status_code=501,
         ) from None
     except Exception as exc:  # noqa: BLE001 - never surface a provider payload
-        _mark(subscription_id, status="failed", error=_code(exc))
+        if _definitely_rejected(exc):
+            # The operator answered no. Nothing exists to reconcile, so the row
+            # is terminal and stops consuming this device's capacity.
+            _mark(subscription_id, status="failed", error=_code(exc))
+            raise NetworkConditionError(
+                "provider_rejected",
+                "the operator refused the subscription",
+                status_code=502,
+            ) from None
+        # We never heard back. The subscription may exist at the operator, so
+        # the row stays NON-terminal: it keeps this device's capacity, and a
+        # retry is refused until somebody reconciles it against the provider's
+        # own listing. Creating a second one here is how the first is leaked.
+        _mark(subscription_id, status="unknown", error=_code(exc))
         raise NetworkConditionError(
-            "provider_unavailable",
-            "the operator did not accept the subscription",
+            "provider_unreachable",
+            "the operator did not answer; this subscription may exist and must "
+            "be reconciled before another is created",
             status_code=502,
         ) from None
 
-    _mark(subscription_id, status="active", provider_id=provider_id)
+    if not provider_id or not str(provider_id).strip():
+        # An empty id is not a subscription we can read, delete or match a
+        # callback to. Accepting it as `active` produced a row whose delete
+        # skipped the provider entirely and reported success.
+        _mark(subscription_id, status="unknown", error="operator returned no subscription id")
+        raise NetworkConditionError(
+            "provider_id_missing",
+            "the operator returned no subscription id; the subscription must be "
+            "reconciled before another is created",
+            status_code=502,
+        ) from None
+
+    _mark(subscription_id, status="active", provider_id=str(provider_id))
     with SessionLocal() as session:
         row = _row(session, subscription_id, owner_hash)
         return as_public(row, now)
 
 
 def _scope() -> str:
-    """Never inferred from a call that worked."""
-    return "live_operator" if settings.provider == "nac" and _live_entitled() else "hosted_simulator"
+    """Where the data will actually come from, recorded at creation.
+
+    Not inferred from a call that worked, and not flattened to one label. A
+    reading produced by `MockProvider` is a fixture this repository wrote; a
+    reading from the hosted Nokia simulator is an authenticated response from
+    Nokia; neither is a live network. Labelling the first `hosted_simulator`
+    was a claim about provenance that was simply untrue.
+    """
+    provider = settings.provider
+    if provider == "mock":
+        return "mock"
+    if provider == "nac_fake":
+        return "nac_fake"
+    if provider == "hybrid":
+        # Network conditions have no per-action live/mock split to route by,
+        # and this provider does not offer them at all.
+        return "unsupported"
+    return "live_operator" if _live_entitled() else "hosted_simulator"
 
 
 def _live_entitled() -> bool:
@@ -381,7 +482,11 @@ def query(
     now = now or _now()
     mode = validate_period(start, end)
 
-    with SessionLocal() as session:
+    # The device check, the pacing check and the timestamp write happen under
+    # one lock. Both were check-then-act: one subscription could be used to ask
+    # about any number the same merchant liked, and two clicks in the same
+    # second both reached the operator.
+    with _reservation, SessionLocal() as session:
         row = _row(session, subscription_id, owner_hash)
         if row is None:
             raise NetworkConditionError("not_found", "no such subscription", status_code=404)
@@ -394,6 +499,33 @@ def query(
                 "subscription_not_active",
                 f"the subscription is {status}; create a new one before querying",
             )
+        if not hmac.compare_digest(row.device_hash, subject_hash(phone_number)):
+            # The subscription is the prerequisite for asking about ONE device.
+            # Owner isolation was enforced and this was not, so a merchant could
+            # subscribe one number and then query every other number it liked
+            # through the same subscription.
+            raise NetworkConditionError(
+                "device_not_subscribed",
+                "this subscription is for a different device",
+            )
+        if row.provider_kind and row.provider_kind != settings.provider:
+            raise NetworkConditionError(
+                "provider_changed",
+                "this subscription was created by a different provider",
+            )
+        if row.last_query_at is not None:
+            elapsed = (now - row.last_query_at).total_seconds()
+            minimum = settings.network_conditions_min_query_interval_seconds
+            if elapsed < minimum:
+                raise NetworkConditionError(
+                    "query_too_soon",
+                    f"wait {int(minimum - elapsed) + 1}s before asking again",
+                    status_code=429,
+                )
+        # Written BEFORE the call, so a slow provider cannot be asked twice
+        # while the first request is still in flight.
+        row.last_query_at = now
+        session.commit()
         scope = row.scope
 
     try:
@@ -403,15 +535,7 @@ def query(
             "provider_unavailable", "the operator did not answer", status_code=502
         ) from None
 
-    intervals = [
-        Interval(
-            start=item["start"],
-            stop=item["stop"],
-            level=normalize_level(item.get("level")),
-            confidence=normalize_confidence(item.get("confidence")),
-        )
-        for item in raw or []
-    ]
+    intervals = _normalize_intervals(raw)
     return QueryResult(
         mode=mode,
         intervals=intervals,
@@ -419,6 +543,37 @@ def query(
         provenance=scope,
         empty=not intervals,
     )
+
+
+def _normalize_intervals(raw) -> list[Interval]:
+    """Validate every interval before it becomes a response.
+
+    A provider list is not trusted to be well formed: a missing key, a null
+    timestamp or a reversed interval used to escape normalization and surface as
+    a 500. Bad intervals are dropped rather than repaired — an interval we
+    cannot read is not one we may show — and the count is bounded so an
+    oversized array cannot become the response.
+    """
+    intervals: list[Interval] = []
+    for item in list(raw or [])[:MAX_INTERVALS]:
+        if not isinstance(item, dict):
+            continue
+        start, stop = item.get("start"), item.get("stop")
+        if not isinstance(start, datetime) or not isinstance(stop, datetime):
+            continue
+        if start.tzinfo is None or stop.tzinfo is None:
+            continue
+        if stop <= start:
+            continue
+        intervals.append(
+            Interval(
+                start=start,
+                stop=stop,
+                level=normalize_level(item.get("level")),
+                confidence=normalize_confidence(item.get("confidence")),
+            )
+        )
+    return intervals
 
 
 # --- callback ----------------------------------------------------------------

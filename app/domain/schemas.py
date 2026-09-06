@@ -563,13 +563,18 @@ class ProofShareAttestation(BaseModel):
 
 class NetworkConditionSubscribeRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    phone_number: str = Field(..., min_length=8, max_length=20)
+    # The same E.164 pattern every other route uses. A length check alone let
+    # "notaphone" through to the operator.
+    phone_number: str = Field(..., pattern=r"^\+[1-9]\d{7,14}$", examples=["+962790000001"])
 
 
 class NetworkConditionSubscription(BaseModel):
     subscription_id: str
     status: str
-    # hosted_simulator or live_operator. Never inferred from a call that worked.
+    # What actually answered: "mock", "nac_fake", "hosted_simulator" or a
+    # separately verified live scope. Recorded at creation from the configured
+    # provider, never inferred from a call that worked — a local fixture
+    # labelled `hosted_simulator` would be a lie about where the data came from.
     scope: str
     created_at: datetime
     expires_at: datetime
@@ -592,7 +597,7 @@ class NetworkConditionInterval(BaseModel):
 
 class NetworkConditionQueryRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    phone_number: str = Field(..., min_length=8, max_length=20)
+    phone_number: str = Field(..., pattern=r"^\+[1-9]\d{7,14}$", examples=["+962790000001"])
     # Both absent asks for the upcoming forecast. Both present asks for an
     # explicit historical window; one alone is refused rather than silently
     # becoming a fifteen-minute interval nobody asked for.

@@ -97,7 +97,7 @@ def test_the_subscription_plan_shows_host_expiry_and_cleanup(monkeypatch, capsys
     from app.config import settings
 
     monkeypatch.setattr(
-        settings, "nac_congestion_callback_url", "https://callback.example/secret-hook", False
+        settings, "nac_congestion_callback_base_url", "https://callback.example/secret-hook", False
     )
     transport = Transport()
     run(["--operation", "congestion_create", "--number", "+99999991000"], transport)
@@ -187,7 +187,7 @@ def test_a_half_specified_period_is_refused(capsys):
 def test_a_subscription_is_refused_when_no_callback_is_configured(monkeypatch, capsys):
     from app.config import settings
 
-    monkeypatch.setattr(settings, "nac_congestion_callback_url", "", False)
+    monkeypatch.setattr(settings, "nac_congestion_callback_base_url", "", False)
     transport = Transport()
     run(["--operation", "congestion_create", "--number", "+99999991000", "--execute"], transport)
 
@@ -198,7 +198,7 @@ def test_a_subscription_is_refused_when_no_callback_is_configured(monkeypatch, c
 def test_a_plaintext_callback_is_refused(monkeypatch, capsys):
     from app.config import settings
 
-    monkeypatch.setattr(settings, "nac_congestion_callback_url", "http://callback.example/cb", False)
+    monkeypatch.setattr(settings, "nac_congestion_callback_base_url", "http://callback.example/cb", False)
     transport = Transport()
     run(["--operation", "congestion_create", "--number", "+99999991000", "--execute"], transport)
 

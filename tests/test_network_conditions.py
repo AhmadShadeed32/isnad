@@ -29,7 +29,12 @@ NO_DATA = "+962790000005"
 @pytest.fixture(autouse=True)
 def _callback_configured(monkeypatch):
     monkeypatch.setattr(
-        settings, "nac_congestion_callback_url", "https://callbacks.example/congestion", False
+        settings,
+        "nac_congestion_callback_base_url",
+        # The base must point at THIS service's own receiver, because the
+        # subscription id is appended to it and the operator posts there.
+        "https://isnad.example/v1/network-conditions/callbacks",
+        False,
     )
 
 
@@ -38,6 +43,14 @@ def _two_tenants(monkeypatch):
     monkeypatch.setattr(
         settings, "merchant_api_keys", "demo-merchant-key,other-merchant-key", False
     )
+
+
+@pytest.fixture(autouse=True)
+def _unlimited(monkeypatch):
+    """This file makes far more requests than the per-key minute limit allows,
+    and a 429 late in the file fails a test that has nothing to do with rate
+    limiting. The limiter has its own tests."""
+    monkeypatch.setattr(settings, "rate_limit_enabled", False, False)
 
 
 @pytest.fixture(autouse=True)
@@ -204,7 +217,9 @@ def test_create_get_query_delete_get_confirms_deletion(client, provider):
     created = _subscribe(client).json()
     subscription_id = created["subscription_id"]
     assert created["status"] == "active"
-    assert created["scope"] == "hosted_simulator"
+    # The mock provider is the mock provider. Calling its output
+    # `hosted_simulator` would be a claim about where the data came from.
+    assert created["scope"] == "mock"
 
     read = client.get(f"/v1/network-conditions/subscriptions/{subscription_id}", headers=AUTH)
     assert read.json()["status"] == "active"
@@ -227,8 +242,16 @@ def test_create_get_query_delete_get_confirms_deletion(client, provider):
     assert provider.creates == 1 and provider.queries == 1 and provider.deletes == 1
 
 
-def test_a_scope_is_never_inferred_from_a_call_that_worked(client, provider):
+def test_a_scope_names_the_provider_that_actually_answered(client, provider):
+    """A reading produced by MockProvider is a fixture this repository wrote.
+    Labelling it `hosted_simulator` confused an authored fixture with an
+    authenticated response from Nokia."""
+    assert _subscribe(client).json()["scope"] == "mock"
+
+
+def test_a_successful_call_never_promotes_the_scope_to_live(client, provider, monkeypatch):
     """The portal says Simulator. Nothing about a 200 changes that."""
+    monkeypatch.setattr(settings, "provider", "nac", False)
     assert _subscribe(client).json()["scope"] == "hosted_simulator"
 
 
@@ -261,9 +284,10 @@ def test_a_failed_cleanup_is_surfaced_rather_than_reported_as_deleted(client, mo
     assert "cleanup failed" in still.json()["reason"]
 
 
-def test_an_uncertain_create_leaves_a_row_to_reconcile_against(client, monkeypatch):
-    """The row is written before the provider call, so a create that timed out
-    having actually succeeded can be found instead of repeated."""
+def test_an_uncertain_create_stays_non_terminal_so_it_must_be_reconciled(client, monkeypatch):
+    """A timeout is not a refusal. The subscription may exist at the operator,
+    so the row keeps this device's capacity and a retry is refused — creating a
+    second one is exactly how the first is leaked."""
     recording = Recording(fail_create=True)
     monkeypatch.setattr(
         "app.api.routes_network_conditions.get_live_provider", lambda *a, **k: recording
@@ -271,9 +295,66 @@ def test_an_uncertain_create_leaves_a_row_to_reconcile_against(client, monkeypat
     response = _subscribe(client)
 
     assert response.status_code == 502
+    assert response.json()["detail"]["code"] == "provider_unreachable"
     with SessionLocal() as session:
         rows = session.query(NetworkConditionSubscriptionRow).all()
-        assert any(row.status == "failed" for row in rows)
+        assert [row.status for row in rows] == ["unknown"]
+
+    retry = _subscribe(client)
+    assert retry.json()["detail"]["code"] == "device_already_subscribed"
+    assert recording.creates == 1
+
+
+def test_a_definite_refusal_is_terminal_and_frees_the_device(client, monkeypatch):
+    """A 4xx is an answer: nothing was created, so nothing needs reconciling."""
+
+    class Refused(Recording):
+        refuse = True
+
+        def create_congestion_subscription(self, *args, **kwargs):
+            if self.refuse:
+                self.creates += 1
+                error = RuntimeError("bad request")
+                error.status_code = 422
+                raise error
+            return super().create_congestion_subscription(*args, **kwargs)
+
+    recording = Refused()
+    monkeypatch.setattr(
+        "app.api.routes_network_conditions.get_live_provider", lambda *a, **k: recording
+    )
+    response = _subscribe(client)
+
+    assert response.json()["detail"]["code"] == "provider_rejected"
+    with SessionLocal() as session:
+        assert [r.status for r in session.query(NetworkConditionSubscriptionRow).all()] == [
+            "failed"
+        ]
+    # The device is free again, so an honest retry is allowed.
+    recording.refuse = False
+    assert _subscribe(client).status_code == 201
+
+
+def test_an_empty_provider_id_never_becomes_an_active_subscription(client, monkeypatch):
+    """An id we cannot read, delete or match a callback to is not one to
+    activate: delete would skip the provider and report success."""
+
+    class Nameless(Recording):
+        def create_congestion_subscription(self, *args, **kwargs):
+            self.creates += 1
+            return "   "
+
+    recording = Nameless()
+    monkeypatch.setattr(
+        "app.api.routes_network_conditions.get_live_provider", lambda *a, **k: recording
+    )
+    response = _subscribe(client)
+
+    assert response.json()["detail"]["code"] == "provider_id_missing"
+    with SessionLocal() as session:
+        assert [r.status for r in session.query(NetworkConditionSubscriptionRow).all()] == [
+            "unknown"
+        ]
 
 
 def test_a_query_needs_a_live_subscription(client, provider):
@@ -365,7 +446,7 @@ def test_an_owner_is_capped_and_the_cap_counts_only_active_ones(client, provider
 
 
 def test_no_subscription_is_created_without_a_configured_callback(client, provider, monkeypatch):
-    monkeypatch.setattr(settings, "nac_congestion_callback_url", "", False)
+    monkeypatch.setattr(settings, "nac_congestion_callback_base_url", "", False)
     response = _subscribe(client)
 
     assert response.status_code == 503
@@ -375,18 +456,55 @@ def test_no_subscription_is_created_without_a_configured_callback(client, provid
 
 def test_a_plaintext_callback_is_refused(client, provider, monkeypatch):
     monkeypatch.setattr(
-        settings, "nac_congestion_callback_url", "http://callbacks.example/x", False
+        settings, "nac_congestion_callback_base_url", "http://callbacks.example/x", False
     )
     assert _subscribe(client).json()["detail"]["code"] == "callback_not_https"
     assert provider.creates == 0
 
 
-def test_the_operator_is_pointed_only_at_the_configured_callback(client, provider):
-    """A destination supplied by a request would let a caller aim an operator
-    at any host."""
-    _subscribe(client)
+def test_the_operator_is_pointed_at_a_url_that_names_this_subscription(client, provider):
+    """The host is ours and only ours — a destination supplied by a request
+    would let a caller aim an operator at any host — and the path carries the
+    subscription id, because one static URL cannot say which subscription an
+    event belongs to."""
+    created = _subscribe(client).json()
 
-    assert provider.callback_url == "https://callbacks.example/congestion"
+    assert provider.callback_url.startswith(
+        "https://isnad.example/v1/network-conditions/callbacks/"
+    )
+    assert provider.callback_url.endswith(created["subscription_id"])
+
+
+def test_an_event_posted_to_the_url_the_operator_was_given_reaches_the_right_row(
+    client, monkeypatch
+):
+    """The wiring the old test could not see: it called the handler with an id
+    it already knew, so a static callback URL passed."""
+    recording = Recording()
+    monkeypatch.setattr(
+        "app.api.routes_network_conditions.get_live_provider", lambda *a, **k: recording
+    )
+    first = _subscribe(client).json()["subscription_id"]
+    first_token = recording.callback_token
+    first_url = recording.callback_url
+    second = _subscribe(client, number=QUIET).json()["subscription_id"]
+
+    # Post exactly where the operator was told to, for the first subscription.
+    path = "/" + first_url.split("/", 3)[3]
+    assert path.startswith("/v1/network-conditions/callbacks/")
+    response = client.post(
+        path,
+        headers={"Authorization": f"Bearer {first_token}"},
+        json={
+            "event_id": "evt-wired",
+            "level": "High",
+            "occurred_at": datetime.now(UTC).isoformat(),
+        },
+    )
+
+    assert response.status_code == 204
+    assert nc.latest_event(_owner(), first)["event_id"] == "evt-wired"
+    assert nc.latest_event(_owner(), second) is None
 
 
 # --- tenant isolation --------------------------------------------------------
@@ -683,3 +801,214 @@ def test_the_panel_never_requests_anything_on_load():
             preceding = panel[:index]
             assert "addEventListener('click'" in preceding, call
             break
+
+
+# --- the subscription is a prerequisite for ONE device -----------------------
+
+
+def test_a_subscription_cannot_be_used_to_ask_about_another_number(client, provider):
+    """Owner isolation was enforced and this was not, so one merchant could
+    subscribe a single number and then query every other number it liked."""
+    subscription_id = _subscribe(client, number=NUMBER).json()["subscription_id"]
+    provider.queries = 0
+
+    response = client.post(
+        f"/v1/network-conditions/subscriptions/{subscription_id}/query",
+        headers=AUTH,
+        json={"phone_number": QUIET},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"]["code"] == "device_not_subscribed"
+    assert provider.queries == 0
+
+
+def test_the_subscribed_device_can_still_be_queried(client, provider):
+    subscription_id = _subscribe(client, number=NUMBER).json()["subscription_id"]
+
+    response = client.post(
+        f"/v1/network-conditions/subscriptions/{subscription_id}/query",
+        headers=AUTH,
+        json={"phone_number": NUMBER},
+    )
+
+    assert response.status_code == 200
+
+
+def test_a_subscription_is_not_reused_after_the_provider_changes(client, provider, monkeypatch):
+    """A provider id minted by one backend handed to another is at best a 404
+    and at worst a delete of somebody else's resource."""
+    subscription_id = _subscribe(client).json()["subscription_id"]
+    monkeypatch.setattr(settings, "provider", "nac", False)
+    provider.queries = 0
+
+    response = client.post(
+        f"/v1/network-conditions/subscriptions/{subscription_id}/query",
+        headers=AUTH,
+        json={"phone_number": NUMBER},
+    )
+
+    assert response.json()["detail"]["code"] == "provider_changed"
+    assert provider.queries == 0
+
+
+# --- pacing and concurrency --------------------------------------------------
+
+
+def test_a_repeated_query_is_paced_rather_than_billed_twice(client, provider):
+    subscription_id = _subscribe(client).json()["subscription_id"]
+    body = {"phone_number": NUMBER}
+    path = f"/v1/network-conditions/subscriptions/{subscription_id}/query"
+
+    assert client.post(path, headers=AUTH, json=body).status_code == 200
+    second = client.post(path, headers=AUTH, json=body)
+
+    assert second.status_code == 429
+    assert second.json()["detail"]["code"] == "query_too_soon"
+    assert provider.queries == 1
+
+
+def test_pacing_releases_once_the_configured_interval_has_passed(client, provider, monkeypatch):
+    monkeypatch.setattr(settings, "network_conditions_min_query_interval_seconds", 0, False)
+    subscription_id = _subscribe(client).json()["subscription_id"]
+    path = f"/v1/network-conditions/subscriptions/{subscription_id}/query"
+    body = {"phone_number": NUMBER}
+
+    assert client.post(path, headers=AUTH, json=body).status_code == 200
+    assert client.post(path, headers=AUTH, json=body).status_code == 200
+    assert provider.queries == 2
+
+
+def test_two_concurrent_creates_for_one_device_produce_one_subscription(client, monkeypatch):
+    """Counting and inserting were separate steps, and the routes run in worker
+    threads: two requests interleaved between them both passed a limit of one."""
+    import threading
+
+    recording = Recording()
+    monkeypatch.setattr(
+        "app.api.routes_network_conditions.get_live_provider", lambda *a, **k: recording
+    )
+    start = threading.Barrier(2)
+    results: list[int] = []
+
+    def attempt():
+        start.wait(timeout=5)
+        results.append(_subscribe(client).status_code)
+
+    threads = [threading.Thread(target=attempt) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=20)
+
+    assert sorted(results) == [201, 422]
+    assert recording.creates == 1
+    with SessionLocal() as session:
+        active = [
+            row
+            for row in session.query(NetworkConditionSubscriptionRow).all()
+            if row.status == "active"
+        ]
+        assert len(active) == 1
+
+
+# --- malformed provider data -------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "row",
+    [
+        {"start": None, "stop": None, "level": "Low", "confidence": 10},
+        {"level": "Low"},
+        "not a mapping",
+        {"start": "2026-09-06T10:00:00Z", "stop": "2026-09-06T10:15:00Z", "level": "Low"},
+    ],
+)
+def test_a_malformed_interval_is_dropped_rather_than_crashing_the_response(
+    client, monkeypatch, row
+):
+    """A missing key or a null timestamp used to escape normalization and
+    surface as a 500."""
+    recording = Recording(rows=[row])
+    monkeypatch.setattr(
+        "app.api.routes_network_conditions.get_live_provider", lambda *a, **k: recording
+    )
+    subscription_id = _subscribe(client).json()["subscription_id"]
+    response = client.post(
+        f"/v1/network-conditions/subscriptions/{subscription_id}/query",
+        headers=AUTH,
+        json={"phone_number": NUMBER},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["intervals"] == []
+    assert response.json()["empty"] is True
+
+
+def test_a_reversed_interval_is_dropped(client, monkeypatch):
+    now = datetime.now(UTC)
+    recording = Recording(
+        rows=[{"start": now, "stop": now - timedelta(minutes=15), "level": "High", "confidence": None}]
+    )
+    monkeypatch.setattr(
+        "app.api.routes_network_conditions.get_live_provider", lambda *a, **k: recording
+    )
+    subscription_id = _subscribe(client).json()["subscription_id"]
+    body = client.post(
+        f"/v1/network-conditions/subscriptions/{subscription_id}/query",
+        headers=AUTH,
+        json={"phone_number": NUMBER},
+    ).json()
+
+    assert body["intervals"] == []
+
+
+def test_an_oversized_provider_array_is_bounded(client, monkeypatch):
+    now = datetime.now(UTC)
+    rows = [
+        {
+            "start": now + timedelta(minutes=i),
+            "stop": now + timedelta(minutes=i + 1),
+            "level": "Low",
+            "confidence": None,
+        }
+        for i in range(500)
+    ]
+    recording = Recording(rows=rows)
+    monkeypatch.setattr(
+        "app.api.routes_network_conditions.get_live_provider", lambda *a, **k: recording
+    )
+    subscription_id = _subscribe(client).json()["subscription_id"]
+    body = client.post(
+        f"/v1/network-conditions/subscriptions/{subscription_id}/query",
+        headers=AUTH,
+        json={"phone_number": NUMBER},
+    ).json()
+
+    assert len(body["intervals"]) == nc.MAX_INTERVALS
+
+
+# --- input validation --------------------------------------------------------
+
+
+@pytest.mark.parametrize("bad", ["notaphone", "12345678", "+0123456789", "+" + "9" * 20])
+def test_a_phone_that_is_not_e164_never_reaches_the_operator(client, provider, bad):
+    response = client.post(
+        "/v1/network-conditions/subscriptions", headers=AUTH, json={"phone_number": bad}
+    )
+
+    assert response.status_code == 422
+    assert provider.creates == 0
+
+
+def test_a_window_entirely_in_the_future_is_not_history():
+    """Two ordered bounds are not a historical window just because they are
+    ordered. Nokia's forecast is the no-bounds call."""
+    start = datetime.now(UTC) + timedelta(hours=1)
+    with pytest.raises(nc.NetworkConditionError, match="past"):
+        nc.validate_period(start, start + timedelta(hours=1))
+
+
+def test_a_window_starting_within_clock_skew_is_still_accepted():
+    start = datetime.now(UTC) + timedelta(seconds=30)
+    assert nc.validate_period(start, start + timedelta(minutes=10)) == nc.HISTORY
