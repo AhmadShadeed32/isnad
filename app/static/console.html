@@ -101,7 +101,12 @@
              border:1px solid var(--panel2);border-radius:8px;padding:10px;
              font-family:var(--sans);font-size:12px}
   .ask input::placeholder{color:var(--mut)}
-  .ask input:focus{outline:none;border-color:var(--gold2)}
+  /* :focus-visible with a real outline, not outline:none + a 1px border-color
+     change alone — the same pattern judge.html's .audit summary already uses.
+     A border-color shift is too subtle a focus indicator for a keyboard user
+     to reliably spot, particularly at low contrast or on a fast scan. */
+  .ask input:focus{border-color:var(--gold2)}
+  .ask input:focus-visible{outline:2px solid var(--gold2);outline-offset:1px}
   .ask button{flex:none;background:var(--panel);color:var(--txt);
               border:1px solid var(--panel2);border-radius:8px;padding:10px 14px;
               cursor:pointer;font-size:12px;transition:.15s}

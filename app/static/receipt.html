@@ -29,7 +29,15 @@
         padding:.9rem;margin-bottom:.8rem}
   .status{font-size:18px;font-weight:600;display:flex;align-items:center;gap:.5rem}
   .ok{color:var(--green)} .bad{color:var(--red)} .pending{color:var(--mut)}
-  table{width:100%;border-collapse:collapse;font-size:12px}
+  /* The steps table has six columns and does not fit a 375px viewport. Without
+     a scoped scroll container the table simply overflowed its card, which
+     stretched the whole page wider than the viewport (mobile browsers then
+     grow their own layout viewport to match, so the entire receipt — not just
+     the table — became horizontally scrollable and the right-hand columns
+     were clipped with no visible way to reach them). Scoping the scroll to
+     this wrapper keeps the rest of the page fixed at device width. */
+  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{width:100%;min-width:480px;border-collapse:collapse;font-size:12px}
   th{text-align:left;color:var(--mut);font-weight:normal;padding:.2rem .3rem}
   td{padding:.2rem .3rem;border-top:1px solid var(--line)}
   .k{color:var(--mut)}
@@ -63,10 +71,12 @@
   </div>
 
   <div class="card" id="stepsCard" hidden>
-    <table>
-      <thead><tr><th>#</th><th>network API</th><th>signal</th><th>result</th><th>&Delta; log-odds</th><th>asked over</th></tr></thead>
-      <tbody id="steps"></tbody>
-    </table>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>#</th><th>network API</th><th>signal</th><th>result</th><th>&Delta; log-odds</th><th>asked over</th></tr></thead>
+        <tbody id="steps"></tbody>
+      </table>
+    </div>
   </div>
 
   <!-- The belief, redone rather than asserted. Every number here comes out of
