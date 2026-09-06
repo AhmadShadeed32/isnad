@@ -2,10 +2,18 @@
 
 Updated 6 September 2026. **Read this file first.**
 
-**Active user-requested work:** [§12 — full scope, sequence and acceptance checks](#12-active-user-requests-and-implementation-plan--6-september-2026).
-Read it before implementing further changes. Gemini/Arabic edits are in progress;
-swap timestamps and Congestion Insights are planned, not delivered.
+**Start implementation here:** [step-by-step execution runbook](EXECUTION_RUNBOOK.md).
+It is the active order and acceptance contract for any next model: baseline,
+API contracts/probes, Gemini, new capabilities, Arabic/UI, browser rehearsal,
+complete test guide, release checks and private push. The [API review](NAC_DEMO_REVIEW_2026-09-06.md)
+contains source-backed recommendations and simulator limitations. [§12](#12-active-user-requests-and-implementation-plan--6-september-2026)
+retains the original scope and historical checkpoint details.
 
+**Current checkpoint:** Gemini and cross-page Arabic edits are local and unfinished;
+no new Nokia API integration or external call was completed. The 901-test result
+predates the latest Arabic changes; 39 focused locale/pilot tests subsequently
+passed, but browser verification and a known Ruff cleanup remain. Follow the
+runbook's fresh checks rather than treating historical totals as release proof.
 
 **Latest review:** [fixes, verification and hackathon priorities](REVIEW_2026-09-06.md).
 886 tests pass. F1/F3 were already implemented in this checkout; F2 is now closed
