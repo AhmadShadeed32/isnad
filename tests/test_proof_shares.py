@@ -9,6 +9,7 @@ revoke the already-public original receipt or erase anything downloaded.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -266,6 +267,45 @@ def test_revoking_a_share_does_not_touch_the_original_receipt():
 
 
 # --- no leaked data ------------------------------------------------------------
+
+
+def test_a_browser_navigation_gets_the_page_and_a_script_gets_json():
+    """I13's UI: same content negotiation as P4a's consent callback — JSON is
+    the default, and only an explicit text/html preference switches."""
+    _seed("chn_ps_html")
+    created = _create("chn_ps_html").json()
+
+    browser = client.get(
+        f"/p/{created['token']}",
+        headers={"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"},
+    )
+    assert browser.status_code == 200
+    assert "text/html" in browser.headers["content-type"]
+    assert "shared verification summary" in browser.text
+
+    script = client.get(f"/p/{created['token']}")
+    assert "application/json" in script.headers["content-type"]
+    assert script.json()["chain_id"] == "chn_ps_html"
+
+
+def test_the_page_separates_signature_integrity_from_link_access():
+    """An expired link's downloaded summary still verifies; the page must not
+    let those two facts read as one."""
+    page = (Path(__file__).resolve().parents[1] / "app" / "static" / "proof.html").read_text(
+        encoding="utf-8"
+    )
+    assert "still verifies" in page
+    assert "does not withdraw the original receipt" in page
+    # Never claims to be a redacted copy of the original signature.
+    assert "not a redacted copy" in page
+
+
+def test_the_page_never_renders_the_source_payload_itself():
+    page = (Path(__file__).resolve().parents[1] / "app" / "static" / "proof.html").read_text(
+        encoding="utf-8"
+    )
+    assert "source_payload_digest" in page
+    assert "signed_payload" not in page
 
 
 def test_the_attestation_never_carries_full_chain_or_merchant_or_session_data():

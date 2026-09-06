@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from app.agent.investigator import build_engine_for_pricing, build_investigator
+from app.api.content_negotiation import accept_quality, prefers_html
 from app.api.deps import get_live_provider, require_api_key
 from app.api.rate_limit import limit_per_ip, limit_per_key
 from app.chain.models import Verdict
@@ -30,44 +31,10 @@ page_router = APIRouter(tags=["consent"], dependencies=[Depends(limit_per_ip)])
 _CONSENT_COMPLETE_HTML = Path(__file__).parent.parent / "static" / "consent_complete.html"
 
 
-def _accept_quality(accept: str, media_type: str) -> float:
-    """The q-value Accept assigns to an exact media type (no wildcard credit).
-
-    A `*/*` or `text/*` entry does not count toward a specific type's score
-    here — "prefers html" must mean an explicit `text/html`, not a browser's
-    catch-all fallback, or "wildcard-only... keep JSON" would break.
-    """
-    best = 0.0
-    for part in accept.split(","):
-        part = part.strip()
-        if not part:
-            continue
-        type_part, *params = part.split(";")
-        if type_part.strip() != media_type:
-            continue
-        quality = 1.0
-        for param in params:
-            param = param.strip()
-            if param.startswith("q="):
-                try:
-                    quality = float(param[2:])
-                except ValueError:
-                    quality = 1.0
-        best = max(best, quality)
-    return best
-
-
-def _prefers_html(accept: str | None) -> bool:
-    """Whether a browser's Accept header prefers text/html over JSON.
-
-    Absent, wildcard-only, or tied preferences all keep JSON — this only
-    fires for an explicit, strictly higher preference for text/html, which is
-    what an ordinary browser navigation (not a fetch()/curl/script client)
-    sends.
-    """
-    if not accept:
-        return False
-    return _accept_quality(accept, "text/html") > _accept_quality(accept, "application/json")
+# Extracted to app/api/content_negotiation.py so the I13 proof-share route
+# uses the same implementation rather than a second copy of it.
+_accept_quality = accept_quality
+_prefers_html = prefers_html
 
 
 def _redirect_to_completion_page() -> RedirectResponse:

@@ -1,0 +1,181 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Isnad — shared verification summary</title>
+<!--
+  I13 — a reviewer-facing summary of one decision, reached through an expiring
+  link. Deliberately NOT the original receipt:
+
+    * it is a SEPARATELY ISSUED attestation, signed under its own type
+      (isnad_proof_share_attestation_v1), not a redacted copy of the original
+      Verdict signature — Ed25519 offers no selective disclosure, and pretending
+      otherwise would be the dishonest version of this feature;
+    * it carries a DIGEST of the source payload, never the payload itself, so
+      the full evidence chain is not disclosed through a share;
+    * "this signature is intact" and "this link still works" are two different
+      facts, shown separately, because an expired link's downloaded summary
+      still verifies.
+
+  Zero external origins, like receipt.html. The Ed25519 check runs here in the
+  browser with WebCrypto against the exact bytes the server signed.
+-->
+<style>
+  :root{--bg:#0d1117;--fg:#e6edf3;--mut:#8b949e;--green:#3fb950;--red:#f85149;
+        --amber:#d29922;--line:#30363d;--card:#161b22}
+  *{box-sizing:border-box}
+  body{margin:0;padding:1.2rem;background:var(--bg);color:var(--fg);
+       font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  main{max-width:620px;margin:0 auto}
+  h1{font-size:15px;font-weight:600;margin:0 0 .2rem}
+  .sub{color:var(--mut);font-size:12px;margin-bottom:1rem}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:6px;
+        padding:.9rem;margin-bottom:.8rem}
+  .status{font-size:18px;font-weight:600;display:flex;align-items:center;gap:.5rem}
+  .ok{color:var(--green)} .bad{color:var(--red)} .pending{color:var(--mut)}
+  .row{display:flex;justify-content:space-between;gap:1rem;padding:.15rem 0}
+  .k{color:var(--mut)}
+  .mono{font-size:11px;color:var(--mut);word-break:break-all}
+  .note{font-size:11px;color:var(--mut);margin-top:.5rem;line-height:1.5}
+  .decision{font-weight:600}
+  .decision.ALLOW{color:var(--green)}
+  .decision.CHALLENGE{color:var(--amber)}
+  .decision.DECLINE{color:var(--red)}
+</style>
+<main>
+  <h1>Isnad — shared verification summary</h1>
+  <div class="sub" id="shareId">loading…</div>
+
+  <div class="card">
+    <div class="status pending" id="status">⋯ verifying signature…</div>
+    <div class="note" id="statusNote"></div>
+  </div>
+
+  <div class="card" id="summaryCard" hidden>
+    <div class="row"><span class="k">decision</span><span id="decision"></span></div>
+    <div class="row"><span class="k">chain grade</span><span id="grade"></span></div>
+    <div class="row"><span class="k">issued at</span><span id="issuedAt"></span></div>
+    <div class="row"><span class="k">link expires</span><span id="expiresAt"></span></div>
+    <p class="note" id="accessNote"></p>
+  </div>
+
+  <div class="card" id="proofCard" hidden>
+    <div class="k">source payload digest (SHA-256)</div>
+    <div class="mono" id="digest"></div>
+    <div class="k" style="margin-top:.5rem">issuer public key (Ed25519, raw hex)</div>
+    <div class="mono" id="issuerKey"></div>
+    <div class="k" style="margin-top:.5rem">attestation signature</div>
+    <div class="mono" id="signature"></div>
+    <p class="note">
+      This is a summary issued <strong>about</strong> a decision, not the decision's
+      own receipt. The digest above identifies the signed source payload without
+      disclosing it — it lets someone holding that payload confirm this summary
+      refers to it, and does nothing else. A valid signature proves this summary
+      was issued by the key below; it does not establish who controls that key,
+      that the underlying network evidence was true, or anything about the
+      subject's current status.
+    </p>
+  </div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+
+function hexToBytes(hex){
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.substr(i * 2, 2), 16);
+  return out;
+}
+
+function setStatus(state, text, note){
+  const el = $('status');
+  el.className = 'status ' + state;
+  el.textContent = text;
+  $('statusNote').textContent = note || '';
+}
+
+// The server signs a canonical JSON serialization of the attestation with its
+// `signature` field absent. Rebuilding those exact bytes here is what makes
+// this verifiable rather than merely displayed.
+function canonicalBytes(attestation){
+  const copy = {};
+  for (const key of Object.keys(attestation).sort()) {
+    if (key === 'signature') continue;
+    copy[key] = attestation[key];
+  }
+  return new TextEncoder().encode(JSON.stringify(copy));
+}
+
+async function verify(attestation){
+  if (!window.isSecureContext || !crypto.subtle){
+    setStatus('pending', '⋯ cannot verify here',
+      'WebCrypto needs HTTPS (or localhost). Open this page over HTTPS to verify.');
+    return null;
+  }
+  try{
+    const key = await crypto.subtle.importKey(
+      'raw', hexToBytes(attestation.issuer_public_key), {name:'Ed25519'}, false, ['verify']);
+    return await crypto.subtle.verify(
+      {name:'Ed25519'}, key, hexToBytes(attestation.signature), canonicalBytes(attestation));
+  }catch(err){
+    setStatus('pending', '⋯ cannot verify here',
+      'This browser does not support Ed25519 in WebCrypto.');
+    return null;
+  }
+}
+
+function render(attestation){
+  $('shareId').textContent = attestation.chain_id;
+
+  const decision = $('decision');
+  decision.textContent = attestation.decision;
+  decision.className = 'decision ' + attestation.decision;
+  $('grade').textContent = attestation.chain_grade || 'UNGRADED';
+  $('issuedAt').textContent = attestation.issued_at;
+  $('expiresAt').textContent = attestation.expires_at;
+  // Integrity and access are separate facts, and the difference is the whole
+  // point of an expiring link: the summary keeps verifying after the link
+  // stops working, and revoking the link does not reach anything already
+  // downloaded — or the original public receipt, which was never gated by it.
+  $('accessNote').textContent =
+    'Access through this link ends at the time above. That is separate from the ' +
+    'signature: a copy saved now still verifies afterwards, and revoking this ' +
+    'link does not withdraw the original receipt or anything already downloaded.';
+  $('summaryCard').hidden = false;
+
+  $('digest').textContent = attestation.source_payload_digest;
+  $('issuerKey').textContent = attestation.issuer_public_key;
+  $('signature').textContent = attestation.signature;
+  $('proofCard').hidden = false;
+}
+
+(async function main(){
+  const token = location.pathname.split('/').pop() || '';
+  try{
+    if (!token){
+      setStatus('bad', '✗ invalid link', 'This URL does not contain a share token.');
+      return;
+    }
+    const response = await fetch(location.pathname, {headers: {'Accept': 'application/json'}});
+    if (!response.ok){
+      // Missing, expired and revoked deliberately answer identically — a
+      // reader learns nothing about which one it was.
+      setStatus('bad', '✗ link unavailable',
+        'This link is not available. It may never have existed, may have expired, or may have been revoked.');
+      $('shareId').textContent = '—';
+      return;
+    }
+    const attestation = await response.json();
+    const ok = await verify(attestation);
+    if (ok === null) { render(attestation); return; }
+    if (ok){
+      setStatus('ok', '✓ signature valid',
+        'This summary was issued by the key below and has not been altered since.');
+    } else {
+      setStatus('bad', '✗ signature INVALID',
+        'These bytes do not match the signature. Do not rely on this summary.');
+    }
+    render(attestation);
+  }catch(err){
+    setStatus('bad', '✗ could not load', 'The summary could not be fetched.');
+  }
+})();
+</script>
