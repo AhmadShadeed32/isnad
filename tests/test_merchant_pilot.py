@@ -195,6 +195,55 @@ def test_a_full_flow_creation_and_completion(monkeypatch):
     assert pilot_module.ISNAD_MERCHANT_API_KEY not in polled.text
 
 
+def test_an_unsupported_currency_is_rejected_before_calling_isnad(monkeypatch):
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise AssertionError("Isnad must never be called for an unsupported currency")
+
+    _patch_isnad(monkeypatch, handler)
+    client = _client()
+    csrf = _login(client)
+    resp = client.post(
+        "/api/flows",
+        json={"phone_number": "+15551234567", "amount": {"value": 100, "currency": "JOD"}},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert resp.status_code == 422
+
+
+def test_a_claimed_location_is_forwarded_to_isnad(monkeypatch):
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/consents/number-verification":
+            captured["body"] = json.loads(request.content)
+            return httpx.Response(
+                202,
+                json={
+                    "consent_id": "cns_loc",
+                    "status": "PENDING",
+                    "authorization_url": "https://consent.test/authorize?state=s",
+                    "expires_at": "2026-01-01T00:05:00+00:00",
+                    "chain_id": None,
+                    "reason": None,
+                },
+            )
+        raise AssertionError(f"unexpected call to {request.url.path}")
+
+    _patch_isnad(monkeypatch, handler)
+    client = _client()
+    csrf = _login(client)
+    resp = client.post(
+        "/api/flows",
+        json={
+            "phone_number": "+15551234567",
+            "claimed_location": {"lat": 31.95, "lon": 35.91, "radius_m": 2000},
+        },
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert resp.status_code == 200
+    assert captured["body"]["context"]["claimed_location"]["lat"] == 31.95
+
+
 def test_an_invalid_phone_number_is_rejected(monkeypatch):
     client = _client()
     csrf = _login(client)

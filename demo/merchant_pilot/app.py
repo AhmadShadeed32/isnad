@@ -37,7 +37,7 @@ from fastapi import Cookie, FastAPI, Header, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, ValidationError
 
-from app.domain.schemas import RequestContext
+from app.domain.schemas import Area, Money, RequestContext
 
 # --- configuration (env-only: this is a reference harness, not a config system) ---
 
@@ -214,6 +214,19 @@ class NewFlowRequest(BaseModel):
     phone_number: str
     event: str = "checkout"
     account_age_days: int | None = None
+    # I11: a customer/merchant CLAIM, never an observed phone location. Bounded
+    # by the same Area schema Isnad's own RequestContext uses; omitted means
+    # "location cannot be verified", never inferred from anything else.
+    claimed_location: Area | None = None
+    amount: Money | None = None
+
+
+# I11 step 4: the harness's own Money model (like Isnad's) accepts any
+# three-character code. Until a per-currency policy or a reviewed conversion
+# contract exists, only the demo's own currency is accepted here — comparing
+# an unconverted JOD/SAR amount to a USD-denominated policy threshold would be
+# a silent unit error, not a supported feature.
+SUPPORTED_CURRENCIES = {"USD"}
 
 
 _REPORTABLE_RESULTS = {"PASSED", "FAILED", "ABANDONED"}
@@ -396,8 +409,18 @@ async def create_flow(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.errors())
     if not _PHONE_PATTERN.match(body.phone_number):
         raise HTTPException(status_code=422, detail="phone_number must be E.164")
+    if body.amount is not None and body.amount.currency not in SUPPORTED_CURRENCIES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"unsupported currency {body.amount.currency!r}; only {sorted(SUPPORTED_CURRENCIES)} for now",
+        )
 
-    context = RequestContext(event=body.event, account_age_days=body.account_age_days)
+    context = RequestContext(
+        event=body.event,
+        account_age_days=body.account_age_days,
+        claimed_location=body.claimed_location,
+        amount=body.amount,
+    )
 
     async with httpx.AsyncClient(base_url=ISNAD_BASE_URL, timeout=15.0) as client:
         response = await client.post(
