@@ -17,9 +17,14 @@ import os
 import sys
 from pathlib import Path
 
+# In-memory only: importing the app creates tables, and this generator has no
+# business touching a real database.
 os.environ.setdefault("ISNAD_DATABASE_URL", "sqlite://")
-os.environ.setdefault("ISNAD_PROVIDER", "mock")
-os.environ.setdefault("ISNAD_PLANNER", "greedy")
+# The provider and planner are NOT set here. setdefault yields to an
+# environment that already asks for `llm`, so an environment variable was never
+# the offline guarantee it looked like; demo/lab/runner.py constructs a
+# MockProvider and a GreedyPlanner itself, whatever this process is configured
+# for (see the handoff's F3).
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:

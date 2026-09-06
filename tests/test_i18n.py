@@ -121,9 +121,13 @@ def test_the_page_uses_logical_properties_so_a_flip_needs_no_extra_rules():
 def test_locale_never_reaches_a_verification_request():
     """I6 step 1's hard rule: locale is UI-only. The only request that may
     carry it is the dictionary read itself."""
-    fetches = re.findall(r"fetch\(([^)]*)\)", RECEIPT_SCRIPT)
-    carrying_locale = [f for f in fetches if "locale" in f]
-    assert carrying_locale == ["`/ui/i18n/${locale}.json`"]
+    # Match the whole template literal each fetch is given, so a locale
+    # smuggled into a later path segment or query string is caught too. A
+    # naive `[^)]*` would stop at the ) inside encodeURIComponent(chainId).
+    urls = re.findall(r"fetch\((`[^`]*`)", RECEIPT_SCRIPT)
+    assert urls, "the page must still fetch something"
+    assert [u for u in urls if "locale" in u] == ["`/ui/i18n/${locale}.json`"]
+    assert "`/v1/receipts/${encodeURIComponent(chainId)}`" in urls
 
 
 def test_the_verdict_is_never_encoded_in_colour_alone():

@@ -17,6 +17,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from app.agent.investigator import build_investigator
+from app.agent.planner import GreedyPlanner
 from app.api.routes_console import DEMO_ACTS
 from app.config import settings
 from app.events import _redact
@@ -126,7 +127,20 @@ async def run_scenario(
 
     engine = get_engine(str(settings.policy_path))
     provider = provider_override or MockProvider()
-    investigator = build_investigator(provider, engine=engine, planner=planner, event_sink=sink)
+    # The lab's offline, deterministic guarantee is constructed here, not
+    # inherited from process configuration. Passing planner=None on to the
+    # Investigator would reach `get_planner`, which hands back an LLMPlanner
+    # whenever global settings say "llm" — so a deployment with credentials
+    # configured would have this "offline" runner call a model, and I2's
+    # counterfactual comparisons would be comparing two different agents.
+    # An explicitly injected planner is still honoured: that is I2/I4's seam,
+    # and a model-backed lab mode would come through it and be labelled.
+    investigator = build_investigator(
+        provider,
+        engine=engine,
+        planner=planner if planner is not None else GreedyPlanner(engine),
+        event_sink=sink,
+    )
     request = request_override or DEMO_ACTS[SCENARIO_IDS[scenario_id]].model_copy(deep=True)
     verdict = await investigator.investigate(request, run_id=run_id)
 
