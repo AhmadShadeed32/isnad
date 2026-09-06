@@ -6,7 +6,6 @@ import time
 from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
-from urllib.parse import urlencode
 
 import httpx
 
@@ -14,6 +13,8 @@ from app.chain.models import EvidenceLink
 from app.config import settings
 from app.domain.enums import API_LABEL, Action, Result
 from app.domain.schemas import VerificationRequest
+from app.oidc import IdTokenError
+from app.providers import oidc_flow
 from app.providers.vocabulary import detail_for, window_hours
 
 # A dedicated, bounded pool for the blocking SDK (S12).
@@ -98,19 +99,27 @@ class NacProvider:
         )
 
     async def begin_number_verification(
-        self, phone_number: str, redirect_uri: str, state: str
+        self, phone_number: str, redirect_uri: str, state: str, nonce: str
     ) -> str:
         return await asyncio.wait_for(
-            self._in_pool(self._begin_number_verification_sync, phone_number, redirect_uri, state),
+            self._in_pool(
+                self._begin_number_verification_sync, phone_number, redirect_uri, state, nonce
+            ),
             timeout=settings.nac_timeout_seconds,
         )
 
-    async def exchange_number_verification_code(self, code: str, redirect_uri: str) -> str:
+    async def exchange_number_verification_code(
+        self, code: str, redirect_uri: str, nonce: str
+    ) -> str:
         number_api = self._number_verification_api()
         if number_api is not None:
             for method_name in ("exchange_code_for_token", "create_camara_token"):
                 method = getattr(number_api, method_name, None)
                 if callable(method):
+                    # The vendor SDK's own OIDC client, if this method exists,
+                    # owns id_token validation internally — this adapter does
+                    # not re-validate a token it never sees. See H2 in the
+                    # handoff for what that leaves unverified.
                     token = await asyncio.wait_for(
                         self._in_pool(method, code, redirect_uri),
                         timeout=settings.nac_timeout_seconds,
@@ -120,6 +129,8 @@ class NacProvider:
         client_id = settings.nac_client_id
         client_secret = settings.nac_client_secret
         token_endpoint = settings.nac_token_endpoint
+        issuer = settings.nac_issuer
+        jwks_uri = settings.nac_jwks_uri
         if not client_id or not client_secret or not token_endpoint:
             try:
                 client_id, client_secret, _, token_endpoint = await asyncio.wait_for(
@@ -130,24 +141,31 @@ class NacProvider:
                 raise RuntimeError("Number Verification OAuth metadata request timed out") from exc
             except Exception as exc:
                 raise RuntimeError("Number Verification OAuth credentials are unavailable") from exc
+        if not issuer or not jwks_uri:
+            raise RuntimeError(
+                "ISNAD_NAC_ISSUER and ISNAD_NAC_JWKS_URI are required to validate the "
+                "id_token the manual Number Verification exchange returns"
+            )
 
-        data = {
-            "grant_type": "authorization_code",
-            "code": code,
-            "redirect_uri": redirect_uri,
-            "client_id": client_id,
-        }
-        auth = None
-        if client_secret:
-            auth = (client_id, client_secret)
-            data.pop("client_id")
         try:
             async with httpx.AsyncClient(timeout=settings.nac_timeout_seconds) as client:
-                response = await client.post(token_endpoint, data=data, auth=auth)
-                response.raise_for_status()
-                return self._extract_access_token(response.json())
-        except Exception as exc:
-            raise RuntimeError("Number Verification token exchange failed") from exc
+                return await oidc_flow.complete_number_verification_exchange(
+                    http_client=client,
+                    token_endpoint=token_endpoint,
+                    client_id=client_id,
+                    client_secret=client_secret,
+                    code=code,
+                    redirect_uri=redirect_uri,
+                    issuer=issuer,
+                    audience=client_id,
+                    nonce=nonce,
+                    jwks_uri=jwks_uri,
+                    leeway_seconds=settings.nac_id_token_leeway_seconds,
+                )
+        except oidc_flow.OidcFlowError as exc:
+            raise RuntimeError(str(exc)) from exc
+        except IdTokenError as exc:
+            raise RuntimeError(str(exc)) from exc
 
     def _gather_sync(self, action: Action, request: VerificationRequest) -> tuple[Result, str, str]:
         phone = request.phone_number
@@ -276,7 +294,7 @@ class NacProvider:
         )
 
     def _begin_number_verification_sync(
-        self, phone_number: str, redirect_uri: str, state: str
+        self, phone_number: str, redirect_uri: str, state: str, nonce: str
     ) -> str:
         number_api = self._number_verification_api()
         if number_api is not None:
@@ -288,15 +306,20 @@ class NacProvider:
                     url = method(
                         redirect_uri=redirect_uri,
                         state=state,
+                        nonce=nonce,
+                        prompt="none",
                         login_hint=phone_number,
                         scope=settings.nac_number_verification_scope,
                     )
                 except TypeError:
-                    url = method(
-                        redirect_uri=redirect_uri,
-                        state=state,
-                        login_hint=phone_number,
-                    )
+                    # The old code retried this same call with scope dropped.
+                    # nonce/prompt are not optional extras the way scope was —
+                    # silently retrying without them would ship a Number
+                    # Verification request the documented contract calls
+                    # replay-vulnerable. Try the next candidate method name,
+                    # if any, rather than guessing which argument the
+                    # installed SDK version will accept.
+                    continue
                 return self._as_url(url)
 
         client_id = settings.nac_client_id
@@ -311,18 +334,15 @@ class NacProvider:
                     "ISNAD_NAC_AUTHORIZATION_ENDPOINT and ISNAD_NAC_CLIENT_ID"
                 ) from exc
 
-        query = urlencode(
-            {
-                "response_type": "code",
-                "client_id": client_id,
-                "redirect_uri": redirect_uri,
-                "scope": settings.nac_number_verification_scope,
-                "state": state,
-                "login_hint": phone_number,
-            }
+        return oidc_flow.build_authorization_url(
+            authorization_endpoint=authorization_endpoint,
+            client_id=client_id,
+            redirect_uri=redirect_uri,
+            scope=settings.nac_number_verification_scope,
+            state=state,
+            nonce=nonce,
+            login_hint=phone_number,
         )
-        separator = "&" if "?" in authorization_endpoint else "?"
-        return f"{authorization_endpoint}{separator}{query}"
 
     def _sdk_oauth_details_sync(self) -> tuple[str, str, str, str]:
         credentials = self.client.oauth.get_client_credentials()
