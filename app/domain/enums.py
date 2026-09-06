@@ -72,6 +72,10 @@ class Action(str, Enum):
     REACHABILITY = "reachability"
     ROAMING = "roaming"
     DEVICE_INTELLIGENCE = "device_intelligence"
+    # Has the subscriber behind this number changed since the merchant last
+    # verified it? Only answerable when the merchant actually holds that date,
+    # so this action has a precondition like location_verify does.
+    NUMBER_RECYCLING = "number_recycling"
     STEP_UP_OTP = "step_up_otp"
     # Local evidence, not CAMARA calls and not planner choices: both are answered
     # from this service's own state in microseconds, before any network call is
@@ -90,6 +94,7 @@ API_LABEL: dict[Action, str] = {
     Action.REACHABILITY: "Device Reachability Status",
     Action.ROAMING: "Device Roaming Status",
     Action.DEVICE_INTELLIGENCE: "Device Intelligence",
+    Action.NUMBER_RECYCLING: "Number Recycling",
     Action.STEP_UP_OTP: "Step-up (OTP)",
     Action.REGISTRY_CHECK: "Number Registry",
     Action.CALL_ANNOUNCEMENT: "Verified Caller pre-announce",

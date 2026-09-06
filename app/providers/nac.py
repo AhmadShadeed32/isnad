@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import datetime as dt
 import importlib
 import time
 from collections.abc import Mapping
@@ -387,6 +388,45 @@ class NacProvider:
             if verification == "PARTIAL":
                 return Result.INFO, "LOCATION_PARTIAL", detail_for("LOCATION_PARTIAL")
             return Result.INFO, "LOCATION_UNKNOWN", detail_for("LOCATION_UNKNOWN")
+
+        if action == Action.NUMBER_RECYCLING:
+            reference = request.context.last_verified_at
+            if reference is None:
+                # PRECONDITION. Without the merchant's own date there is no
+                # question to ask, so no SDK call is made at all — the same
+                # shape as location_verify with no claimed location.
+                return (
+                    Result.INFO,
+                    "RECYCLING_REFERENCE_MISSING",
+                    detail_for("RECYCLING_REFERENCE_MISSING"),
+                )
+            if reference > dt.datetime.now(dt.UTC).date():
+                # Observed 2026-09-06: the hosted simulator answers 400 to a
+                # future reference date. Refused here so a merchant's bad input
+                # costs nothing and reads as unknown rather than as an outage.
+                return (
+                    Result.INFO,
+                    "RECYCLING_REFERENCE_INVALID",
+                    detail_for("RECYCLING_REFERENCE_INVALID"),
+                )
+            response = self.client.number_recycling.check(
+                phone_number=phone,
+                specified_date=reference.isoformat(),
+                request_options=_bounded(),
+            )
+            recycled = self._value(response, "phone_number_recycled", None)
+            if recycled is None:
+                return (
+                    Result.INFO,
+                    "EVIDENCE_UNAVAILABLE",
+                    detail_for("EVIDENCE_UNAVAILABLE"),
+                )
+            signal = "NUMBER_RECYCLED" if recycled else "NUMBER_CONTINUOUS"
+            return (
+                Result.FLAG if recycled else Result.PASS,
+                signal,
+                detail_for(signal),
+            )
 
         if action == Action.NUMBER_VERIFY:
             if not self.number_verification_token:

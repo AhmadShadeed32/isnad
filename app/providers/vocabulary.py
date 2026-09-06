@@ -17,9 +17,11 @@ not return a timestamp, so no link may say "swapped 41 minutes ago", "SIM active
 operator in the room would have known it. The window is the strongest true
 statement available, and it is strong enough: it is the same fact, bounded.
 
-`SIM Swap` does publish a `retrieve-date` endpoint that would return the actual
-change date. This system does not call it. If it ever does, the timestamp
-becomes sayable — and that is the only way it becomes sayable.
+`SIM Swap` does publish a `retrieve-date` endpoint that returns the actual
+change date. This system now calls it as a separately priced enrichment, and
+the timestamp it returns lands in `EvidenceLink.timing` — never in one of these
+sentences, and never merged into the boolean's meaning. The two answers can
+disagree, which is exactly why they stay apart.
 """
 
 from __future__ import annotations
@@ -86,6 +88,13 @@ _DETAIL: dict[str, str] = {
     # Device Reachability / Roaming Status.
     "REACHABLE_UNAVAILABLE": "device is not reachable from the network",
     "HOME_NETWORK": "device is on its home network",
+    # Number Recycling — has the subscriber changed since the merchant's own
+    # last-verified date? "Continuous" removes a doubt; it does not add trust,
+    # which is why policy.yaml weights it at exactly zero.
+    "NUMBER_RECYCLED": "the subscriber behind this number changed since the merchant last verified it",
+    "NUMBER_CONTINUOUS": "no subscriber change since the merchant last verified this number",
+    "RECYCLING_REFERENCE_MISSING": "no merchant-held last-verified date for this number",
+    "RECYCLING_REFERENCE_INVALID": "the merchant's last-verified date is not a date the operator can answer about",
     # The network could not answer. This is a hole in the chain, not a finding.
     "PROVIDER_UNAVAILABLE": "provider request failed",
     "EVIDENCE_UNAVAILABLE": "provider could not produce evidence for this device",

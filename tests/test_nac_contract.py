@@ -10,8 +10,9 @@ that `NacProvider`'s normalization still produces the signal the live API
 actually produced. If Nokia changes a response shape, or someone "tidies" the
 provider's field handling, these fail rather than the demo.
 
-Five APIs were observed live: SIM Swap, Device Swap, Reachability, Roaming and
-Location Verification. Number Verification and step-up require user consent, and
+Six APIs have been observed against the hosted simulator: SIM Swap, Device Swap,
+Reachability, Roaming and Location Verification (2026-08-30), and Number
+Recycling (2026-09-06, recorded in docs/nac/observations/). Number Verification and step-up require user consent, and
 Device Intelligence has no adapter — those three are recorded as such, and the
 tests assert exactly that rather than pretending they were exercised.
 """
@@ -36,6 +37,7 @@ OBSERVED = {
     "number_verify": "CONSENT_REQUIRED",
     "step_up_otp": "CONSENT_REQUIRED",
     "device_intelligence": "EVIDENCE_UNAVAILABLE",
+    "number_recycling": "NUMBER_RECYCLED",
 }
 
 # The three that were NOT a live network call, and why. Kept explicit so nobody
@@ -100,7 +102,8 @@ def test_the_unexercised_apis_are_labelled_not_claimed(action: str, reason: str)
 
 
 @pytest.mark.parametrize(
-    "action", ["sim_swap", "device_swap", "reachability", "roaming", "location_verify"]
+    "action",
+    ["sim_swap", "device_swap", "reachability", "roaming", "location_verify", "number_recycling"],
 )
 def test_the_live_apis_really_did_call_the_network(action: str):
     """Non-zero latency is the difference between an observation and a guess."""

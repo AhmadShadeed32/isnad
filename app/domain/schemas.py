@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -46,6 +46,14 @@ class RequestContext(BaseModel):
     payment_method: str | None = None  # e.g. "cod", "card"
     account_age_days: int | None = Field(default=None, ge=0)
     claimed_location: Area | None = None
+    # The date THIS MERCHANT last verified that this number belonged to this
+    # customer. Supplied by the caller because only the caller knows it: a
+    # signup date invented by the backend would make Number Recycling answer a
+    # question nobody asked, and answer it confidently.
+    #
+    # Absent means "no prior verification", which is a reason not to run the
+    # check at all rather than a reason to guess a date.
+    last_verified_at: date | None = None
 
 
 class Figure(BaseModel):

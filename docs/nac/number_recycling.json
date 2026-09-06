@@ -1,0 +1,26 @@
+{
+  "action": "number_recycling",
+  "api": "Number Recycling",
+  "sdk": "network-as-code",
+  "sdk_version": "10.0.0",
+  "rapidapi_host": "network-as-code.nokia.rapidapi.com",
+  "captured_at": "2026-09-06T20:32:55.250754+00:00",
+  "elapsed_ms": 642,
+  "device_suffix": "00",
+  "reference_date": "2026-01-15",
+  "raw": {
+    "ok": true,
+    "result": "Result.FLAG",
+    "signal": "NUMBER_RECYCLED",
+    "detail": "the subscriber behind this number changed since the merchant last verified it"
+  },
+  "normalized": {
+    "result": "Result.FLAG",
+    "signal": "NUMBER_RECYCLED",
+    "detail": "the subscriber behind this number changed since the merchant last verified it",
+    "source": "nac",
+    "requires_consent": false,
+    "consent_basis": "NaC authorization / end-user consent"
+  },
+  "note": "One authenticated call to the hosted simulator on 2026-09-06 with the merchant reference date 2026-01-15. The same call on the second documented simulator number answered false, and a future reference date answered 400 - which is why an out-of-range date is refused locally rather than sent."
+}

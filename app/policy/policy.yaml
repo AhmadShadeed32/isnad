@@ -30,6 +30,15 @@ signals:
   SIM_SWAPPED: 2.2
   DEVICE_STABLE: -0.5
   DEVICE_SWAPPED: 1.6
+  # Number Recycling. A recycled number means the SIM this merchant once
+  # verified now belongs to someone else, so any stored trust in it is void.
+  NUMBER_RECYCLED: 1.8
+  # Exactly zero, and deliberately. "The subscriber did not change" removes a
+  # doubt; it does not attest that this person is who they say they are. The
+  # ALLOW gate counts only strictly-negative links as support, so a weight of
+  # zero is what makes "a non-recycled number never buys an automatic ALLOW"
+  # true in the engine rather than only in a comment.
+  NUMBER_CONTINUOUS: 0.0
   AT_CLAIMED_LOCATION: -1.2
   NOT_AT_CLAIMED_LOCATION: 1.6
   LOCATION_UNKNOWN: 0.0
@@ -109,6 +118,9 @@ actions:
   # Priced, never selected — see planner._UNSERVED. No CAMARA device-reputation
   # API exists on Nokia NaC, so the agent cannot buy this check today.
   device_intelligence: { cost: 2, gain: 1.4, friction: 0 }
+  # Cheap and narrow: one boolean about subscriber continuity, and only
+  # answerable when the merchant supplied its own last-verified date.
+  number_recycling:    { cost: 1, gain: 1.1, friction: 0 }
   # Priced, never selected. `cheapest_stepup` used to fall back to it, which
   # spent 6 of a 12 budget on a provider call that does not exist. CHALLENGE is
   # itself the instruction to step the customer up; the merchant runs it.
@@ -134,7 +146,7 @@ enrichments:
 # cannot speak to the hypothesis produces a receipt answering a question
 # nobody asked.
 hypotheses:
-  account_takeover: { relevant: [sim_swap, location_verify, device_swap] }
+  account_takeover: { relevant: [sim_swap, location_verify, device_swap, number_recycling] }
   mule:             { relevant: [device_swap, reachability, device_intelligence] }
   # number_verify was here and should not have been. It establishes that the
   # handset presenting this number holds that SIM — and a bot farm runs real
@@ -151,7 +163,7 @@ hypotheses:
   bot_farm:         { relevant: [reachability, device_intelligence] }
   legit:            { relevant: [] }
   legit_thin_file:  { relevant: [] }
-  impersonation:    { relevant: [number_verify, sim_swap, reachability, roaming] }
+  impersonation:    { relevant: [number_verify, sim_swap, reachability, roaming, number_recycling] }
 
 # Chain grading: how many corroborating links a chain needs before it counts as
 # fully attested rather than partially attested. Per hypothesis, since a takeover

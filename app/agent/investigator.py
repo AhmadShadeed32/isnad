@@ -116,6 +116,50 @@ class Investigator:
             )
             await self._emit_link(link, belief, run_id)
 
+        # --- continuity before reused trust -------------------------------
+        #
+        # A merchant that sends `last_verified_at` is telling us it already
+        # trusts this number from an earlier verification. Before that trust is
+        # reused, ask whether the subscriber behind the number has changed —
+        # otherwise an established-customer path hands a recycled number the
+        # standing of the person who used to hold it.
+        #
+        # Choreographed, not planned: the merchant's own date is what makes the
+        # question askable, so there is nothing for a planner to decide. Same
+        # budget and accounting as every other network call.
+        if ctx.last_verified_at is not None:
+            recycling_cost = self.engine.action_cost(Action.NUMBER_RECYCLING)
+            if recycling_cost <= budget_left:
+                continuity = Choice(
+                    Action.NUMBER_RECYCLING,
+                    "policy: check subscriber continuity before reusing stored trust",
+                    "policy",
+                )
+                await self._emit(
+                    self._with_run_id(
+                        self._selection_event(
+                            continuity, hypothesis, budget_left, phase="continuity"
+                        ),
+                        run_id,
+                    )
+                )
+                link = await self._call(Action.NUMBER_RECYCLING, request, chain)
+                belief.apply(link.detail, link.delta_logodds)
+                evidence_cost += recycling_cost
+                budget_left -= recycling_cost
+                if link.signal in _UNRESOLVED_SIGNALS:
+                    unresolved_signals.add(link.signal)
+                used.add(Action.NUMBER_RECYCLING)
+                observations.append(
+                    Observation(
+                        action=Action.NUMBER_RECYCLING,
+                        signal=link.signal,
+                        delta_logodds=link.delta_logodds,
+                    )
+                )
+                await self._emit_link(link, belief, run_id)
+                choreographed = True
+
         # A caller may arrive with authorization for one specific provider
         # action already granted. That authorization is part of the request's
         # contract, not a suggestion to the planner: asking the model whether to
@@ -304,6 +348,18 @@ class Investigator:
         missing_support = self._needs_a_network_fact(belief, chain, hypothesis)
         evidence_unresolved = bool(unresolved_signals) or missing_support
         if decision == Decision.ALLOW and evidence_unresolved:
+            decision = Decision.CHALLENGE
+        # A recycled number is not a score adjustment to be outweighed. The
+        # merchant asked this question because it was about to rely on trust it
+        # stored earlier, and the operator answered that the subscriber behind
+        # the number changed — so that stored trust is about somebody else.
+        # Fresh verification, whatever the surrounding evidence says.
+        #
+        # Deliberately not in `_UNRESOLVED_SIGNALS`: this is a definite answer,
+        # not a hole. It blocks an ALLOW without pretending the check failed.
+        if decision == Decision.ALLOW and any(
+            link.signal == "NUMBER_RECYCLED" for link in chain.links
+        ):
             decision = Decision.CHALLENGE
 
         grade = self.engine.grade(

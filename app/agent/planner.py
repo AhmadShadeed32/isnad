@@ -26,7 +26,18 @@ _LOCAL = {Action.REGISTRY_CHECK, Action.CALL_ANNOUNCEMENT}
 # product, so buying it spends budget to guarantee a hole in the chain. It stays
 # priced in policy.yaml for the day a reputation provider is wired in; until
 # then, offering it to a planner is offering a choice that does not exist.
-_UNSERVED = {Action.DEVICE_INTELLIGENCE}
+# Priced, but never a planner choice.
+#
+# DEVICE_INTELLIGENCE has no CAMARA product behind it at all.
+#
+# NUMBER_RECYCLING has one, but it is only answerable when the merchant
+# supplied its own last-verified date — and it is the cheapest check priced,
+# so a planner that could reach it would buy it first and get
+# RECYCLING_REFERENCE_MISSING for the money on every request that has no such
+# date. It is choreographed instead: supplying the date IS the merchant saying
+# "I have prior trust in this number", and continuity is checked before that
+# trust is reused rather than chosen between.
+_UNSERVED = {Action.DEVICE_INTELLIGENCE, Action.NUMBER_RECYCLING}
 _CANDIDATES = [
     a for a in Action if a != Action.STEP_UP_OTP and a not in _LOCAL and a not in _UNSERVED
 ]

@@ -203,6 +203,18 @@ OPERATIONS: dict[str, Operation] = {
         ),
         _norm_device_date,
     ),
+    "number_recycling": Operation(
+        "number_recycling",
+        "passthrough/camara/v1/number-recycling/number-recycling/v0.2/check",
+        "Has the subscriber behind this number changed since --specified-date?",
+        lambda c, a: c.number_recycling.check(
+            phone_number=a.number,
+            specified_date=a.specified_date,
+            correlator=a.correlator,
+            request_options=REQUEST_OPTIONS,
+        ),
+        lambda r: {"phone_number_recycled": getattr(r, "phone_number_recycled", None)},
+    ),
     "forwarding_unconditional": Operation(
         "forwarding_unconditional",
         "passthrough/camara/v1/call-forwarding-signal/call-forwarding-signal"
@@ -295,6 +307,11 @@ class Runner:
                 )
         if operation.needs_subscription and not args.subscription_id:
             raise ProbeError(f"{operation.name} needs --subscription-id from a create record")
+        if operation.name == "number_recycling" and not args.specified_date:
+            raise ProbeError(
+                "number_recycling needs --specified-date: a reference date the "
+                "merchant actually holds, never one the backend guessed"
+            )
         if operation.needs_callback:
             if not args.callback_url:
                 raise ProbeError(
@@ -447,6 +464,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--start", default=None, help="historical query start, RFC 3339")
     parser.add_argument("--end", default=None, help="historical query end, RFC 3339")
     parser.add_argument("--subscription-id", default=None)
+    parser.add_argument(
+        "--specified-date",
+        default=None,
+        help="the merchant's last-verified ownership date, YYYY-MM-DD",
+    )
     parser.add_argument("--record", default=None, help="append the sanitized record here")
     parser.add_argument(
         "--execute",

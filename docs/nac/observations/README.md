@@ -46,6 +46,22 @@ recorded rather than edited out of the data:
    demanded a number for it anyway. Fixed with a `needs_device` flag, so the
    field is now null for collection-level operations.
 
+## 2026-09-06, second batch: Number Recycling
+
+Four more calls, appended to the same file, same host and same bounds.
+
+| # | Operation | Device | Reference date | Status | Result |
+| --- | --- | --- | --- | --- | --- |
+| 12 | `number_recycling` | `…1000` | 2026-01-15 | 200 | `phone_number_recycled: true` |
+| 13 | `number_recycling` | `…1001` | 2026-01-15 | 200 | `phone_number_recycled: false` |
+| 14 | `number_recycling` | `…1000` | **2030-01-15** | **400** | `http_400` |
+
+The third of those is the useful one: a reference date in the future is an
+operator **error**, not a `false`. Isnad therefore refuses an out-of-range date
+locally and records it as unknown, rather than spending a call to be told.
+
+(The file holds 14 lines: the eleven above plus these three.)
+
 ## What these observations settled
 
 - **The catalog host answers.** `network-as-code.p-eu.apihub.nokia.io` returned

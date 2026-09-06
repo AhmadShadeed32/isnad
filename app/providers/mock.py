@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 from app.chain.models import EvidenceLink
 from app.domain.enums import API_LABEL, Action, Result
@@ -37,6 +37,7 @@ _CLEAN: Scenario = {
     Action.REACHABILITY: (Result.PASS, "REACHABLE_NORMAL"),
     Action.ROAMING: (Result.PASS, "HOME_NETWORK"),
     Action.DEVICE_INTELLIGENCE: _DI_UNAVAILABLE,
+    Action.NUMBER_RECYCLING: (Result.PASS, "NUMBER_CONTINUOUS"),
 }
 
 # Act II — the ghost: a swap inside the window, a new device, wrong location.
@@ -50,6 +51,9 @@ _GHOST: Scenario = {
     Action.REACHABILITY: (Result.PASS, "REACHABLE_NORMAL"),
     Action.ROAMING: (Result.PASS, "HOME_NETWORK"),
     Action.DEVICE_INTELLIGENCE: _DI_UNAVAILABLE,
+    # The takeover fixture: this number now belongs to a different subscriber,
+    # so whatever the merchant verified about it before is void.
+    Action.NUMBER_RECYCLING: (Result.FLAG, "NUMBER_RECYCLED"),
 }
 
 # Act III — the invisible: no bank record, but the network has nothing against
@@ -62,6 +66,7 @@ _INVISIBLE: Scenario = {
     Action.REACHABILITY: (Result.PASS, "REACHABLE_NORMAL"),
     Action.ROAMING: (Result.PASS, "HOME_NETWORK"),
     Action.DEVICE_INTELLIGENCE: _DI_UNAVAILABLE,
+    Action.NUMBER_RECYCLING: (Result.PASS, "NUMBER_CONTINUOUS"),
 }
 
 # Act V — the gap: consent withheld and a provider that cannot answer.
@@ -74,6 +79,8 @@ _GAP: Scenario = {
     Action.REACHABILITY: (Result.PASS, "REACHABLE_NORMAL"),
     Action.ROAMING: (Result.PASS, "HOME_NETWORK"),
     Action.DEVICE_INTELLIGENCE: _DI_UNAVAILABLE,
+    # The operator cannot answer this one either. A hole, not a finding.
+    Action.NUMBER_RECYCLING: (Result.INFO, "EVIDENCE_UNAVAILABLE"),
 }
 
 # Act VI — the lost phone: a real customer who replaced a SIM inside the window.
@@ -90,6 +97,9 @@ _LOST_PHONE: Scenario = {
     Action.REACHABILITY: (Result.PASS, "REACHABLE_NORMAL"),
     Action.ROAMING: (Result.INFO, "ROAMING_NETWORK"),
     Action.DEVICE_INTELLIGENCE: _DI_UNAVAILABLE,
+    # She kept her number; only the SIM changed. Continuity is exactly what
+    # distinguishes this from the takeover — and it still buys no ALLOW.
+    Action.NUMBER_RECYCLING: (Result.PASS, "NUMBER_CONTINUOUS"),
 }
 
 # Scripted demo scenarios, keyed by phone number.
@@ -278,6 +288,16 @@ class MockProvider:
             {"start": first, "stop": second, "level": level, "confidence": confidence}
         ]
 
+    def _recycling(self, request: VerificationRequest, scenario) -> tuple[Result, str]:
+        """The same precondition the live adapter enforces, so the offline path
+        cannot pass a case the network would refuse."""
+        reference = request.context.last_verified_at
+        if reference is None:
+            return Result.INFO, "RECYCLING_REFERENCE_MISSING"
+        if reference > datetime.now(UTC).date():
+            return Result.INFO, "RECYCLING_REFERENCE_INVALID"
+        return scenario.get(Action.NUMBER_RECYCLING, (Result.PASS, "NUMBER_CONTINUOUS"))
+
     async def gather(self, action: Action, request: VerificationRequest) -> EvidenceLink:
         if self.step_delay_ms:
             await asyncio.sleep(self.step_delay_ms / 1000)
@@ -316,7 +336,10 @@ class MockProvider:
                 max_age_hours=window_hours(action),
             )
         scenario = self.scenarios.get(request.phone_number, _CLEAN)
-        result, signal = scenario.get(action, (Result.INFO, "EVIDENCE_UNAVAILABLE"))
+        if action == Action.NUMBER_RECYCLING:
+            result, signal = self._recycling(request, scenario)
+        else:
+            result, signal = scenario.get(action, (Result.INFO, "EVIDENCE_UNAVAILABLE"))
         detail = detail_for(signal, connectivity="SMS")
         return EvidenceLink(
             step=0,  # assigned by the investigator when added to the chain
