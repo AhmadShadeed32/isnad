@@ -2222,6 +2222,25 @@ journey. Machine-facing JSON/OpenAPI field names are not translated API contract
 
 ### N3 — Reconcile the NaC docs with the installed SDK
 
+**User-supplied authenticated API reference:**
+[Network as Code API catalog](https://networkascode.nokia.io/network-as-code-network-as-code-default/api/network-as-code).
+Added 6 September 2026 after the user supplied the exact catalog URL. A real
+browser opened it and was redirected to Nokia sign-in with this API page as the
+return destination. Its endpoint schemas were **not inspected** in this session;
+do not imply that merely opening the catalog verified them. No credentials were
+entered and no API request was executed.
+
+When authenticated access is available, use this catalog to verify the exact
+API version, base URL, authorization/scopes, request/response field names, error
+semantics, subscriber entitlement and simulator behavior for each N3/N4/N5
+operation. In particular check SIM Swap and Device Swap `retrieve-date` response
+metadata, plus Congestion Insights query/subscription/notification schemas.
+Compare those contracts with the installed SDK and public tutorials; record
+mismatches before implementing an adapter change. Do not treat the catalog page
+URL as an API base URL or run its interactive requests simply to read a schema.
+Public documentation and local SDK inspection remain available while catalog
+access is pending; only catalog-specific claims remain unverified.
+
 **Sources already checked:**
 
 - [User-supplied getting-started entry](https://networkascode.nokia.io/docs/getting-started).
