@@ -12,6 +12,7 @@ from app.api import (
     routes_challenge,
     routes_consent,
     routes_console,
+    routes_i18n,
     routes_judge,
     routes_outcomes,
     routes_privacy,
@@ -99,6 +100,7 @@ def create_app() -> FastAPI:
     app.include_router(routes_privacy.router)
     app.include_router(routes_registry.router)
     app.include_router(routes_verified_caller.router)
+    app.include_router(routes_i18n.router)
 
     @app.get("/", include_in_schema=False)
     async def root() -> RedirectResponse:

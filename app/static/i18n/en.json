@@ -1,0 +1,25 @@
+{
+  "locale": "en",
+  "decision": {
+    "ALLOW": "Proceed",
+    "CHALLENGE": "Additional verification needed",
+    "DECLINE": "Do not proceed"
+  },
+  "chain_grade": {
+    "ATTESTED_FULL": "Fully attested",
+    "ATTESTED_PARTIAL": "Partially attested",
+    "DEGRADED": "Degraded evidence",
+    "UNRESOLVED": "Unresolved evidence",
+    "REFUTED": "Refuted"
+  },
+  "ui": {
+    "supporting_evidence": "Supporting evidence",
+    "adverse_evidence": "Adverse evidence",
+    "unresolved_checks": "Unresolved checks",
+    "risk_score": "Risk score",
+    "risk_score_note": "Policy-derived, uncalibrated score. It is not a measured fraud probability.",
+    "signature_valid": "Signature valid",
+    "signature_invalid": "Signature INVALID",
+    "back_to_demo": "Back to the checkout demo"
+  }
+}

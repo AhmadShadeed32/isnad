@@ -1,0 +1,26 @@
+{
+  "locale": "ar",
+  "review_status": "draft — not yet reviewed by an Arabic-speaking reader (I6 step 3). Treat every string below as a machine-assisted draft, not a validated translation.",
+  "decision": {
+    "ALLOW": "يمكن المتابعة",
+    "CHALLENGE": "يلزم تحقق إضافي",
+    "DECLINE": "لا تتابع الطلب"
+  },
+  "chain_grade": {
+    "ATTESTED_FULL": "إثبات كامل",
+    "ATTESTED_PARTIAL": "إثبات جزئي",
+    "DEGRADED": "أدلة ضعيفة",
+    "UNRESOLVED": "أدلة غير محسومة",
+    "REFUTED": "مرفوض"
+  },
+  "ui": {
+    "supporting_evidence": "أدلة داعمة",
+    "adverse_evidence": "أدلة معارضة",
+    "unresolved_checks": "فحوصات غير محسومة",
+    "risk_score": "درجة الخطورة",
+    "risk_score_note": "درجة مشتقة من السياسة وغير معايرة. ليست احتمال احتيال مقاسًا.",
+    "signature_valid": "التوقيع صالح",
+    "signature_invalid": "التوقيع غير صالح",
+    "back_to_demo": "العودة إلى عرض الدفع"
+  }
+}
