@@ -172,6 +172,11 @@ class FlowRecord:
     # Current outcome label per dimension (P5), keyed "order_status" /
     # "fraud_assessment" — available regardless of decision, unlike `challenge`.
     outcomes: dict[str, Any] = field(default_factory=dict)
+    # I8: the trust session bound to this order, plus this harness's own
+    # fulfillment decision. `session["status"]` is only ever a snapshot from
+    # the last check against Isnad — release-order re-checks it fresh rather
+    # than trusting a stale copy.
+    session: dict[str, Any] | None = None
     lock: threading.Lock = field(default_factory=threading.Lock)
 
 
@@ -497,7 +502,109 @@ async def get_flow(
         # Current outcome label per dimension (P5) — also a sibling of
         # `result`, available on any decision.
         "outcomes": flow.outcomes,
+        # I8: the trust session bound to this order, if one was opened.
+        "session": flow.session,
     }
+
+
+@app.post("/api/flows/{flow_id}/trust-session")
+async def open_trust_session(
+    flow_id: str,
+    request: Request,
+    pilot_session: str | None = Cookie(default=None),
+    x_csrf_token: str | None = Header(default=None),
+) -> dict:
+    """I8: open a trust-with-a-TTL session on this order's number, binding it
+    to the flow (this harness's stand-in for an order id) so a later release
+    can only ever check *this* session, never a caller-supplied one."""
+    session = _require_session(pilot_session)
+    _require_csrf(request, session, x_csrf_token)
+    flow = flows.get(flow_id)
+    if flow is None or flow.result is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no such flow")
+
+    async with httpx.AsyncClient(base_url=ISNAD_BASE_URL, timeout=15.0) as client:
+        response = await client.post(
+            "/v1/sessions",
+            headers={"Authorization": f"Bearer {ISNAD_MERCHANT_API_KEY}"},
+            json={"phone_number": flow.phone_number},
+        )
+    if response.status_code != status.HTTP_200_OK:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Isnad rejected the session request")
+    data = response.json()
+    flow.session = {
+        "session_id": data["session_id"],
+        "status": data["status"],
+        "fulfillment_state": "HELD",
+    }
+    return flow.session
+
+
+@app.post("/api/flows/{flow_id}/simulate-swap")
+async def simulate_flow_swap(
+    flow_id: str,
+    request: Request,
+    pilot_session: str | None = Cookie(default=None),
+    x_csrf_token: str | None = Header(default=None),
+) -> dict:
+    """Demo control only (I8), mirrors the existing clean-case continuity
+    drill: inject a mid-session SIM swap on this flow's own bound session."""
+    session = _require_session(pilot_session)
+    _require_csrf(request, session, x_csrf_token)
+    flow = flows.get(flow_id)
+    if flow is None or flow.session is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no open trust session for this flow")
+
+    async with httpx.AsyncClient(base_url=ISNAD_BASE_URL, timeout=15.0) as client:
+        response = await client.post(
+            f"/v1/sessions/{flow.session['session_id']}/simulate-swap",
+            headers={"Authorization": f"Bearer {ISNAD_MERCHANT_API_KEY}"},
+        )
+    if response.status_code != status.HTTP_200_OK:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Isnad rejected the swap simulation")
+    return {"status": response.json().get("status")}
+
+
+@app.post("/api/flows/{flow_id}/release-order")
+async def release_order(
+    flow_id: str,
+    request: Request,
+    pilot_session: str | None = Cookie(default=None),
+    x_csrf_token: str | None = Header(default=None),
+) -> dict:
+    """I8: release fulfillment only if the bound session is CURRENTLY ACTIVE
+    — re-checked against Isnad on every call, never assumed from a stale
+    local copy. Idempotent once released; refuses (409) if the session has
+    moved to REVOKED/EXPIRED/ENDED since it was opened. The lock makes the
+    check-then-set atomic against a concurrent release or the swap
+    simulation racing it in this same process."""
+    session = _require_session(pilot_session)
+    _require_csrf(request, session, x_csrf_token)
+    flow = flows.get(flow_id)
+    if flow is None or flow.session is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no open trust session for this flow")
+
+    with flow.lock:
+        if flow.session["fulfillment_state"] == "RELEASED":
+            return flow.session
+
+        async with httpx.AsyncClient(base_url=ISNAD_BASE_URL, timeout=15.0) as client:
+            response = await client.get(
+                f"/v1/sessions/{flow.session['session_id']}",
+                headers={"Authorization": f"Bearer {ISNAD_MERCHANT_API_KEY}"},
+            )
+        if response.status_code != status.HTTP_200_OK:
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Isnad rejected the session lookup")
+        current = response.json()
+        flow.session["status"] = current["status"]
+
+        if current["status"] != "ACTIVE":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"session is {current['status']}, not ACTIVE; fulfillment stays held",
+            )
+        flow.session["fulfillment_state"] = "RELEASED"
+        return flow.session
 
 
 @app.get("/api/capabilities")

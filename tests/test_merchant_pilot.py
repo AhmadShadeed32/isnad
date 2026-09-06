@@ -535,6 +535,159 @@ def test_capabilities_lists_the_manifest_read_only():
     assert len(body["capabilities"]) >= 6
 
 
+def _session_handler(request: httpx.Request):
+    if request.url.path == "/v1/consents/number-verification":
+        return httpx.Response(
+            202,
+            json={
+                "consent_id": "cns_session",
+                "status": "PENDING",
+                "authorization_url": "https://consent.test/authorize?state=s",
+                "expires_at": "2026-01-01T00:05:00+00:00",
+                "chain_id": None,
+                "reason": None,
+            },
+        )
+    if request.url.path == "/v1/consents/cns_session":
+        return httpx.Response(
+            200,
+            json={
+                "consent_id": "cns_session",
+                "status": "AUTHORIZED",
+                "authorization_url": "https://consent.test/authorize?state=s",
+                "expires_at": "2026-01-01T00:05:00+00:00",
+                "chain_id": None,
+                "reason": None,
+            },
+        )
+    if request.url.path == "/v1/consents/cns_session/verify":
+        return httpx.Response(
+            200,
+            json={
+                "decision": "ALLOW",
+                "planner": "greedy",
+                "chain_grade": "ATTESTED_FULL",
+                "confidence": 0.05,
+                "hypothesis": "legit",
+                "reason": "r",
+                "chain_id": "chn_session",
+                "evidence_cost": 0.0,
+                "latency_ms": 1,
+                "evidence_steps": 1,
+                "provider_sources": ["test"],
+            },
+        )
+    if request.url.path == "/v1/sessions" and request.method == "POST":
+        return httpx.Response(
+            200,
+            json={
+                "session_id": "sess_test",
+                "status": "ACTIVE",
+                "phone_number": "+1***67",
+                "reason": None,
+                "created_at": "2026-01-01T00:00:00+00:00",
+                "expires_at": "2026-01-01T00:02:00+00:00",
+            },
+        )
+    if request.url.path == "/v1/sessions/sess_test" and request.method == "GET":
+        status_value = _session_handler.current_status
+        return httpx.Response(
+            200,
+            json={
+                "session_id": "sess_test",
+                "status": status_value,
+                "phone_number": "+1***67",
+                "reason": "SIM swap detected" if status_value == "REVOKED" else None,
+                "created_at": "2026-01-01T00:00:00+00:00",
+                "expires_at": "2026-01-01T00:02:00+00:00",
+            },
+        )
+    if request.url.path == "/v1/sessions/sess_test/simulate-swap":
+        _session_handler.current_status = "REVOKED"
+        return httpx.Response(200, json={"status": "REVOKED"})
+    raise AssertionError(f"unexpected call to {request.url.path}")
+
+
+_session_handler.current_status = "ACTIVE"
+
+
+def _make_allowed_flow(monkeypatch, client: TestClient, csrf: str) -> str:
+    _session_handler.current_status = "ACTIVE"
+    _patch_isnad(monkeypatch, _session_handler)
+    created = client.post(
+        "/api/flows",
+        json={"phone_number": "+15551234567"},
+        headers={"X-CSRF-Token": csrf},
+    )
+    flow_id = created.json()["flow_id"]
+    polled = client.get(f"/api/flows/{flow_id}")
+    assert polled.json()["status"] == "COMPLETED"
+    assert polled.json()["result"]["decision"] == "ALLOW"
+    return flow_id
+
+
+def test_a_trust_session_can_be_opened_and_the_order_released(monkeypatch):
+    client = _client()
+    csrf = _login(client)
+    flow_id = _make_allowed_flow(monkeypatch, client, csrf)
+
+    opened = client.post(f"/api/flows/{flow_id}/trust-session", json={}, headers={"X-CSRF-Token": csrf})
+    assert opened.status_code == 200
+    assert opened.json()["fulfillment_state"] == "HELD"
+
+    released = client.post(f"/api/flows/{flow_id}/release-order", json={}, headers={"X-CSRF-Token": csrf})
+    assert released.status_code == 200
+    assert released.json()["fulfillment_state"] == "RELEASED"
+
+
+def test_a_revoked_session_blocks_release(monkeypatch):
+    client = _client()
+    csrf = _login(client)
+    flow_id = _make_allowed_flow(monkeypatch, client, csrf)
+    client.post(f"/api/flows/{flow_id}/trust-session", json={}, headers={"X-CSRF-Token": csrf})
+
+    client.post(f"/api/flows/{flow_id}/simulate-swap", json={}, headers={"X-CSRF-Token": csrf})
+
+    released = client.post(f"/api/flows/{flow_id}/release-order", json={}, headers={"X-CSRF-Token": csrf})
+    assert released.status_code == 409
+    polled = client.get(f"/api/flows/{flow_id}")
+    assert polled.json()["session"]["fulfillment_state"] == "HELD"
+    assert polled.json()["session"]["status"] == "REVOKED"
+
+
+def test_release_without_an_open_session_is_404(monkeypatch):
+    client = _client()
+    csrf = _login(client)
+    flow_id = _make_allowed_flow(monkeypatch, client, csrf)
+    resp = client.post(f"/api/flows/{flow_id}/release-order", json={}, headers={"X-CSRF-Token": csrf})
+    assert resp.status_code == 404
+
+
+def test_repeated_release_after_success_is_a_no_op_not_a_double_release(monkeypatch):
+    client = _client()
+    csrf = _login(client)
+    flow_id = _make_allowed_flow(monkeypatch, client, csrf)
+    client.post(f"/api/flows/{flow_id}/trust-session", json={}, headers={"X-CSRF-Token": csrf})
+
+    first = client.post(f"/api/flows/{flow_id}/release-order", json={}, headers={"X-CSRF-Token": csrf})
+    second = client.post(f"/api/flows/{flow_id}/release-order", json={}, headers={"X-CSRF-Token": csrf})
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert second.json()["fulfillment_state"] == "RELEASED"
+
+
+def test_trust_session_and_release_require_a_session_and_csrf(monkeypatch):
+    client = _client()
+    csrf = _login(client)
+    flow_id = _make_allowed_flow(monkeypatch, client, csrf)
+
+    no_session = TestClient(app, client=LOCAL_CLIENT).post(f"/api/flows/{flow_id}/trust-session", json={})
+    assert no_session.status_code == 401
+
+    no_csrf = client.post(f"/api/flows/{flow_id}/trust-session", json={})
+    assert no_csrf.status_code == 403
+
+
 def test_logout_clears_the_session():
     client = _client()
     _login(client)
