@@ -16,6 +16,14 @@
   .challenge button.fail{background:#b91c1c;color:#fff}
   .challenge button.abandon{background:#6e7781;color:#fff}
   .challenge .err{color:#b91c1c}
+  .outcomes{border:1px solid #ddd;border-radius:6px;padding:.9rem;margin:.6rem 0}
+  .outcomes h3{margin-top:0}
+  .outcomes .row{margin:.6rem 0}
+  .outcomes label{display:block;font-size:.85rem;color:#444;margin-bottom:.2rem}
+  .outcomes select{padding:.35rem;margin-right:.4rem}
+  .outcomes button{padding:.35rem .8rem;border:0;border-radius:4px;background:#0969da;color:#fff;cursor:pointer}
+  .outcomes .current{font-size:.85rem;color:#555;margin-top:.2rem}
+  .outcomes .err{color:#b91c1c}
 </style>
 <h1>Number Verification consent</h1>
 <p>Scan this with the phone being verified. Disable Wi-Fi first if the provider
@@ -25,6 +33,7 @@ requires a mobile data connection.</p>
 <p class="status" id="status">Loading…</p>
 <div id="outcome"></div>
 <div id="challenge-panel"></div>
+<div id="outcomes-panel"></div>
 <a class="back" href="/">← Start another consent</a>
 <script>
 const flowId = "__FLOW_ID__";
@@ -125,6 +134,78 @@ function renderChallengePanel(challenge, decision) {
     </div>`;
 }
 
+const ORDER_STATUS_VALUES = ["ACCEPTED", "FULFILLED", "CANCELLED", "UNKNOWN"];
+const FRAUD_VALUES = ["CONFIRMED_FRAUD", "CONFIRMED_LEGITIMATE", "INCONCLUSIVE", "UNKNOWN"];
+const CONFIRMED_FRAUD_VALUES = new Set(["CONFIRMED_FRAUD", "CONFIRMED_LEGITIMATE"]);
+
+// Available regardless of decision (P5 has no CHALLENGE gate, unlike P3's
+// panel above). "Not yet reported" is its own state, never conflated with an
+// explicit UNKNOWN the merchant chose to record.
+function renderOutcomesPanel(outcomes) {
+  const panel = document.getElementById("outcomes-panel");
+  const current = outcomes || {};
+
+  const optionsFor = (values) => values.map(v => `<option value="${v}">${v}</option>`).join("");
+  const currentLine = (dimension) => current[dimension]
+    ? `<p class="current">Current: <strong>${current[dimension].value}</strong>${current[dimension].basis ? " (" + current[dimension].basis + ")" : ""}</p>`
+    : `<p class="current">Not yet reported.</p>`;
+
+  panel.innerHTML = `
+    <div class="outcomes">
+      <h3>Report what actually happened</h3>
+      <div class="row">
+        <label>Order status</label>
+        <select id="order-status-value">${optionsFor(ORDER_STATUS_VALUES)}</select>
+        <button id="order-status-submit">Report</button>
+        ${currentLine("order_status")}
+      </div>
+      <div class="row">
+        <label>Fraud assessment</label>
+        <select id="fraud-value">${optionsFor(FRAUD_VALUES)}</select>
+        <select id="fraud-basis" style="display:none">
+          <option value="manual_investigation">manual_investigation</option>
+          <option value="customer_confirmation">customer_confirmation</option>
+        </select>
+        <button id="fraud-submit">Report</button>
+        ${currentLine("fraud_assessment")}
+      </div>
+      <p class="err" id="outcomes-err"></p>
+    </div>`;
+
+  const fraudValue = document.getElementById("fraud-value");
+  const fraudBasis = document.getElementById("fraud-basis");
+  fraudValue.addEventListener("change", () => {
+    fraudBasis.style.display = CONFIRMED_FRAUD_VALUES.has(fraudValue.value) ? "" : "none";
+  });
+
+  document.getElementById("order-status-submit").addEventListener("click", async () => {
+    const value = document.getElementById("order-status-value").value;
+    const { ok, data } = await postJson("/api/flows/" + flowId + "/outcomes", {
+      dimension: "order_status",
+      value,
+    });
+    if (!ok) {
+      document.getElementById("outcomes-err").textContent = "Could not report: " + (data.detail || "error");
+      return;
+    }
+    poll();
+  });
+
+  document.getElementById("fraud-submit").addEventListener("click", async () => {
+    const value = fraudValue.value;
+    const body = { dimension: "fraud_assessment", value };
+    if (CONFIRMED_FRAUD_VALUES.has(value)) {
+      body.basis = fraudBasis.value;
+    }
+    const { ok, data } = await postJson("/api/flows/" + flowId + "/outcomes", body);
+    if (!ok) {
+      document.getElementById("outcomes-err").textContent = "Could not report: " + (data.detail || "error");
+      return;
+    }
+    poll();
+  });
+}
+
 async function poll() {
   try {
     const response = await fetch("/api/flows/" + flowId);
@@ -141,6 +222,7 @@ async function poll() {
     if (data.result) {
       renderOutcome(data.result);
       renderChallengePanel(data.challenge, data.result.decision);
+      renderOutcomesPanel(data.outcomes);
     }
     if (TERMINAL.has(data.status)) {
       return; // stop polling: a terminal state does not change again

@@ -169,6 +169,9 @@ class FlowRecord:
     # Isnad's /v1/chains/{chain_id}/challenges response — never mixed into
     # `result`, which is the signed verdict.
     challenge: dict[str, Any] | None = None
+    # Current outcome label per dimension (P5), keyed "order_status" /
+    # "fraud_assessment" — available regardless of decision, unlike `challenge`.
+    outcomes: dict[str, Any] = field(default_factory=dict)
     lock: threading.Lock = field(default_factory=threading.Lock)
 
 
@@ -213,6 +216,15 @@ _REPORTABLE_RESULTS = {"PASSED", "FAILED", "ABANDONED"}
 
 class ChallengeEventBody(BaseModel):
     result: str
+
+
+_OUTCOME_DIMENSIONS = {"order_status", "fraud_assessment"}
+
+
+class OutcomeReportBody(BaseModel):
+    dimension: str
+    value: str
+    basis: str | None = None
 
 
 # --- app ---
@@ -482,7 +494,68 @@ async def get_flow(
         # The merchant's own CHALLENGE followup, if any — always a sibling of
         # `result`, never folded into it (P3).
         "challenge": flow.challenge,
+        # Current outcome label per dimension (P5) — also a sibling of
+        # `result`, available on any decision.
+        "outcomes": flow.outcomes,
     }
+
+
+@app.post("/api/flows/{flow_id}/outcomes")
+async def report_flow_outcome(
+    flow_id: str,
+    request: Request,
+    pilot_session: str | None = Cookie(default=None),
+    x_csrf_token: str | None = Header(default=None),
+) -> dict:
+    """Report or correct an order-status/fraud-assessment label.
+
+    The Idempotency-Key includes the current head's event id (or "none" for a
+    first report): a repeat of the exact same click replays, while a second,
+    different correction against the same starting point is always a fresh
+    write — never a confusing "key reused" conflict for what is, from the
+    operator's chair, just clicking a different button.
+    """
+    session = _require_session(pilot_session)
+    _require_csrf(request, session, x_csrf_token)
+    flow = flows.get(flow_id)
+    if flow is None or flow.result is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no such flow")
+
+    try:
+        body = OutcomeReportBody.model_validate(await request.json())
+    except ValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.errors())
+    if body.dimension not in _OUTCOME_DIMENSIONS:
+        raise HTTPException(status_code=422, detail="dimension must be order_status or fraud_assessment")
+
+    chain_id = flow.result["chain_id"]
+    current = flow.outcomes.get(body.dimension)
+    payload: dict[str, Any] = {
+        "dimension": body.dimension,
+        "value": body.value,
+        "occurred_at": _now().isoformat(),
+    }
+    if body.basis is not None:
+        payload["basis"] = body.basis
+    supersedes = current["event_id"] if current is not None else "none"
+    if current is not None:
+        payload["supersedes_event_id"] = current["event_id"]
+
+    async with httpx.AsyncClient(base_url=ISNAD_BASE_URL, timeout=15.0) as client:
+        response = await client.post(
+            f"/v1/chains/{chain_id}/outcomes",
+            headers={
+                "Authorization": f"Bearer {ISNAD_MERCHANT_API_KEY}",
+                "Idempotency-Key": f"pilot-outcome-{flow_id}-{body.dimension}-{supersedes}-{body.value}",
+            },
+            json=payload,
+        )
+    if response.status_code == status.HTTP_409_CONFLICT:
+        raise HTTPException(status_code=409, detail=response.json().get("detail"))
+    if response.status_code != status.HTTP_201_CREATED:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Isnad rejected the outcome report")
+    flow.outcomes[body.dimension] = response.json()
+    return flow.outcomes[body.dimension]
 
 
 @app.post("/api/flows/{flow_id}/challenge")

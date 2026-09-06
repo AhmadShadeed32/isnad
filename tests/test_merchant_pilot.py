@@ -310,6 +310,22 @@ def _challenge_handler(request: httpx.Request) -> httpx.Response:
             200,
             json={"attempt_id": "chgat_test", "status": result, "result": result, "reported_at": "2026-01-01T00:01:00+00:00"},
         )
+    if request.url.path == "/v1/chains/chn_challenge/outcomes":
+        body = json.loads(request.content)
+        return httpx.Response(
+            201,
+            json={
+                "event_id": "mout_" + body["dimension"] + "_" + body["value"],
+                "chain_id": "chn_challenge",
+                "dimension": body["dimension"],
+                "value": body["value"],
+                "basis": body.get("basis"),
+                "occurred_at": body["occurred_at"],
+                "reported_at": "2026-01-01T00:02:00+00:00",
+                "late_report": False,
+                "supersedes_event_id": body.get("supersedes_event_id"),
+            },
+        )
     raise AssertionError(f"unexpected call to {request.url.path}")
 
 
@@ -431,6 +447,76 @@ def test_reporting_before_a_challenge_is_opened_is_404(monkeypatch):
         headers={"X-CSRF-Token": csrf},
     )
     assert resp.status_code == 404
+
+
+def test_an_outcome_can_be_reported_and_corrected(monkeypatch):
+    client = _client()
+    csrf = _login(client)
+    flow_id = _make_challenged_flow(monkeypatch, client, csrf)
+
+    first = client.post(
+        f"/api/flows/{flow_id}/outcomes",
+        json={"dimension": "order_status", "value": "ACCEPTED"},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert first.status_code == 200
+    assert first.json()["value"] == "ACCEPTED"
+    assert first.json()["supersedes_event_id"] is None
+
+    corrected = client.post(
+        f"/api/flows/{flow_id}/outcomes",
+        json={"dimension": "order_status", "value": "CANCELLED"},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert corrected.status_code == 200
+    assert corrected.json()["value"] == "CANCELLED"
+    assert corrected.json()["supersedes_event_id"] == first.json()["event_id"]
+
+    polled = client.get(f"/api/flows/{flow_id}")
+    assert polled.json()["outcomes"]["order_status"]["value"] == "CANCELLED"
+    # A dimension never reported must not appear.
+    assert "fraud_assessment" not in polled.json()["outcomes"]
+
+
+def test_a_fraud_outcome_can_be_reported_with_a_basis(monkeypatch):
+    client = _client()
+    csrf = _login(client)
+    flow_id = _make_challenged_flow(monkeypatch, client, csrf)
+
+    resp = client.post(
+        f"/api/flows/{flow_id}/outcomes",
+        json={"dimension": "fraud_assessment", "value": "CONFIRMED_FRAUD", "basis": "manual_investigation"},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["basis"] == "manual_investigation"
+
+
+def test_reporting_an_outcome_requires_a_session_and_csrf(monkeypatch):
+    client = _client()
+    csrf = _login(client)
+    flow_id = _make_challenged_flow(monkeypatch, client, csrf)
+
+    no_session = TestClient(app, client=LOCAL_CLIENT).post(
+        f"/api/flows/{flow_id}/outcomes", json={"dimension": "order_status", "value": "ACCEPTED"}
+    )
+    assert no_session.status_code == 401
+
+    no_csrf = client.post(f"/api/flows/{flow_id}/outcomes", json={"dimension": "order_status", "value": "ACCEPTED"})
+    assert no_csrf.status_code == 403
+
+
+def test_an_unknown_outcome_dimension_is_rejected(monkeypatch):
+    client = _client()
+    csrf = _login(client)
+    flow_id = _make_challenged_flow(monkeypatch, client, csrf)
+
+    resp = client.post(
+        f"/api/flows/{flow_id}/outcomes",
+        json={"dimension": "shipping_status", "value": "X"},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert resp.status_code == 422
 
 
 def test_logout_clears_the_session():
