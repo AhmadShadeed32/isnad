@@ -1,0 +1,59 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Isnad merchant pilot</title>
+<style>
+  body{font-family:system-ui,sans-serif;max-width:480px;margin:2.5rem auto;padding:0 1rem}
+  label{display:block;margin:.6rem 0 .2rem;font-size:.9rem;color:#444}
+  input,select{width:100%;padding:.5rem;box-sizing:border-box}
+  button{margin-top:1rem;padding:.6rem 1.2rem;background:#1a7f37;color:#fff;border:0;border-radius:4px;cursor:pointer}
+  .err{color:#b91c1c;margin-top:.6rem}
+  form.logout{display:inline;float:right}
+  form.logout button{background:#6e7781;padding:.3rem .7rem;font-size:.8rem}
+</style>
+<form class="logout" method="post" action="/logout"><button type="submit">Sign out</button></form>
+<h1>Start a Number Verification consent</h1>
+<p>This calls Isnad's real consent API. Nothing here talks to a live network —
+the provider is whatever <code>ISNAD_PROVIDER</code> Isnad itself is running with.</p>
+<form id="new-flow">
+  <label>Customer phone number (E.164)
+    <input type="text" name="phone_number" placeholder="+15551234567" required>
+  </label>
+  <label>Event
+    <select name="event">
+      <option value="checkout" selected>checkout</option>
+      <option value="signup">signup</option>
+      <option value="payout">payout</option>
+    </select>
+  </label>
+  <button type="submit">Start consent</button>
+</form>
+<p class="err" id="error"></p>
+<script>
+const csrfToken = "__CSRF_TOKEN__";
+document.getElementById("new-flow").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = new FormData(event.target);
+  const errorEl = document.getElementById("error");
+  errorEl.textContent = "";
+  try {
+    const response = await fetch("/api/flows", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
+      body: JSON.stringify({
+        phone_number: form.get("phone_number"),
+        event: form.get("event"),
+      }),
+    });
+    if (!response.ok) {
+      const detail = await response.json().catch(() => ({}));
+      errorEl.textContent = "Could not start consent: " + (detail.detail || response.status);
+      return;
+    }
+    const data = await response.json();
+    window.location.href = "/flow/" + data.flow_id;
+  } catch (err) {
+    errorEl.textContent = "Request failed: " + err;
+  }
+});
+</script>

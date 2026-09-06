@@ -1,0 +1,71 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Isnad merchant pilot — consent status</title>
+<style>
+  body{font-family:system-ui,sans-serif;max-width:480px;margin:2.5rem auto;padding:0 1rem}
+  #qr{max-width:220px;margin:1rem 0}
+  .status{font-size:1.1rem;font-weight:600;margin:.6rem 0}
+  .card{border:1px solid #ddd;border-radius:6px;padding:.9rem;margin:.6rem 0}
+  ul{margin:.3rem 0;padding-left:1.2rem}
+  a.back{display:inline-block;margin-top:1rem}
+</style>
+<h1>Number Verification consent</h1>
+<p>Scan this with the phone being verified. Disable Wi-Fi first if the provider
+requires a mobile data connection.</p>
+<div id="qr"></div>
+<p><a id="open-link" href="#" target="_blank" rel="noopener">Open the authorization link directly</a></p>
+<p class="status" id="status">Loading…</p>
+<div id="outcome"></div>
+<a class="back" href="/">← Start another consent</a>
+<script>
+const flowId = "__FLOW_ID__";
+const TERMINAL = new Set(["COMPLETED", "DENIED", "FAILED", "EXPIRED"]);
+let delayMs = 1500;
+const MAX_DELAY_MS = 8000;
+
+function renderOutcome(result) {
+  if (!result || !result.presentation) return;
+  const p = result.presentation;
+  const facts = (title, items) => items && items.length
+    ? `<p><strong>${title}:</strong></p><ul>${items.map(f => `<li>${f}</li>`).join("")}</ul>`
+    : "";
+  document.getElementById("outcome").innerHTML = `
+    <div class="card">
+      <h2>${p.title}</h2>
+      <p>${p.summary}</p>
+      ${facts("Supporting", p.supporting_facts)}
+      ${facts("Adverse", p.adverse_facts)}
+      ${facts("Unresolved", p.unresolved_checks)}
+      <p><em>${p.next_action}</em></p>
+    </div>`;
+}
+
+async function poll() {
+  try {
+    const response = await fetch("/api/flows/" + flowId);
+    if (!response.ok) {
+      document.getElementById("status").textContent = "Error checking status.";
+      return;
+    }
+    const data = await response.json();
+    document.getElementById("status").textContent = "Status: " + data.status;
+    if (data.qr_svg && !document.getElementById("qr").innerHTML) {
+      document.getElementById("qr").innerHTML = data.qr_svg;
+      document.getElementById("open-link").href = data.authorization_url;
+    }
+    if (data.result) {
+      renderOutcome(data.result);
+    }
+    if (TERMINAL.has(data.status)) {
+      return; // stop polling: a terminal state does not change again
+    }
+  } catch (err) {
+    document.getElementById("status").textContent = "Request failed: " + err;
+  }
+  delayMs = Math.min(delayMs * 1.5, MAX_DELAY_MS);
+  setTimeout(poll, delayMs);
+}
+
+poll();
+</script>
