@@ -26,11 +26,23 @@ class Belief:
         self.logodds += delta
         self.trace.append((label, delta))
 
-    def explain(self, decision: str, unresolved: bool = False) -> str:
+    def explain(self, decision: str, unresolved: bool = False, *, material: float = 0.4) -> str:
+        """The sentence a merchant reads. It has to name the links the decision
+        actually rested on.
+
+        `material` is policy's `grading.adverse_delta` — the bar at which a
+        link counts as having moved the belief — and the comparison is "at
+        least", matching how `PolicyEngine.grade` reads the same number. It was
+        a hard-coded strict `> 0.4` here, so a link worth exactly the bar was
+        named on neither side: a clean signup cleared partly by REACHABLE_NORMAL
+        (-0.4) was explained as "Cleared by: network number matches the provided
+        number", crediting only the other link. The chain was right and the
+        sentence gave the wrong reason for it.
+        """
         if unresolved:
             return "Insufficient network evidence — consent or a provider result was unavailable."
-        flags = [lbl for lbl, d in self.trace if d > 0.4]
-        clears = [lbl for lbl, d in self.trace if d < -0.4]
+        flags = [lbl for lbl, d in self.trace if d >= material]
+        clears = [lbl for lbl, d in self.trace if d <= -material]
         if decision == "DECLINE":
             return (
                 "Fraud indicators: " + ", ".join(flags) + "." if flags else "Multiple risk signals."

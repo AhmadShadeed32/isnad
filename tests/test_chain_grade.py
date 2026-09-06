@@ -441,3 +441,59 @@ def test_a_pre_grading_chain_reads_back_as_ungraded_not_as_a_grade():
     )
     verdict = Verdict.model_validate_json(legacy)
     assert verdict.chain_grade is None
+
+
+# --- the sentence and the grade have to read the same number ------------------
+
+
+def test_the_explanation_reads_material_the_way_the_grade_does():
+    """`grade` treats `adverse_delta` as "at least" — `d >= threshold` — and
+    policy.yaml says so in as many words. `Belief.explain` used a hard-coded
+    strict `> 0.4` for the same idea, so a link worth exactly the bar was named
+    on neither side of the sentence: a chain cleared partly by REACHABLE_NORMAL
+    (-0.4) was explained as though that link had contributed nothing. Two
+    copies of one policy number, one of them a literal, disagreeing about the
+    boundary.
+    """
+    from app.agent.belief import Belief
+
+    engine = _engine()
+    bar = engine.adverse_delta()
+
+    cleared = Belief(logodds=-2.0)
+    cleared.apply("exactly at the bar", -bar)
+    assert "exactly at the bar" in cleared.explain("ALLOW", material=bar)
+
+    flagged = Belief(logodds=2.0)
+    flagged.apply("exactly at the bar", bar)
+    assert "exactly at the bar" in flagged.explain("DECLINE", material=bar)
+
+
+def test_the_explanation_takes_its_bar_from_policy_not_a_literal():
+    """So a change to grading.adverse_delta moves both, or neither."""
+    import inspect
+
+    from app.agent import belief as belief_module
+    from app.agent import investigator as investigator_module
+
+    assert "material=self.engine.adverse_delta()" in inspect.getsource(investigator_module)
+    explain_source = inspect.getsource(belief_module.Belief.explain)
+    assert "d >= material" in explain_source
+    assert "d <= -material" in explain_source
+    assert "0.4" not in explain_source.split('"""')[-1], "the literal is back"
+
+
+@pytest.mark.asyncio
+async def test_a_cleared_chain_names_every_link_that_carried_it():
+    """End to end on a real chain, not just the helper."""
+    req = VerificationRequest(
+        phone_number="+962790000001",
+        context=RequestContext(event="signup", account_age_days=0),
+    )
+    verdict = await _investigator().investigate(req)
+    bar = _engine().adverse_delta()
+
+    assert verdict.decision == Decision.ALLOW
+    for link in verdict.chain:
+        if link.delta_logodds <= -bar:
+            assert link.detail in verdict.reason, f"{link.signal} carried the ALLOW unnamed"

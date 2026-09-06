@@ -307,7 +307,13 @@ class Investigator:
             chain_grade=grade,
             confidence=round(belief.p_fraud, 3),
             hypothesis=hypothesis.value,
-            reason=belief.explain(decision.value, unresolved=evidence_unresolved),
+            # One definition of "material", read from policy rather than
+            # duplicated as a literal in two files that could drift apart.
+            reason=belief.explain(
+                decision.value,
+                unresolved=evidence_unresolved,
+                material=self.engine.adverse_delta(),
+            ),
             chain_id=chain.id,
             chain=chain.links,
             evidence_cost=round(evidence_cost, 2),
