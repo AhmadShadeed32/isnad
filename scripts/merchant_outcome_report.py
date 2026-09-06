@@ -52,7 +52,42 @@ def _evidence_cost(verdict_json: str) -> float:
         return 0.0
 
 
-def build_report(owner: str) -> dict:
+def _business_impact_worksheet(
+    *, review_cost: float | None, margin_percent: float | None, currency: str | None, challenge_opened: int
+) -> dict | None:
+    """I12 step 3: merchant-entered assumptions only, never actual recovered
+    revenue. None of these figures come from a signed chain or an outcome
+    event -- they are what-if inputs the merchant typed in, computed here and
+    nowhere else, with zero effect on any policy, provider call or verdict."""
+    if review_cost is None:
+        return None
+    currency = currency or "USD"
+    low = review_cost * challenge_opened
+    high = low * (1 + (margin_percent or 0) / 100)
+    return {
+        "currency": currency,
+        "assumptions": {
+            "review_cost": review_cost,
+            "margin_percent": margin_percent,
+            "challenge_opened": challenge_opened,
+        },
+        "range": {"low": round(low, 2), "high": round(high, 2)},
+        "disclaimer": (
+            "This is a scenario assumption, not recovered revenue: it multiplies a merchant-entered "
+            "review cost by how many followups were opened. It does not know whether any of those "
+            "orders shipped, whether the review actually prevented fraud, or what the order's own "
+            "margin really was."
+        ),
+    }
+
+
+def build_report(
+    owner: str,
+    *,
+    review_cost: float | None = None,
+    margin_percent: float | None = None,
+    currency: str | None = None,
+) -> dict:
     from app.db.database import SessionLocal
     from app.db.models import ChainRow, ChallengeAttemptRow, MerchantOutcomeEventRow
 
@@ -74,6 +109,8 @@ def build_report(owner: str) -> dict:
         adverse_allows = 0
         evidence_cost_total = 0.0
         eligible_created_ats: list[datetime] = []
+        manually_accepted_orders = 0
+        challenge_completion_seconds: list[float] = []
 
         for chain in chains:
             if _is_synthetic(chain.verdict_json):
@@ -108,6 +145,8 @@ def build_report(owner: str) -> dict:
                     counts[dimension]["explicit_unknown"] += 1
                 else:
                     counts[dimension]["labelled"] += 1
+            if order is not None and order.value == "ACCEPTED":
+                manually_accepted_orders += 1
 
             attempt = (
                 session.query(ChallengeAttemptRow)
@@ -119,6 +158,10 @@ def build_report(owner: str) -> dict:
                 challenge["opened"] += 1
                 if attempt.status in ("PASSED", "FAILED"):
                     challenge["completed"] += 1
+                    if attempt.terminal_at is not None:
+                        challenge_completion_seconds.append(
+                            (attempt.terminal_at - attempt.created_at).total_seconds()
+                        )
                 elif attempt.status == "ABANDONED":
                     challenge["abandoned"] += 1
                 else:
@@ -157,6 +200,24 @@ def build_report(owner: str) -> dict:
         "recorded_costs": {"evidence_cost_total": round(evidence_cost_total, 4)},
         "false_declines_among_labelled_legitimate": false_declines,
         "adverse_allows_among_labelled_fraud": adverse_allows,
+        # I12: review metrics, each with its own definition/denominator/missing
+        # count rather than one blended figure.
+        "review_metrics": {
+            "manually_accepted_orders": manually_accepted_orders,
+            "manually_accepted_orders_denominator": len(rows),
+            "challenge_completion_time_seconds": (
+                round(sum(challenge_completion_seconds) / len(challenge_completion_seconds), 1)
+                if challenge_completion_seconds
+                else None
+            ),
+            "challenge_completion_time_denominator": len(challenge_completion_seconds),
+        },
+        "business_impact_worksheet": _business_impact_worksheet(
+            review_cost=review_cost,
+            margin_percent=margin_percent,
+            currency=currency,
+            challenge_opened=challenge["opened"],
+        ),
         "limits": [
             "Synthetic runs (mock/nac_fake provider_sources) are excluded from every count above.",
             (
@@ -185,6 +246,11 @@ def build_report(owner: str) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--out", type=Path, default=Path("/tmp/isnad-outcome-report.json"))
+    parser.add_argument(
+        "--review-cost", type=float, default=None, help="I12: assumed cost per opened followup (report-only)"
+    )
+    parser.add_argument("--margin-percent", type=float, default=None, help="I12: assumed margin, as a percent")
+    parser.add_argument("--currency", type=str, default=None, help="I12: currency label for the worksheet")
     args = parser.parse_args()
 
     api_key = os.environ.get("ISNAD_MERCHANT_API_KEY", "")
@@ -197,7 +263,9 @@ def main() -> int:
 
     init_db()
     owner = owner_hash(api_key)
-    report = build_report(owner)
+    report = build_report(
+        owner, review_cost=args.review_cost, margin_percent=args.margin_percent, currency=args.currency
+    )
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
