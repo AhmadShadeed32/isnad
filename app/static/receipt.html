@@ -63,6 +63,8 @@
      chain id, hex key or ISO timestamp reordered by the bidi algorithm would
      no longer be the string the reader is meant to compare. */
   bdi{unicode-bidi:isolate}
+  /* The translation that sits beside a signed token, never in place of it. */
+  .gloss{color:var(--mut)}
 </style>
 <main>
   <p class="note"><a href="/judge" style="color:inherit" id="backLink"><span
@@ -149,6 +151,8 @@
     </div>
   </div>
 </main>
+<!-- Same origin, no CDN: the shared locale switch (I6). -->
+<script src="/ui/i18n.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const rawChainId = location.pathname.split('/').pop() || '';
@@ -160,99 +164,42 @@ let payloadBytes = null, originalBytes = null, sigBytes = null, keyBytes = null;
 let bundleText = null;
 
 // --- I6: locale ------------------------------------------------------------
-// Locale is presentation only. It never enters a request commitment, never
-// reaches a policy decision, and never rewrites a signed value: a translated
-// phrase is shown *beside* the signed token, never in place of it.
-const LOCALE_KEY = 'isnad.locale';
-const SUPPORTED = ['en', 'ar'];
-const dicts = {};
-let activeLocale = 'en';
+// The switch itself lives in /ui/i18n.js, shared with the other pages that
+// have one. This page only says what *it* must redraw when the language
+// changes; the fallback rule has one implementation, not one per page.
+//
+// If that module does not load, the page falls back to English and keeps
+// working. Verification is what this page is *for*, and it must not be lost
+// because a presentation concern failed to arrive — an unreachable translation
+// is not a reason to leave a reader unable to check a signature.
+const Locale = (typeof Isnad !== 'undefined') ? Isnad : {
+  applyText: (el, path, literal, prefix) => { el.textContent = (prefix || '') + literal; },
+  isolate: (value) => { const b = document.createElement('bdi'); b.dir = 'ltr'; b.textContent = value; return b; },
+  setIsolated: (el, value) => { el.replaceChildren(Locale.isolate(value)); },
+  codedInto: (el, code) => { el.replaceChildren(Locale.isolate(code)); },
+  onChange: () => {},
+  setLocale: async () => 'en',
+  preferred: () => 'en',
+  reviewStatus: () => null
+};
+
 let signedState = null;      // re-rendered when the language changes
 let lastSignature = null;    // true | false, or null when not yet checked
 
-const lookup = (dict, path) =>
-  path.split('.').reduce((o, k) => (o && typeof o === 'object' ? o[k] : undefined), dict);
-
-/* Unknown keys fall back to English *visibly*: the reader gets the English
-   sentence — never a raw key and never a blank — and the element is marked
-   lang="en" so assistive technology switches voice and the stylesheet can
-   show that this string is untranslated rather than an editorial choice. */
-function applyText(el, path, literal, prefix){
-  const local = path ? lookup(dicts[activeLocale], path) : undefined;
-  let value = local;
-  let fellBack = false;
-  if (typeof value !== 'string'){
-    value = path ? lookup(dicts.en, path) : undefined;
-    fellBack = true;
-  }
-  if (typeof value !== 'string'){ value = literal; fellBack = true; }
-  el.textContent = (prefix || '') + value;
-  if (fellBack && activeLocale !== 'en') el.setAttribute('lang', 'en');
-  else el.removeAttribute('lang');
-}
-
-const ORIGINAL_TEXT = new WeakMap();
-
-function applyDictionary(){
-  document.querySelectorAll('[data-i18n]').forEach(el => {
-    if (!ORIGINAL_TEXT.has(el)) ORIGINAL_TEXT.set(el, el.textContent.trim());
-    applyText(el, el.dataset.i18n, ORIGINAL_TEXT.get(el));
-  });
-}
-
-/* A signed enum shown as signed, LTR-isolated, with the translation beside it.
-   Replacing "CHALLENGE" with a translated phrase would mean the receipt no
-   longer displays the value the signature actually covers. */
-function renderCoded(id, code, group){
-  const el = $(id);
-  const isolated = document.createElement('bdi');
-  isolated.dir = 'ltr';
-  isolated.textContent = code;
-  el.replaceChildren(isolated);
-  const path = group + '.' + code;
-  const local = lookup(dicts[activeLocale], path);
-  const phrase = typeof local === 'string' ? local : lookup(dicts.en, path);
-  if (typeof phrase !== 'string') return;   // e.g. UNGRADED: the code stands alone
-  const gloss = document.createElement('span');
-  gloss.className = 'k';
-  gloss.textContent = ' · ' + phrase;
-  if (typeof local !== 'string' && activeLocale !== 'en') gloss.setAttribute('lang', 'en');
-  el.appendChild(gloss);
-}
-
-async function loadDictionary(locale){
-  if (dicts[locale]) return;
-  try{
-    const response = await fetch(`/ui/i18n/${locale}.json`);
-    if (response.ok) dicts[locale] = await response.json();
-  }catch(_){ /* stay in English: the visible fallback below is the point */ }
-}
-
-async function setLocale(requested){
-  const locale = SUPPORTED.includes(requested) ? requested : 'en';
-  // English is the fallback dictionary, so it is loaded whatever the reader
-  // chose. Without it, a key the Arabic dictionary is missing would fall back
-  // to whatever the markup happened to say rather than to the English string.
-  await Promise.all(locale === 'en' ? [loadDictionary('en')]
-                                    : [loadDictionary('en'), loadDictionary(locale)]);
-  activeLocale = dicts[locale] ? locale : 'en';
-  document.documentElement.lang = activeLocale;
-  document.documentElement.dir = activeLocale === 'ar' ? 'rtl' : 'ltr';
-  $('locale').value = activeLocale;
+Locale.onChange((locale) => {
+  $('locale').value = locale;
   // The arrow is a direction, not a word, so it flips with the page.
-  $('backArrow').textContent = activeLocale === 'ar' ? '→' : '←';
+  $('backArrow').textContent = locale === 'ar' ? '\u2192' : '\u2190';
   // An unreviewed translation says so on the page, not only in its JSON file.
-  const review = dicts[activeLocale] && dicts[activeLocale].review_status;
+  const review = Locale.reviewStatus();
   $('draftNote').textContent = review || '';
   $('draftNote').hidden = !review;
-  applyDictionary();
   if (lastSignature !== null) showSignature(lastSignature);
   if (signedState){
-    renderCoded('decision', signedState.decision, 'decision');
-    renderCoded('grade', signedState.chain_grade || 'UNGRADED', 'chain_grade');
+    Locale.codedInto($('decision'), signedState.decision, 'decision');
+    Locale.codedInto($('grade'), signedState.chain_grade || 'UNGRADED', 'chain_grade');
   }
-  try{ localStorage.setItem(LOCALE_KEY, activeLocale); }catch(_){ /* private mode */ }
-}
+});
 
 function hexToBytes(hex){
   const out = new Uint8Array(hex.length / 2);
@@ -275,7 +222,7 @@ function showSignature(ok){
   lastSignature = ok;
   const el = $('status');
   el.className = 'status ' + (ok ? 'ok' : 'bad');
-  applyText(el,
+  Locale.applyText(el,
     ok ? 'ui.signature_valid' : 'ui.signature_invalid',
     ok ? 'signature valid' : 'signature INVALID',
     ok ? '✓ ' : '✗ ');
@@ -313,12 +260,7 @@ async function showVerification(){
    algorithm reorders a bare chain id, hex digest, ISO timestamp or signed
    number at its neutral edges, and a reordered string is no longer the one the
    reader is being asked to compare. */
-function setIsolated(id, value){
-  const isolated = document.createElement('bdi');
-  isolated.dir = 'ltr';
-  isolated.textContent = value;        // textContent throughout: never markup
-  $(id).replaceChildren(isolated);
-}
+const setIsolated = (id, value) => Locale.setIsolated($(id), value);
 
 function render(signed, publicKey, signature){
   signedState = signed;
@@ -327,8 +269,8 @@ function render(signed, publicKey, signature){
   setIsolated('signature', signature);
   setIsolated('signedAt', signed.signed_at || '—');
 
-  renderCoded('decision', signed.decision, 'decision');
-  renderCoded('grade', signed.chain_grade || 'UNGRADED', 'chain_grade');
+  Locale.codedInto($('decision'), signed.decision, 'decision');
+  Locale.codedInto($('grade'), signed.chain_grade || 'UNGRADED', 'chain_grade');
   setIsolated('confidence', signed.confidence);
   $('hypothesis').textContent = signed.hypothesis;
   setIsolated('planner', signed.planner);
@@ -354,10 +296,7 @@ function render(signed, publicKey, signature){
       const td = document.createElement('td');
       // API names, signed signal tokens and signed numbers, isolated so an
       // RTL page cannot reorder a "+0.90" into "0.90+" or split an API name.
-      const isolated = document.createElement('bdi');
-      isolated.dir = 'ltr';
-      isolated.textContent = v;        // textContent throughout: never markup
-      td.appendChild(isolated);
+      td.appendChild(Locale.isolate(v));
       tr.appendChild(td);
     });
     body.appendChild(tr);
@@ -458,12 +397,10 @@ $('downloadBtn').addEventListener('click', () => {
   setTimeout(() => URL.revokeObjectURL(url), 30000);
 });
 
-$('locale').addEventListener('change', (event) => { setLocale(event.target.value); });
+$('locale').addEventListener('change', (event) => { Locale.setLocale(event.target.value); });
 
 (async function main(){
-  let preferred = null;
-  try{ preferred = localStorage.getItem(LOCALE_KEY); }catch(_){ /* private mode */ }
-  await setLocale(preferred || 'en');
+  await Locale.setLocale(Locale.preferred());
   try{
     if (!chainId){
       setStatus('bad', '✗ invalid receipt link', 'This receipt URL does not contain a valid chain id.');
