@@ -21,10 +21,14 @@ P1 is complete; P2 is partial with 541 tests and browser checks reported by its
 implementation session. Remaining P2 work is keyboard traversal verification and
 mobile receipt-table layout. P4a (local live-consent journey against an offline
 fake operator) is done locally with 596 tests passing; P4b (a real
-handset/operator) remains unproven. This documentation revision changes no
-application behavior beyond what P4a's own implementation record describes.
-[Prior validation records](P1_P2_IMPLEMENTATION_RECORDS.md) and the
-[P4a record](P4A_IMPLEMENTATION_RECORD.md) remain available.
+handset/operator) remains unproven. P3 (merchant CHALLENGE followup and
+completion reporting, reusing the P4a harness) is also done locally, with 627
+tests passing and a real browser pass proving the public receipt is unchanged
+by a followup. This documentation revision changes no application behavior
+beyond what the P3 and P4a implementation records describe.
+[Prior validation records](P1_P2_IMPLEMENTATION_RECORDS.md), the
+[P4a record](P4A_IMPLEMENTATION_RECORD.md) and the
+[P3 record](P3_IMPLEMENTATION_RECORD.md) remain available.
 
 Earlier detailed history is preserved in
 [the previously pushed handoff](https://github.com/AhmadShadeed32/isnad-private/blob/faf467ffd1150127a0f16de3a1bea7936d60794e/docs/PHASE2_HANDOFF.md).

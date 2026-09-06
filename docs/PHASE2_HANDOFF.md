@@ -64,7 +64,7 @@ record any justified change to these contracts here before implementing it.
 | P1 | Honest location fixtures and provider preconditions | Baseline checks | COMPLETE (implementation record in §8) |
 | P2 | Plain-language merchant result and focused demo entry | P1 | PARTIAL (6 Sep implementation session; see §8) |
 | P4a | Local live-consent journey and current OAuth contract | P1, P2 | DONE LOCALLY (6 Sep implementation session; see §8) |
-| P3 | Merchant challenge attempt and completion reporting | P2; reuse P4a harness | NOT STARTED |
+| P3 | Merchant challenge attempt and completion reporting | P2; reuse P4a harness | DONE LOCALLY (6 Sep implementation session; see §8) |
 | P5 | Merchant outcome collection and evaluation report | P3 event/ownership conventions | NOT STARTED |
 | P4b | Physical handset/operator proof | P4a + external prerequisites in §4 | NOT STARTED |
 
@@ -1339,3 +1339,23 @@ test had caught. Full suite 541 → 596 passed, Ruff clean, `scripts/
 handset_validation.py contract` still passes. Status: **DONE LOCALLY**; P4b
 (a real handset/operator) is untouched, as instructed. Full record:
 [P4A_IMPLEMENTATION_RECORD.md](P4A_IMPLEMENTATION_RECORD.md).
+
+**P3 implementation — 6 Sep (same day, follow-up session):** built merchant
+CHALLENGE followup and completion reporting per §3 P3. Made `store.save`
+insert-only first (it was silently upsertable — a confirmed, then fixed,
+defect unrelated to P3's own scope but load-bearing for it). Added
+`ChallengeAttemptRow`/`ChallengeEventRow` in their own tables (never a column
+on `ChainRow`), migration `0002_challenge_followups`, and three endpoints
+under `/v1/chains/{chain_id}/challenges` with merchant auth, ownership
+scoping and compare-and-swap transitions (PENDING → PASSED/FAILED/ABANDONED/
+EXPIRED). Idempotency is durable (a new `IdempotencyRecordRow`, not the
+in-memory cache `/v1/verify` uses), keyed by owner+operation+key and a
+fingerprint binding the full target and body, so a reused key against a
+different chain, attempt or body is a 409. Extended the P4a merchant-pilot
+harness with a "Continue merchant verification" panel, then ran all three
+processes again and drove a real CHALLENGE (NUMBER_MISMATCH) through to a
+reported FAILED result in a real browser, confirming by direct `curl` that
+the public receipt's signed payload is untouched by the followup. Full suite
+623 → 627 passed, Ruff clean, `scripts/handset_validation.py contract` still
+passes. Status: **DONE LOCALLY**. Full record:
+[P3_IMPLEMENTATION_RECORD.md](P3_IMPLEMENTATION_RECORD.md).
