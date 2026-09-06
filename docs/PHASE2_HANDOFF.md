@@ -2,6 +2,11 @@
 
 Updated 6 September 2026. **Read this file first.**
 
+**Active user-requested work:** [§12 — full scope, sequence and acceptance checks](#12-active-user-requests-and-implementation-plan--6-september-2026).
+Read it before implementing further changes. Gemini/Arabic edits are in progress;
+swap timestamps and Congestion Insights are planned, not delivered.
+
+
 **Latest review:** [fixes, verification and hackathon priorities](REVIEW_2026-09-06.md).
 886 tests pass. F1/F3 were already implemented in this checkout; F2 is now closed
 with idle cleanup, terminal authorization clearing, and a bounded five-minute
@@ -9,7 +14,7 @@ phone retention window for continuity-session opt-in. Packaging and polling fixe
 are also included. The latest 13-case result is 38/78 calls, five CHALLENGEs and
 three authored-expectation disagreements; historical results below remain dated
 records. The capability manifest now lives at `app/nac_capabilities.json`.
- It replaces the long running
+This handoff replaces the long running
 log with current facts and an implementation plan. Read §6 for submission gates,
 §7 for the competition feature build order, and §3 for the underlying product
 contracts. Before further implementation, read §9 for seven confirmed code-review
@@ -2067,3 +2072,313 @@ this is a follow-up verification requirement, not a claimed screen-reader test.
 375×812 and 1440×1000 for idle/running/ALLOW/CHALLENGE/unresolved/error states,
 run the relevant existing tests and targeted interaction checks, then review the
 complete journey. Do not call this plan implemented until those results exist.
+
+## 12. Active user requests and implementation plan — 6 September 2026
+
+**Read this section before continuing implementation.** The user explicitly asked
+that every new request and the plan for tackling it be added to the handoff
+before further work. This section supersedes earlier recommendations to keep
+Gemini optional, defer Arabic beyond labels, or treat swap evidence as necessarily
+boolean-only. Earlier implementation/evaluation records remain historical facts.
+
+### Requested outcomes
+
+1. Make **Gemini the primary/default planner**. Use greedy fallback **if and only
+   if Gemini does not respond**; do not silently replace a returned answer.
+2. Provide **everything that was added and how to test it**, including previously
+   implemented features, new fixes, configuration, UI entry points, expected
+   outcomes, and limitations.
+3. Fix **Arabic everywhere**. The user clarified that the problem affects all
+   pages, not just one screen or a single untranslated label.
+4. Add **Nokia Network Intelligence / Congestion Insights** and explain its use.
+5. Use the user's [NaC getting-started documentation](https://networkascode.nokia.io/docs/getting-started)
+   to improve the integration rather than relying on old SDK assumptions.
+6. Use **actual SIM/device swap timestamps where available** to improve the
+   evidence, explanations, and agent context.
+7. Record this entire plan first, preserve existing work, validate the completed
+   behavior, update README/current state/testing instructions, and push the
+   completed changes to the **private** Isnad remote under the existing request.
+
+### Exact current state at this planning checkpoint
+
+Last completed/pushed review: `167dcd30d98b0c94cafb6c6e33aef5148eaa5cf2` on
+`private/main`. Its full suite passed **886 tests**, Ruff and the runtime lock
+check. See [the review record](REVIEW_2026-09-06.md) for the delivered fixes.
+
+**Uncommitted work already in progress before the user requested this checkpoint:**
+
+- `app/config.py`: planner default changed to `llm`; planner values restricted
+  to `llm` or `greedy`.
+- `app/agent/gemini.py`: introduced `GeminiNoResponse` to distinguish missing
+  candidate text from explicit refusal/invalid output.
+- `app/agent/planner.py`: narrowed fallback to missing client/no answer or
+  transport timeout/failure. Invalid responses, invalid actions and the call
+  ceiling now yield an explicit stopped selection rather than greedy selection.
+- `tests/test_llm_planner.py` and new `tests/test_gemini_primary.py`: updated
+  regressions. **17 required-behavior probes failed before the code changes;
+  the focused Gemini/planner/adapter set now passes 52 tests.** The full suite
+  has not been rerun for this in-progress change; comments/docs still need cleanup.
+- `app/static/i18n/en.json` / `ar.json`: drafted a broader UI phrase catalogue.
+  **Not wired into all pages and not browser-verified. Arabic is not fixed yet.**
+- No Congestion Insights or swap-date integration has been implemented.
+- Local configuration was inspected without exposing secrets: planner already
+  says `llm`, and a Gemini key is configured. No live model call was made.
+
+Do not discard these changes, mark them complete, or claim new test totals based
+on the previous commit. Continue from the actual diff and inspect it first.
+
+### Delivery order and gates
+
+| Order | Package | Current status | Completion gate |
+| --- | --- | --- | --- |
+| 1 | N1 — Gemini-first selection | IN PROGRESS | Default/config/UI agree; strict fallback regressions and integration tests pass |
+| 2 | N2 — Arabic across product pages | CATALOGUE DRAFT ONLY | Real browser passes in Arabic/English, including dynamic results and mobile RTL |
+| 3 | N3 — NaC contract audit | INITIAL SOURCE/SDK INSPECTION | Versioned capability matrix and direct SDK contract tests; verified docs links |
+| 4 | N4 — Swap timestamps | NOT STARTED | Normalized dates/unknowns, budget correctness, preserved old receipts, English/Arabic display |
+| 5 | N5 — Congestion Insights | NOT STARTED | Owner-scoped lifecycle, bounded queries, honest mock/live labels, UI and tests |
+| 6 | N6 — Complete feature/testing guide | PLANNED | Every delivered feature has an executable test path and honest status |
+| 7 | N7 — Release verification and private push | PLANNED | Full checks, updated records/artifacts, reviewed commit and verified remote HEAD |
+
+N3's contract checks can be read before N1/N2 finish, but do not mix new network
+behavior into the application until its contract and tests are understood.
+Maintain the guide while delivering each package rather than reconstructing it
+from memory at the end. No additional model, quota, or timeout changes are implied.
+
+### N1 — Gemini is primary; greedy only when no answer arrives
+
+**Files:** `app/config.py`, `app/agent/gemini.py`, `app/agent/planner.py`, relevant
+investigator/console labels, `.env.example`, README and planner tests.
+
+1. Finish the default change to `llm` and update the normal launch instructions.
+   Preserve explicit greedy configuration for offline tests, reproducible
+   evaluations and recorded lab artifacts. Distinguish those commands from the
+   primary interactive Gemini path.
+2. Define the fallback boundary explicitly:
+   - Timeout, connection/transport failure, empty candidate/no model answer:
+     greedy may choose, with the actual source visible.
+   - Missing Gemini credentials: explain unavailability; greedy is the no-model
+     path, never label it as a successful Gemini run.
+   - Valid action: use it. Valid STOP: honor model stopping subject to unchanged
+     policy-required checks.
+   - Returned malformed JSON/schema, unavailable/repeated/unknown action,
+     provider rejection/refusal: stop model selection with a bounded diagnostic;
+     do not substitute greedy and do not execute the invalid action.
+   - Call ceiling: stop selection, keep the cap, and explain it. Reaching the cap
+     is not a failure to respond and must not trigger greedy fallback.
+3. Keep mandatory consent checks, corroboration and evidence-support gates
+   enforced and visibly labeled `policy`. They are not planner fallback.
+4. Clean up old broad-fallback comments in both adapter and planner. Display-only
+   narrative/explanation fallback is a separate contract from evidence selection.
+5. Test actual adapter response shapes, timeout/transport exceptions, empty text,
+   refusal, 429/4xx/5xx responses, invalid JSON, repeated/overspend choices, STOP,
+   missing credentials and call ceiling. Test source labels through a completed
+   investigation, not only direct `choose()` calls.
+6. Keep model responses out of HTML interpolation, secrets out of prompts/logs,
+   and signed planner vocabulary compatible. Record whether a live model test
+   actually ran rather than infer it from configuration.
+
+### N2 — Arabic everywhere, including changing state
+
+**Observed cause:** the Arabic dictionary originally covered only a few labels.
+Judge sections were hard-coded `lang="en" dir="ltr"`; most page copy and dynamic
+results bypassed the dictionary. Console/lab/shared-summary/merchant pages did
+not share a complete language control. Merely flipping the root direction cannot
+translate or repair these pages.
+
+**Surfaces:** Judge Mode, full console, receipt, shared summary, lab, consent
+completion, privacy page, merchant checkout/flow/readiness pages and their login
+framing. Operator simulator labels should also be reviewed as part of the local
+journey. Machine-facing JSON/OpenAPI field names are not translated API contracts.
+
+1. Extend the single shared locale mechanism and provide consistent visible
+   English/Arabic switching, saved preference, and safe English fallback.
+   The separately served merchant app must serve its own same-origin locale
+   assets, not assume the main server's origin or leak credentials in links.
+2. Translate complete static copy, buttons, descriptions, validation/errors,
+   empty/loading/recovery states, hints, placeholders and accessible names.
+   The current draft phrase catalogue is input material, not completion evidence.
+3. Translate dynamic scenario descriptions, deterministic presentation summaries,
+   evidence fact labels, verdict explanations where structured facts permit,
+   congestion status, timestamps and session/consent/challenge/outcome states.
+   Prefer stable keys/structured templates. If using a shared renderer for existing
+   text nodes, preserve original text, handle updates without mutation loops,
+   and never change form values or use DOM text as application state.
+4. Keep original signed enums/identifiers and raw provider facts inspectable.
+   Add Arabic glosses beside audit tokens rather than rewriting receipt bytes.
+   Do not invent Arabic model explanations or claim arbitrary operator/model
+   prose has been translated; explicitly mark remaining English free text.
+5. Replace inappropriate forced-English regions with inherited language/direction.
+   Use logical spacing/borders/alignment, Arabic-capable system fonts, natural
+   Arabic line heights and no Latin letter spacing on Arabic sentences. Isolate
+   phone numbers, currency codes, hashes, timestamps and signed tokens LTR.
+6. Prevent racing language loads from reverting a newer selection. Locale changes
+   must redraw current results without restarting an investigation or losing form
+   inputs, focus, receipt bytes, download contents or signature state.
+7. Validate English → Arabic → English, persisted preference after navigation,
+   missing dictionary/network failure, live trace updates, ALLOW/CHALLENGE/
+   unresolved/error screens, 375px/mobile, desktop, 200% zoom and keyboard use.
+   Exercise the shared logic, not just source-string assertions; capture real
+   browser evidence. Keep the human translation-review status honest.
+
+### N3 — Reconcile the NaC docs with the installed SDK
+
+**Sources already checked:**
+
+- [User-supplied getting-started entry](https://networkascode.nokia.io/docs/getting-started).
+  The web reader returned an API Hub shell with no extractable content; use the
+  linked official detailed documentation and browser/API definitions as needed.
+- [SIM Swap](https://networkascode.nokia.io/_docs/sim-swap/sim-swap).
+- [Device Swap](https://networkascode.nokia.io/_docs/device-swap/device-swap).
+- [Congestion notifications](https://networkascode.nokia.io/_docs/network-insights/congestion-notifications).
+- [Congestion subscription retrieval](https://networkascode.nokia.io/_docs/network-insights/get-congestion).
+
+Initial local SDK inspection confirms `client.sim_swap.retrieve_date`,
+`client.device_swap.retrieve_date`, and `client.congestion_insights.query` /
+`create_subscription` exist. Some tutorial snippets use older resource names;
+verify installed generated request/response models before copying them.
+
+1. Build a concise matrix of the APIs Isnad actually uses: operation/version,
+   installed SDK method, request fields, response fields, required authorization,
+   simulator support, last observed run and limitations.
+2. Audit Number Verification consent/OIDC, location claims, SIM/device swap,
+   reachability and roaming against current documented contracts. Fix confirmed
+   mismatches with regressions rather than add every advertised API indiscriminately.
+3. Update `app/nac_capabilities.json`, provider preflight and runbooks from evidence.
+   Entitlement, subscriber coverage, API version and successful live validation are
+   different fields; SDK method availability proves none of the latter.
+4. Bound request timeouts/retries and preserve provider failure/consent-required
+   distinctions. Do not automatically retry billed writes or silently mix mocks
+   into a failed live query. Do not assume Number Verification consent grants
+   permission for every other API.
+
+### N4 — Use real SIM/device change times
+
+**Confirmed:** Nokia documents separate `retrieve_date` operations. SIM response
+uses `latest_sim_change`; Device Swap uses `latest_device_change`. The current
+adapter uses `.check(...)` and normalizes the boolean only. The boolean's
+`max_age` window is not the event timestamp. Nokia also documents that a retrieved
+date may represent activation/first device association, and a null date has
+limited semantics. Do not equate every date with a fraudulent replacement.
+
+1. Inspect returned SDK types, timestamp timezone/null behavior and monitored-period
+   metadata. Add mocked contract tests for both operations before integrating.
+2. Design an optional normalized temporal record: provider-reported change time,
+   time retrieved, source/operation, meaning (change-or-activation when ambiguous),
+   date availability, and monitoring horizon when actually returned. Distinguish
+   no date, unsupported, consent missing, provider failure and malformed time.
+3. Reject naive/impossible future dates; preserve timezone-aware UTC instants.
+   Derive age relative to the observation/issuance time, not a later replay clock.
+   At render time show a human date with explicit timezone plus the exact value
+   in audit details. Arabic must use the same instant and meaning.
+4. Prefer one date lookup that answers the needed recency question when its
+   contract supports that inference; otherwise model boolean check and date
+   retrieval as distinct operations. Every extra network call must count against
+   a configured cost/call budget. Do not silently double provider spend or apply
+   the same adverse evidence weight twice.
+5. Add date/age to the normalized planner context where useful and explain
+   “reported change/activation at …” versus “change within the last N hours.”
+   Do not change fraud weights merely because a timestamp is more precise.
+   Any recency-based policy change needs explicit scenarios and remeasured
+   decisions/costs, with policy-derived scores still labeled uncalibrated.
+6. Add temporal fields compatibly to newly issued evidence/receipts if appropriate.
+   Existing stored signed payloads must remain byte-for-byte unchanged and verify
+   with existing keys; no reserialization or backfilling invented dates. Keep
+   precise timestamps out of shared summaries unless explicitly needed.
+7. Mock dates must be deterministic and visibly synthetic. Test boundary hours,
+   timezone offsets, null/activation ambiguity, retained-window limits, failures,
+   unavailable operations, budget exhaustion, old receipt compatibility, tamper
+   detection and English/Arabic presentation.
+
+### N5 — Add Congestion Insights as network-quality context
+
+**Purpose:** Nokia describes congestion information for a device's surrounding
+network area, useful for anticipating bandwidth/latency constraints. Isnad can
+show network conditions and recommend a lighter or retryable verification flow.
+Congestion does not establish fraud, explain every timeout, or prove an OTP delay.
+It must not independently raise a fraud score or decline an order.
+
+**Confirmed prerequisites:** official docs require a congestion subscription
+before querying/inspecting congestion levels. The installed SDK offers
+`query(device=..., start=..., end=...)`; omitted times request an upcoming
+15-minute prediction. Inspect exact response level/interval/confidence fields
+before designing the normalized schema. Never label a forecast as an observation.
+
+1. Add an owner-scoped network-insights service and request/response schema,
+   independent of the fraud-evidence weights. Expose query results, intervals,
+   forecast/history basis, source and availability explicitly.
+2. Implement required subscription setup/get/delete, bounded TTL and per-owner
+   limits. Reuse existing auth, ownership and idempotency conventions. If durable
+   subscription ownership needs a migration, inspect the current migration head
+   first and allocate one shared revision deliberately.
+3. Use a configured server-side HTTPS notification URL/token for live subscriptions;
+   do not accept arbitrary callback destinations from an untrusted browser.
+   Authenticate notifications, bound payloads, deduplicate event IDs, reject
+   foreign/expired subscriptions and prevent stale/out-of-order updates from
+   replacing newer conditions. Clean up expiry and deletion.
+4. Bound query windows, result sizes, call frequency and concurrency. Require
+   configured credentials, supported subscribers and API-specific authorization.
+   No subscription/query is created by visiting a page. Unsupported regions and
+   absent subscriptions get an actionable unavailable result.
+5. Add deterministic mock scenarios for low/high congestion, no data, expired
+   subscription and provider failure. Live failure never selects a mock fallback.
+6. Add a discoverable, bilingual network-insights panel/page linked from the
+   console/judge exploration area. Explain levels and operational suggestions,
+   show freshness/forecast interval and mock/live provenance. Preserve the
+   original verification verdict and signed chain.
+7. Test SDK serialization, subscription ownership, replay/idempotency, notification
+   auth/deduplication/order, query limits, cleanup and zero calls before preflight.
+   Prove that changing congestion alone does not change fraud verdicts.
+   Distinguish local fixture tests from an actually executed Nokia simulator trial.
+
+### N6 — Give the user a complete feature inventory and test guide
+
+Create a linked `docs/TESTING_GUIDE.md` (and add its ignore exception) with a
+copy/paste local launch, required processes/ports, exact UI route or API request,
+fixture inputs, expected observable output and reset/cleanup steps for each item.
+Do not include credentials, real phone numbers, or a stale fixed port assumption.
+
+Inventory to cover, based on existing handoff §7 and delivered code:
+
+- Judge replacement/clean/unresolved cases and console Acts I–IX, including the
+  established-customer example and their actual current decisions/grades.
+- Gemini selection, no-response fallback, STOP and invalid-response handling;
+  deterministic offline mode and honest planner/provenance labels.
+- Forward verification, inbound caller/announcement checks, caller velocity,
+  idempotent request replay, and owner-scoped trace recovery.
+- Evidence receipt verification, deliberate tampering/restoration, exact-byte
+  download and offline verifier; shared summary creation, expiry and revocation.
+- Local fake operator consent success/denial/expiry and recovery after response
+  loss; physical handset proof listed separately as unproven.
+- Merchant CHALLENGE follow-up, reported result, order/fraud outcome corrections,
+  trust-session revocation and blocked order release, retention and recovery fixes.
+- Recorded lab replay, seeded case order, missing-location comparison, injected
+  outages, evidence-budget comparison and recorded-artifact drift.
+- Arabic switching, dynamic results, RTL layout and language persistence across
+  every UI surface, plus remaining untranslated free-text limitations.
+- New swap date/recency behavior and Congestion Insights, only once implemented.
+- Provider readiness, dependency/runtime/package checks and privacy posture.
+
+For each row distinguish **implemented/tested**, **implemented but not live-validated**,
+**in progress**, and **planned**. Include the exact automated test command and a
+manual user path. No need for the user to read implementation history to test it.
+
+### N7 — Finish, verify and publish the actual result
+
+1. Run focused failing regressions before each fix, then relevant integration
+   checks. Preserve a pre-change receipt for compatibility verification.
+2. Run the full `.venv311` suite, Ruff, runtime lock, consent contract, evidence
+   pack, fixed evaluation and a standalone wheel smoke after final changes.
+   Regenerate affected lab artifacts and document changed costs/outcomes.
+3. Exercise the actual browser journey in both languages; record tested sizes,
+   states, screenshots and limits. Source-string tests alone do not prove RTL.
+4. Update README, CURRENT_STATE, this section's status ledger, capability matrix,
+   testing guide and Graphify. Do not present 886 or 52 as the final new test count.
+5. Commit coherent reviewed packages and push to `private`, preserving remote
+   history. Confirm remote HEAD and report the commit plus testing-guide link.
+6. The earlier dependency-inventory audit was blocked by automatic approval
+   review. Do not bypass that rejection or claim the advisory check passed;
+   it remains a separately disclosed approval requirement.
+
+**Checkpoint rule:** this section is the requested plan, not an implementation
+claim. Next work should start at N1's unfinished items and update this ledger as
+each package actually passes its completion gate.

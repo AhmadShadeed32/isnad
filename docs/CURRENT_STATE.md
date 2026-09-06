@@ -2,6 +2,9 @@
 
 Updated 6 September 2026.
 
+**Active follow-up:** [handoff §12](PHASE2_HANDOFF.md#12-active-user-requests-and-implementation-plan--6-september-2026) records the user’s complete new scope and implementation order: Gemini-first, Arabic everywhere, NaC contract audit, actual swap timestamps, Congestion Insights, full testing guide, and final private-repository push. The plan distinguishes in-progress edits from unimplemented features.
+
+
 - **Judges:** [README](../README.md) → [90-second walkthrough](JUDGE_WALKTHROUGH.md).
 - **Next developer session:** [compact handoff](PHASE2_HANDOFF.md). It holds the
   current evidence, the step-by-step P1–P5 implementation contract (see its current status ledger),
