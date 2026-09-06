@@ -35,8 +35,7 @@ class UnknownScenario(ValueError):
     pass
 
 
-def _fixture_digest(scenario_id: str) -> str:
-    request = DEMO_ACTS[SCENARIO_IDS[scenario_id]]
+def _fixture_digest(request) -> str:
     return hashlib.sha256(request.model_dump_json().encode("utf-8")).hexdigest()[:16]
 
 
@@ -79,7 +78,11 @@ def _planner_source(events: list[TraceEvent]) -> str:
     return "policy"
 
 
-async def run_scenario(scenario_id: str, *, planner=None) -> LabRun:
+async def run_scenario(scenario_id: str, *, planner=None, request_override=None) -> LabRun:
+    """Run the named scenario's fixture, or `request_override` (a full
+    VerificationRequest already derived from it) when a caller — I2's
+    counterfactual comparator — needs one field changed while keeping the
+    scenario's own digests and identity for comparison."""
     if scenario_id not in SCENARIO_IDS:
         raise UnknownScenario(scenario_id)
 
@@ -114,14 +117,14 @@ async def run_scenario(scenario_id: str, *, planner=None) -> LabRun:
 
     engine = get_engine(str(settings.policy_path))
     investigator = build_investigator(MockProvider(), engine=engine, planner=planner, event_sink=sink)
-    request = DEMO_ACTS[SCENARIO_IDS[scenario_id]].model_copy(deep=True)
+    request = request_override or DEMO_ACTS[SCENARIO_IDS[scenario_id]].model_copy(deep=True)
     verdict = await investigator.investigate(request, run_id=run_id)
 
     revision, dirty = _code_revision()
     return LabRun(
         run_id=run_id,
         scenario_id=scenario_id,
-        fixture_digest=_fixture_digest(scenario_id),
+        fixture_digest=_fixture_digest(request),
         policy_digest=_policy_digest(),
         code_revision=revision,
         dirty=dirty,
