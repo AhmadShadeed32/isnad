@@ -16,6 +16,7 @@ from app.api import (
     routes_judge,
     routes_outcomes,
     routes_privacy,
+    routes_proof_shares,
     routes_receipt,
     routes_registry,
     routes_reverse,
@@ -101,6 +102,8 @@ def create_app() -> FastAPI:
     app.include_router(routes_registry.router)
     app.include_router(routes_verified_caller.router)
     app.include_router(routes_i18n.router)
+    app.include_router(routes_proof_shares.router)
+    app.include_router(routes_proof_shares.page_router)
 
     @app.get("/", include_in_schema=False)
     async def root() -> RedirectResponse:

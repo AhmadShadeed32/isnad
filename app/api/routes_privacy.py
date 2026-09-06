@@ -97,6 +97,16 @@ async def posture(request: Request) -> dict:
                 ),
             },
             {
+                "name": "proof_shares",
+                "seconds": settings.proof_share_max_ttl_seconds,
+                "human": _human(settings.proof_share_max_ttl_seconds),
+                "why": (
+                    "The upper bound a merchant may set on a reviewer link's lifetime. Revoking or "
+                    "expiring a share disables future access through that link only -- it does not "
+                    "revoke the already-public original receipt or erase anything already downloaded."
+                ),
+            },
+            {
                 "name": "outcome_events",
                 "seconds": settings.outcome_retention_seconds,
                 "human": _human(settings.outcome_retention_seconds),

@@ -281,3 +281,31 @@ class AnnouncementUseRow(Base):
     announcement_id: Mapped[str] = mapped_column(String(40), primary_key=True)
     owner_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
     at: Mapped[datetime] = mapped_column(UtcDateTime, default=lambda: datetime.now(UTC))
+
+
+class ProofShareRow(Base):
+    """An expiring reviewer link onto one chain's separately issued
+    attestation (I13) — never a redacted copy of the original signature, and
+    never a second way to reach the original `/r/{chain_id}` bytes.
+
+    Insert-only in practice: `issued_at`/`expires_at` never change once set,
+    so the attestation `sign_attestation()` recomputes from this row is
+    byte-identical every time — nothing about it needs to be stored twice.
+    Only `revoked_at` is ever written after creation, and only once.
+    """
+
+    __tablename__ = "proof_shares"
+
+    share_id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    # sha256 of the bearer token. The token itself is shown to the caller
+    # exactly once (in the create response) and never stored in the clear.
+    token_digest: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    chain_id: Mapped[str] = mapped_column(String(40), index=True)
+    owner_hash: Mapped[str] = mapped_column(String(64), index=True)
+    purpose: Mapped[str] = mapped_column(String(120), default="")
+    scope: Mapped[str] = mapped_column(String(32), default="summary")
+    issued_at: Mapped[datetime] = mapped_column(UtcDateTime)
+    expires_at: Mapped[datetime] = mapped_column(UtcDateTime, index=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    idempotency_key: Mapped[str] = mapped_column(String(128))
+    request_fingerprint: Mapped[str] = mapped_column(String(64))

@@ -217,6 +217,10 @@ class Settings(BaseSettings):
     # calibration observation window, unlike P3's 30-day followup window.
     outcome_retention_seconds: int = Field(15552000, gt=0)
 
+    # --- Expiring reviewer links (I13) ---
+    proof_share_default_ttl_seconds: int = Field(259200, gt=0)  # 3 days
+    proof_share_max_ttl_seconds: int = Field(2592000, gt=0)  # 30 days
+
     # --- Cache / idempotency ---
     cache_backend: str = "memory"  # memory | redis
     redis_url: str | None = None

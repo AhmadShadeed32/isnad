@@ -19,7 +19,7 @@ import logging
 
 from app import announce, velocity
 from app.config import settings
-from app.db import challenges, outcomes
+from app.db import challenges, outcomes, proof_shares
 
 log = logging.getLogger("isnad")
 
@@ -32,6 +32,7 @@ def purge_once() -> dict[str, int]:
         "challenge_followups": challenges.purge_followups(),
         "idempotency_records": challenges.purge_idempotency_records(),
         "outcome_events": outcomes.purge_outcomes(),
+        "proof_shares": proof_shares.purge_expired_shares(),
     }
 
 

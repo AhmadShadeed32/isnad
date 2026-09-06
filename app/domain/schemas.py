@@ -507,3 +507,39 @@ class OutcomeTimelineResponse(BaseModel):
     chain_id: str
     current: dict[str, OutcomeEventResponse]
     timeline: list[OutcomeEventResponse]
+
+
+# --- Expiring reviewer links (I13) ---
+
+
+class ProofShareCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    # A display label only, never proof of the viewer's identity or an access
+    # control decision. Bounded, not free-form commentary.
+    purpose: str = Field(..., min_length=1, max_length=120)
+    ttl_seconds: int | None = Field(default=None, gt=0)
+
+
+class ProofShareCreateResponse(BaseModel):
+    share_id: str
+    chain_id: str
+    # Shown exactly once, in this response. Never returned by any other
+    # endpoint and never logged.
+    token: str
+    purpose: str
+    scope: str
+    issued_at: str
+    expires_at: str
+
+
+class ProofShareAttestation(BaseModel):
+    type: str
+    share_id: str
+    chain_id: str
+    decision: str
+    chain_grade: str | None
+    source_payload_digest: str
+    issued_at: str
+    expires_at: str
+    issuer_public_key: str
+    signature: str
