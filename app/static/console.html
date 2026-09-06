@@ -15,7 +15,7 @@
   *{box-sizing:border-box}
   body{margin:0;background:var(--ink);color:var(--txt);font-family:var(--sans);
        min-height:100vh;padding:28px 32px}
-  header{display:flex;align-items:baseline;gap:16px;margin-bottom:4px}
+  header{display:flex;align-items:baseline;gap:16px;margin-bottom:4px;flex-wrap:wrap}
   h1{font-size:22px;margin:0;letter-spacing:1px}
   h1 .ar{color:var(--gold);font-weight:400;margin-right:8px}
   .sub{color:var(--mut);font-size:13px}
@@ -23,6 +23,16 @@
   .dot{display:inline-block;width:8px;height:8px;border-radius:50%;
        background:var(--red);margin-right:6px;vertical-align:middle}
   .dot.live{background:var(--green)}
+  /* I14 recovery. Deliberately a control the operator presses: a silent
+     backfill would hide that the live stream broke at all. */
+  .recover{background:transparent;border:1px solid var(--line);color:var(--mut);
+           font:inherit;font-size:12px;padding:5px 9px;border-radius:5px;cursor:pointer}
+  .recover:hover:not(:disabled){border-color:var(--gold);color:var(--gold)}
+  .recover:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+  .recover:disabled{opacity:.45;cursor:not-allowed}
+  .recover-note{margin:6px 0 0;font-size:12px;color:var(--mut);line-height:1.5;min-height:1px}
+  .recover-note:empty{margin:0}
+  .recover-note.gap{color:var(--amber)}
   .wrap{display:grid;grid-template-columns:1fr 320px;gap:20px;margin-top:20px;
         align-items:start}
   /* terminal */
@@ -170,7 +180,11 @@
     <h1><span class="ar">إسناد</span>Isnad — Live Agent Console</h1>
     <span class="sub">network-verified trust engine</span>
     <span class="status"><span id="dot" class="dot"></span><span id="statusText">connecting…</span></span>
+    <!-- I14: reads the journal the server wrote before each event went out
+         live. It resumes the record of a run, never the run itself. -->
+    <button id="recoverBtn" class="recover" type="button" disabled>Recover missed events</button>
   </header>
+  <p id="recoverNote" class="recover-note" aria-live="polite"></p>
 
   <section class="runbook">
     <div class="runbook-head">
@@ -366,9 +380,33 @@ let latestChainId = null;
 let providerMode = 'mock';
 let suiteRunning = false;
 let activeRunId = null;
-const clock = () => ((Date.now() - t0) / 1000).toFixed(2).padStart(5, '0');
+const recoverBtn = document.getElementById('recoverBtn');
+const recoverNote = document.getElementById('recoverNote');
+// Elapsed time since this run started — except for a recovered row, which did
+// not happen now and has a real recorded time of its own, and except before a
+// run has started at all, where an elapsed figure would be measured from the
+// epoch. Neither case gets a made-up number.
+let replayTime = null;
+const clock = () => {
+  if (replayTime) return replayTime;
+  if (!t0) return '--.--';
+  return ((Date.now() - t0) / 1000).toFixed(2).padStart(5, '0');
+};
+function journalTime(iso){
+  const at = new Date(iso);
+  return Number.isNaN(at.getTime()) ? '--.--' : at.toISOString().slice(11, 19);
+}
 const cursor = () => '<span class="cursor">▌</span>';
-function newRunId(){ return `run-${Date.now()}-${Math.random().toString(16).slice(2)}`; }
+function newRunId(){
+  // A new run starts a new journal, so nothing seen for the previous one may
+  // suppress or be attributed to this one.
+  const id = `run-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  resetRecovery();
+  // The handler still refuses to act without an active run, so enabling here
+  // — a tick before the caller assigns it — costs nothing.
+  recoverBtn.disabled = false;
+  return id;
+}
 
 function setRunbookStatus(text, tone){
   runbookStatus.textContent = text;
@@ -704,6 +742,14 @@ async function connectStream(){
       es.onopen = () => { dot.classList.add('live'); statusText.textContent = 'live'; };
       es.onerror = () => {
         dot.classList.remove('live'); statusText.textContent = 'reconnecting…';
+        // The moment the stream drops is the moment recovery has a job. The
+        // console does not do it automatically: re-reading the journal is the
+        // operator's call, and a silent backfill would hide that the live
+        // stream broke at all.
+        if (activeRunId){
+          recoverNote.className = 'recover-note gap';
+          recoverNote.textContent = 'The evidence stream dropped. Anything that happened while it was down is in the journal — use "Recover missed events" to read it back. No check is bought again.';
+        }
         if (es) es.close();
         es = null; esKey = null;
         // An expired/rejected stream credential is indistinguishable from a
@@ -725,6 +771,85 @@ async function connectStream(){
 function onStreamMessage(e){
   const ev = JSON.parse(e.data);
   if (activeRunId && ev.type !== 'session' && ev.run_id !== activeRunId) return;
+  // I14 delivers at least once: the same event legitimately arrives twice —
+  // once live, once replayed after a reconnect — and the journal sequence is
+  // the key the two deliveries share. An event with no sequence never reached
+  // the journal, so it is live-only and cannot be deduplicated or recovered.
+  if (typeof ev.sequence === 'number'){
+    if (seenSequences.has(ev.sequence)) return;
+    seenSequences.add(ev.sequence);
+    if (ev.sequence > highestSequence) highestSequence = ev.sequence;
+  }
+  renderStreamEvent(ev);
+}
+
+// ---- I14: recovery after a disconnect ----
+//
+// Nothing here re-runs an investigation or buys a check again: it reads the
+// journal the server wrote before each event was ever sent live. Recovery
+// resumes the *record* of a run, never the run — an interrupted investigation
+// stays interrupted, and that is reported separately from a completed one.
+let seenSequences = new Set();
+let highestSequence = 0;
+
+function resetRecovery(){
+  seenSequences = new Set();
+  highestSequence = 0;
+  recoverBtn.disabled = true;
+  recoverNote.textContent = '';
+  recoverNote.className = 'recover-note';
+}
+
+async function recoverMissedEvents(){
+  if (!activeRunId){ return; }
+  recoverBtn.disabled = true;
+  recoverNote.className = 'recover-note';
+  recoverNote.textContent = 'reading the journal…';
+  try{
+    const data = await apiJson('/v1/console/runs/' + encodeURIComponent(activeRunId)
+      + '/events?after=' + encodeURIComponent(highestSequence));
+    let recovered = 0;
+    for (const row of data.events || []){
+      if (seenSequences.has(row.sequence)) continue;   // in order, and only once
+      seenSequences.add(row.sequence);
+      if (row.sequence > highestSequence) highestSequence = row.sequence;
+      // Stamped with the server time the journal recorded, not with now.
+      replayTime = journalTime(row.server_time);
+      try{
+        renderStreamEvent({...row.body, type: row.event_type, sequence: row.sequence, replayed: true});
+      }finally{
+        replayTime = null;
+      }
+      recovered++;
+    }
+    if (data.gap){
+      // An explicit gap signal, not a silent smooth continuation: the events
+      // before this point are past their retention window or were never
+      // stored, and this console will not invent them.
+      recoverNote.className = 'recover-note gap';
+      recoverNote.textContent = recovered
+        ? `Recovered ${recovered} event(s), but earlier ones are missing from the journal — retention or a failed write. The trace above is incomplete and nothing here reconstructs the absent events.`
+        : 'Earlier events are missing from the journal — retention or a failed write. The trace above is incomplete and nothing here reconstructs the absent events.';
+    } else {
+      recoverNote.textContent = recovered
+        ? `Recovered ${recovered} event(s) from the journal. No provider call was made.`
+        : 'Nothing missing: the journal holds no events this console has not already shown.';
+    }
+  }catch(err){
+    recoverNote.className = 'recover-note gap';
+    recoverNote.textContent = 'Could not read the journal: ' + safeError(err);
+  }finally{
+    recoverBtn.disabled = !activeRunId;
+  }
+}
+
+/* A recovered event carries only what the journal allowlist stores. Printing
+   "undefined" for the rest would be a bug; filling them in would be worse. */
+function val(v, absent){
+  return (v === undefined || v === null) ? (absent || '(not journalled)') : v;
+}
+
+function renderStreamEvent(ev){
   if (ev.type === 'start'){
     t0 = Date.now();
     sessionLabel.textContent = `isnad-agent · hypothesis: ${ev.hypothesis}`;
@@ -736,8 +861,15 @@ function onStreamMessage(e){
     // `asked over` is the window the question covered, not the age of the
     // event — CAMARA returns a boolean with no timestamp.
     const asked = typeof ev.max_age_hours === 'number' ? ` · asked over last ${ev.max_age_hours}h` : '';
-    addRow(clock(), ev.api, `[${mark}] ${ev.detail}  `, cls,
-      `→ risk score=${ev.p_fraud} · ${ev.source||'provider'}${asked}`);
+    // A replayed event carries no `detail`: the journal's allowlist excludes
+    // provider prose on purpose, so the normalized signal stands in rather
+    // than a sentence invented at replay time.
+    // A recovered row has no `detail`: the journal's allowlist excludes
+    // provider prose on purpose, so the normalized signal stands in rather
+    // than a sentence invented at replay time.
+    const said = ev.detail || ev.signal || '(not journalled)';
+    addRow(clock(), ev.api, `[${mark}] ${said}  `, cls,
+      `→ risk score=${ev.p_fraud} · ${ev.source||'provider'}${asked}${ev.replayed ? ' · recovered' : ''}`);
     setMeter(ev.p_fraud);
   } else if (ev.type === 'decision'){
     // The rationale is whoever decided's own sentence, rendered verbatim as
@@ -754,26 +886,29 @@ function onStreamMessage(e){
     // and badging those made the pill read "planner: policy" mid-run.
     if (ev.phase === 'investigation') setPlannerBadge(ev.planner);
   } else if (ev.type === 'announce'){
-    addRow(clock(), 'Verified Caller', `pre-announce → ${ev.institution} from ${ev.calling_participant}`,
-      'pass', `· ${ev.announcement_id} · valid ${ev.ttl_seconds}s`);
+    // The calling number is deliberately absent from a recovered row: it is a
+    // subscriber number and the journal does not keep one.
+    addRow(clock(), 'Verified Caller',
+      `pre-announce → ${val(ev.institution)}` + (ev.calling_participant ? ` from ${ev.calling_participant}` : ''),
+      'pass', `· ${val(ev.announcement_id)} · valid ${val(ev.ttl_seconds, '—')}s${ev.replayed ? ' · recovered' : ''}`);
   } else if (ev.type === 'screen'){
     // Tier 1 is local-only, so the microsecond figure is the point: this ran
     // before the phone would have finished its first ring.
     const cls = ev.label === 'VERIFIED_INSTITUTION' ? 'pass'
               : ev.label === 'SUSPECTED_SPOOF' ? 'flag' : 'info';
-    addRow(clock(), 'Tier 1 screen', `${ev.label} — ${ev.reason}`, cls,
-      `· ${ev.basis} · ${ev.elapsed_us}µs`);
-    setVerdict(ev.label, ev.reason);
+    addRow(clock(), 'Tier 1 screen', `${val(ev.label)} — ${val(ev.reason)}`, cls,
+      `· ${val(ev.basis)} · ${val(ev.elapsed_us, '—')}µs${ev.replayed ? ' · recovered' : ''}`);
+    setVerdict(val(ev.label), val(ev.reason));
   } else if (ev.type === 'velocity'){
     const cls = ev.label === 'SUSPECTED_SPOOF' ? 'flag' : 'info';
     addRow(clock(), 'caller velocity',
-      `${ev.label} — ${ev.reason}`, cls,
-      `· ${ev.calls} distinct callees · threshold ${ev.threshold}`);
-    setVerdict(ev.label, ev.reason);
+      `${val(ev.label)} — ${val(ev.reason)}`, cls,
+      `· ${val(ev.calls, '—')} distinct callees · threshold ${val(ev.threshold, '—')}${ev.replayed ? ' · recovered' : ''}`);
+    setVerdict(val(ev.label), val(ev.reason));
   } else if (ev.type === 'verdict'){
     const cls = ev.decision === 'DECLINE' ? 'flag' : ev.decision === 'ALLOW' ? 'pass' : 'info';
-    addRow(clock(), 'VERDICT', `${ev.decision} / ${ev.chain_grade || '—'} — ${ev.reason} · ${ev.evidence_steps} checks · cost=${ev.evidence_cost}`, cls);
-    setVerdict(ev.decision, ev.reason, ev.chain_grade);
+    addRow(clock(), 'VERDICT', `${ev.decision} / ${ev.chain_grade || '—'} — ${val(ev.reason)} · ${val(ev.evidence_steps, '—')} checks · cost=${val(ev.evidence_cost, '—')}${ev.replayed ? ' · recovered' : ''}`, cls);
+    setVerdict(ev.decision, val(ev.reason), ev.chain_grade);
     setPlannerBadge(ev.planner);
     setLatestChain(ev.chain_id);
     if (!suiteRunning) buttons.forEach(b => b.disabled = !demoMode);
@@ -1290,6 +1425,7 @@ runLiveConsentBtn.addEventListener('click', () => {
 });
 runReverseCheckBtn.addEventListener('click', () => launchSingle(() => runReverseCheck()));
 runSessionDemoBtn.addEventListener('click', () => launchSingle(runSessionDemo));
+recoverBtn.addEventListener('click', recoverMissedEvents);
 runIdempotencyBtn.addEventListener('click', () => launchSingle(() => runIdempotencyCheck()));
 verifyChainRunBtn.addEventListener('click', () => launchSingle(verifyLatestChain));
 runForwardCheckBtn.addEventListener('click', () => launchSingle(() => runForwardCheck()));

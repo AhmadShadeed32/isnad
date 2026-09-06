@@ -57,6 +57,14 @@ async def emit(event: dict) -> None:
     never abort the live investigation the event belongs to, and the
     resulting gap is a fact the replay reader can detect for itself (see
     `app.db.run_events.has_gap`), not one this call pretends did not happen.
+
+    The sequence the journal assigned rides along on the live event. Without
+    it a reconnecting client has no key it can match the two deliveries on:
+    I14 promises at-least-once, so the same event legitimately arrives twice
+    (once live, once replayed) and the UI has to be able to tell that it is
+    the same one. An event that failed to persist carries no sequence — it is
+    live-only and unrecoverable, and saying so is better than numbering it as
+    if it were in the journal.
     """
     event = _redact(event)
     owner = current_owner.get()
@@ -66,7 +74,11 @@ async def emit(event: dict) -> None:
             from app.db import run_events
             from app.ownership import ANONYMOUS
 
-            await asyncio.to_thread(run_events.persist_event, owner or ANONYMOUS, run_id, event)
+            sequence = await asyncio.to_thread(
+                run_events.persist_event, owner or ANONYMOUS, run_id, event
+            )
+            if sequence is not None:
+                event["sequence"] = sequence
         except Exception:
             log.exception("run event persistence failed for run_id=%s", run_id)
     for q, subscriber_owner in list(_subscribers.items()):

@@ -24,6 +24,16 @@ from app.db.models import RunEventRow
 # Structured fields safe to persist. Never a raw phone number, prompt, token
 # or unrestricted provider/exception string (I1's own diagnostic-code rule
 # applies here too).
+#
+# Two exclusions carry the weight of this list and are deliberate:
+#
+#   `detail` — prose that on the NaC path is written by the operator. A
+#   recovered row shows the normalized `signal` instead; the console says so
+#   rather than inventing a sentence at replay time.
+#
+#   `caller_number` / `calling_participant` — subscriber numbers. `_redact`
+#   masks the first on its way through emit; neither belongs in a journal
+#   that outlives the request.
 _ALLOWED_BODY_KEYS = frozenset(
     {
         "chain_id",
@@ -49,6 +59,24 @@ _ALLOWED_BODY_KEYS = frozenset(
         "evidence_steps",
         "evidence_cost",
         "latency_ms",
+        # The verdict sentence. Composed by app/agent/belief.py from this
+        # codebase's own signal labels — never provider text, which is what
+        # `detail` is and why `detail` stays out.
+        "reason",
+        # Tier 1 screening and the Verified Caller act: bounded label and
+        # basis vocabularies set by app/screening.py, an authored institution
+        # name, an announcement id and plain numbers. Without them a recovered
+        # act row had every field missing and rendered as "undefined".
+        "label",
+        "basis",
+        "elapsed_us",
+        "target",
+        "institution",
+        "institution_name",
+        "announcement_id",
+        "ttl_seconds",
+        "calls",
+        "threshold",
     }
 )
 
