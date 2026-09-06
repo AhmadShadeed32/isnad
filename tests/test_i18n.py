@@ -18,6 +18,8 @@ client = TestClient(app)
 RECEIPT_HTML = Path("app/static/receipt.html").read_text(encoding="utf-8")
 RECEIPT_SCRIPT = RECEIPT_HTML.split("<script>")[-1].split("</script>")[0]
 SWITCH_JS = Path("app/static/i18n.js").read_text(encoding="utf-8")
+JUDGE_HTML = Path("app/static/judge.html").read_text(encoding="utf-8")
+JUDGE_SCRIPT = JUDGE_HTML.split("<script>")[-1].split("</script>")[0]
 
 
 def test_english_dictionary_loads():
@@ -91,8 +93,9 @@ def test_an_unknown_key_falls_back_to_english_visibly():
     """A missing translation must show the English sentence, never a raw key
     and never a blank — and must be marked so it does not read as deliberate."""
     assert "lookup(dicts.en, path)" in SWITCH_JS
-    assert "el.setAttribute('lang', 'en')" in SWITCH_JS
+    assert "el.setAttribute('lang', fellBack ? 'en' : activeLocale);" in SWITCH_JS
     assert '[dir="rtl"] [lang="en"]' in RECEIPT_HTML
+    assert '[dir="rtl"] [data-i18n][lang="en"]' in JUDGE_HTML
     # And the English dictionary is loaded whatever the reader chose, or there
     # would be nothing to fall back *to* on an Arabic-first page load.
     assert "[loadDictionary('en'), loadDictionary(locale)]" in SWITCH_JS
@@ -165,3 +168,63 @@ def test_the_verdict_is_never_encoded_in_colour_alone():
     assert "ok ? '✓ ' : '✗ '" in RECEIPT_SCRIPT
     assert "ui.signature_valid" in RECEIPT_SCRIPT
     assert "ui.signature_invalid" in RECEIPT_SCRIPT
+
+
+# --- the judge page's slice (I6 step 1) ---------------------------------------
+
+def test_the_judge_page_loads_the_same_shared_switch():
+    assert '<script src="/ui/i18n.js"></script>' in JUDGE_HTML
+    assert re.findall(r'(?:src|href)\s*=\s*["\'](?:https?:)?//', JUDGE_HTML) == []
+
+
+def test_the_judge_page_translates_only_dictionary_covered_labels():
+    """The result narrative is written server-side by app/presentation.py in
+    English. Re-keying it would mean translating provider provenance and signed
+    vocabulary, which I6 forbids."""
+    en = client.get("/ui/i18n/en.json").json()
+    keys = set(re.findall(r'data-i18n="ui\.([a-z_]+)"', JUDGE_HTML))
+    assert keys, "the judge page translates nothing"
+    assert keys <= set(en["ui"]), f"untranslatable keys: {keys - set(en['ui'])}"
+
+
+def test_the_judge_page_says_which_parts_stayed_in_english():
+    """A half-translated page that does not admit it is worse than an English
+    one. Naming the untranslated regions is the honest version of parity."""
+    assert "are produced in English and are not translated" in JUDGE_SCRIPT
+    assert 'id="localeNote"' in JUDGE_HTML
+    assert "Locale.reviewStatus()" in JUDGE_SCRIPT
+
+
+def test_the_judge_page_survives_the_switch_failing_to_load():
+    assert "typeof Isnad !== 'undefined'" in JUDGE_SCRIPT
+    assert "checkout demonstration must not be lost" in JUDGE_SCRIPT
+
+
+def test_the_judge_signature_result_carries_a_glyph_and_a_sentence():
+    """Never colour alone, and translated through the same dictionary keys the
+    receipt uses so the two pages cannot disagree."""
+    assert "lastSignatureOk ? '✓ ' : '✗ '" in JUDGE_SCRIPT
+    assert "'ui.signature_valid' : 'ui.signature_invalid'" in JUDGE_SCRIPT
+
+
+def test_the_judge_page_isolates_its_identifier_line():
+    assert "gradeLine.dir = 'ltr';" in JUDGE_SCRIPT
+    assert 'bdi{unicode-bidi:isolate}' in JUDGE_HTML
+
+
+def test_the_judge_pages_english_regions_keep_their_own_direction():
+    """An RTL page reorders untagged English at its neutral edges — a sentence's
+    full stop lands at the front. The narrative this page openly declares is
+    English is marked so it renders in its own direction and is announced in
+    its own language."""
+    for region in ('class="lead"', 'class="card checkout"', 'class="card journey"',
+                   'class="proof"', 'class="technical"'):
+        marked = JUDGE_HTML.split(region)[1].split(">")[0]
+        assert 'lang="en"' in marked and 'dir="ltr"' in marked, region
+
+
+def test_a_translated_label_inside_an_english_region_states_its_own_direction():
+    """Otherwise the Arabic label inherits dir="ltr" from the region around it."""
+    for key in ("supporting_evidence", "adverse_evidence", "unresolved_checks"):
+        block = JUDGE_HTML.split(f'data-i18n="ui.{key}"')[0].rsplit("<div", 1)[1]
+        assert 'dir="auto"' in block, key

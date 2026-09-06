@@ -46,8 +46,10 @@ const Isnad = (() => {
     }
     if (typeof value !== 'string') { value = literal; fellBack = true; }
     el.textContent = (prefix || '') + value;
-    if (fellBack && activeLocale !== 'en') el.setAttribute('lang', 'en');
-    else el.removeAttribute('lang');
+    // Always stated, never merely cleared: a translated string sitting inside
+    // an English-marked region would otherwise inherit the wrong language, and
+    // a screen reader would read Arabic with English phonetics.
+    el.setAttribute('lang', fellBack ? 'en' : activeLocale);
   }
 
   function applyDictionary(root) {
