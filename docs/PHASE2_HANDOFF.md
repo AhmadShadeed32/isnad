@@ -2224,22 +2224,41 @@ journey. Machine-facing JSON/OpenAPI field names are not translated API contract
 
 **User-supplied authenticated API reference:**
 [Network as Code API catalog](https://networkascode.nokia.io/network-as-code-network-as-code-default/api/network-as-code).
-Added 6 September 2026 after the user supplied the exact catalog URL. A real
-browser opened it and was redirected to Nokia sign-in with this API page as the
-return destination. Its endpoint schemas were **not inspected** in this session;
-do not imply that merely opening the catalog verified them. No credentials were
-entered and no API request was executed.
+Authenticated access verified on 6 September 2026 after the user signed in.
+The account banner explicitly says **Simulator mode**; live networks require
+onboarding/billing. Documentation inspection made no API calls and proves no
+operator coverage or entitlement. No credentials are recorded here.
 
-When authenticated access is available, use this catalog to verify the exact
-API version, base URL, authorization/scopes, request/response field names, error
-semantics, subscriber entitlement and simulator behavior for each N3/N4/N5
-operation. In particular check SIM Swap and Device Swap `retrieve-date` response
-metadata, plus Congestion Insights query/subscription/notification schemas.
-Compare those contracts with the installed SDK and public tutorials; record
-mismatches before implementing an adapter change. Do not treat the catalog page
-URL as an API base URL or run its interactive requests simply to read a schema.
-Public documentation and local SDK inspection remain available while catalog
-access is pending; only catalog-specific claims remain unverified.
+Verified catalog findings:
+
+- SIM Swap is labelled v1.0.0, but generated requests use
+  `https://network-as-code.p-eu.apihub.nokia.io/passthrough/camara/v1/sim-swap/sim-swap/v0/retrieve-date`.
+  The 200 schema requires `latestSimChange`, a nullable RFC3339 timestamp with a
+  timezone. This schema has no monitoring-period field. Preserve unknown dates.
+- Congestion Insights is labelled v1.0.0, with create/delete/get/list subscription
+  operations and POST `fetch`. The latter targets `/congestion-insights/v0/query`.
+  Its schema requires `device`; optional nullable `start`/`end` are date-times.
+  Neither supplied means a forecast for the upcoming 15 minutes; only one supplied
+  gives a 15-minute window on the corresponding side.
+- **Catalog example defect:** the fetch request example contains subscription
+  fields (`webhook`, `subscriptionExpireTime`) instead of its query schema.
+  Follow the schema and installed SDK, not that example.
+- Fetch response is an array with required `timeIntervalStart`, `timeIntervalStop`,
+  `congestionLevel` (`Low`, `Medium`, `High`) and optional nullable integer
+  `confidenceLevel` in 0–100. Empty example timestamps are placeholders, not data.
+- Generated requests use the apihub host with `x-rapidapi-host` set to
+  `network-as-code.nokia.rapidapi.com`. Do not blindly replace the installed SDK
+  host or infer API versions from the catalog heading.
+
+Device Swap date schema is now verified: `latestDeviceChange` is required and
+nullable with a timezone; optional `monitoredPeriod` records supervision days.
+Five SDK requests were intercepted locally and matched the catalog paths;
+no external call was made. SDK default rapidapi host differs from catalog apihub.
+
+Still to verify: subscription callback and error contracts, consent scopes,
+host compatibility in an actual response, and bounded
+simulator requests. Successful login is not successful live validation. Public
+sources and local SDK inspection below remain supporting evidence.
 
 **Sources already checked:**
 
@@ -2401,3 +2420,16 @@ manual user path. No need for the user to read implementation history to test it
 **Checkpoint rule:** this section is the requested plan, not an implementation
 claim. Next work should start at N1's unfinished items and update this ledger as
 each package actually passes its completion gate.
+
+
+### API review checkpoint — user requested before resuming app changes
+
+See [API additions and demo call plan](NAC_DEMO_REVIEW_2026-09-06.md) for ranked
+additions, authenticated schema corrections, local SDK checks, six-call initial
+simulator matrix, callback lifecycle and the five-minute demo sequence.
+No Nokia API calls were executed in this review. App work is paused for this
+review; existing Gemini/Arabic edits remain unfinished in the working tree.
+Before the latest Arabic edits, full regression suite passed 901 tests. The
+latest locale/pilot focused run passed 39 tests; browser coverage is unfinished
+and Ruff reported an unused noqa in the pilot locale import. These are checkpoint
+results, not final validation of the full requested release.
