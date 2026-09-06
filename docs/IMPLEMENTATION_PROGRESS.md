@@ -22,7 +22,7 @@ a mock response or a dated test count.
 | 7b Network SIM Swap subscriptions | **DEFERRED, recorded** | none | n/a | SDK 10.0.0 exposes no `sim_swap_subscriptions` resource (verified against the exported operation list); the catalog lists v0.3.0 but catalog visibility is not entitlement | Needs a narrowly scoped REST adapter or a justified SDK upgrade **and** a reachable callback — the same missing prerequisite as gate 6. The existing local simulation control stays, clearly labelled |
 | 7c Consent Info | **DEFERRED, recorded** | none | n/a | Contract pinned in `tests/test_nac_wire_contract.py` (v0.1 path, scopes/purpose/requestCaptureUrl); **never called** | Deferred because it reports status and may hand back an operator capture URL — a redirect-ownership surface that needs its own state/replay protection, and no product path needs it before the required gates |
 | 7d Forwarding and tenure | **DEFERRED, recorded** | none | Call forwarding was **observed** (gate 3: active/inactive plus documented 422 and 503) | Contract and hosted behaviour known | No demonstrated product path. Forwarding is voice-only and not fraud by itself; tenure is not merchant history. Implementing either without a path would be an untested array of checks |
-| 8 Arabic + English | IN PROGRESS | `app/static/i18n.js`, `app/static/i18n/{en,ar}.json`, product HTML, `demo/merchant_pilot` | | | Executable DOM tests missing; translator is provisional |
+| 8 Arabic + English | PASSED, with two recorded limits | `app/static/i18n.js`, `app/static/i18n/{en,ar}.json`, `app/static/judge.html`, `tests/browser/` (new), `tests/test_i18n.py`, `requirements-dev.txt` | `pytest -q` → **1118 passed, 39.2 s** (2026-09-07), browser tests included in that single command, **0 skipped**; ruff clean | Chromium 151.0.7922.34 driving a real uvicorn instance: rapid switching, dynamic results, aborted dictionary, stored preference, input/focus preservation, byte-identical signed payload, zero `/v1/` calls on a switch, no console errors | The deterministic explanation paragraph is composed server-side from this chain's numbers and is **marked English, not translated**. CAMARA API names stay English by choice. Arabic remains **draft, human review pending** |
 | 9 UI verification | NOT STARTED | | | | |
 | 10 Core re-audit | NOT STARTED | | | | |
 | 11 Demo rehearsal | NOT STARTED | | | | |
@@ -153,6 +153,46 @@ HTTPS endpoint this project owns; until one exists the probe and the API both
 refuse to point an operator at an unowned destination, which is the correct
 behaviour rather than a gap to work around.
 
-Next action: gate 7a — Number Recycling, with a merchant-supplied last-verified
-date and no automatic ALLOW from a non-recycled number. Record explicit
-dispositions for 7b, 7c and 7d.
+Superseded by the gate 8 checkpoint below.
+
+### 2026-09-07 — gate 8 complete, with limits stated
+
+Three real defects were found by writing the browser tests, not by reading:
+
+1. **`window.Isnad` was never defined.** `const Isnad = (...)()` in a classic
+   script makes a lexical binding, not a window property, so every
+   feature-detecting caller (`window.Isnad ? … : fallback`) had been taking the
+   fallback branch silently. Now assigned explicitly.
+2. **Dynamic rows never re-translated.** The swap-date and network-condition
+   renderers resolved their strings once at insertion time into `textContent`,
+   and those keys live in the `ui` catalog the exact-text observer does not walk
+   — so switching to Arabic after a result rendered left the result English.
+   Every such node now carries `data-i18n` and is re-applied by `setLocale`.
+3. **The network-conditions panel was authored against a light ground** on a
+   dark page and was close to illegible. Caught by the release screenshot; it
+   uses the page's own tokens now.
+
+Also: the mutation observer re-walked the whole body per mutation (quadratic on
+a long console trace) and is coalesced to one pass per frame; evidence sentences
+are keyed on the **signal** rather than on the sentence, because the English
+detail interpolates a policy window; and the English dictionary values for the
+decision title and next action are asserted equal to `app/presentation.py`'s own
+copy, so the screen cannot say something the API did not.
+
+Tooling decision: `pytest-playwright` is **not** used. Its `pytest_runtest_call`
+wrapper runs ahead of pytest-asyncio and left 213 coroutine tests unawaited. The
+browser fixtures are built on the sync API instead, and the Playwright context is
+function-scoped — held open across the session it leaves a running event loop in
+the thread and every later async test dies. The cost is about a second per
+browser test; the benefit is that `pytest -q` remains one command.
+
+Two limits, recorded rather than papered over:
+- the deterministic explanation paragraph is generated server-side from this
+  chain's own numbers and thresholds, so there is no fixed sentence to key. It
+  is marked `lang="en"` rather than left looking like a missing translation.
+- Arabic is a **draft**. `review_status` still says so in the page banner, and
+  no automated test may be read as native review.
+
+Next action: gate 9 — extend the browser matrix past `/judge` (console, receipt,
+proof, privacy, merchant journey), and record honestly which states were visited
+by automation, which by hand and which not at all.

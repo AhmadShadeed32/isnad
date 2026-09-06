@@ -27,3 +27,13 @@ python-multipart>=0.0.20
 # imports and resolves NetworkAsCodeApi with pip removed entirely — verified,
 # not assumed. The shipped image is unaffected; it installs with --no-deps and
 # asserts at build time that pip is absent.
+
+# Browser tests (tests/browser). Dev-only: never in requirements.txt or the
+# runtime lock. The Chromium build is fetched separately with
+# `python -m playwright install chromium`.
+#
+# The `pytest-playwright` plugin is deliberately NOT used: its
+# pytest_runtest_call wrapper runs ahead of pytest-asyncio and leaves every
+# coroutine test in this suite unawaited. tests/browser/conftest.py builds its
+# own fixtures on the sync API instead.
+playwright==1.62.0

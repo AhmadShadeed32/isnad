@@ -216,6 +216,13 @@ def create(
             "callback_not_https", "the configured callback must be HTTPS", status_code=503
         )
 
+    if not hasattr(provider, "create_congestion_subscription"):
+        raise NetworkConditionError(
+            "not_supported",
+            "the configured provider does not offer network conditions",
+            status_code=501,
+        )
+
     device_hash = subject_hash(phone_number)
     ttl = timedelta(seconds=settings.nac_congestion_subscription_ttl_seconds)
     subscription_id = "ncs_" + uuid.uuid4().hex[:20]
@@ -253,6 +260,16 @@ def create(
             callback_token=callback_token,
             expires_at=now + ttl,
         )
+    except NotImplementedError:
+        # A provider that does not offer this at all. No operator was called and
+        # no state exists anywhere, so the reservation is removed rather than
+        # left as a "failed" row somebody would try to reconcile.
+        _forget(subscription_id)
+        raise NetworkConditionError(
+            "not_supported",
+            "the configured provider does not offer network conditions",
+            status_code=501,
+        ) from None
     except Exception as exc:  # noqa: BLE001 - never surface a provider payload
         _mark(subscription_id, status="failed", error=_code(exc))
         raise NetworkConditionError(
@@ -296,6 +313,15 @@ def _mark(subscription_id: str, **updates) -> None:
         if updates.get("deleted_at"):
             row.deleted_at = updates["deleted_at"]
         session.commit()
+
+
+def _forget(subscription_id: str) -> None:
+    """Remove a reservation for a call that never reached an operator."""
+    with SessionLocal() as session:
+        row = session.get(NetworkConditionSubscriptionRow, subscription_id)
+        if row is not None:
+            session.delete(row)
+            session.commit()
 
 
 def _code(exc: Exception) -> str:

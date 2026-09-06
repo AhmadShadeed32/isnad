@@ -126,19 +126,24 @@
 </main>
 <!-- Same origin, no CDN: the shared locale switch (I6). -->
 <style>
-.network-conditions{margin-block:1.5rem;padding:1rem 1.25rem;border:1px solid #d6d9de;border-radius:10px;background:#fbfbfc}
-.network-conditions h2{margin:0 0 .35rem;font-size:1rem;letter-spacing:.04em;text-transform:uppercase}
-.nc-scope{margin:0 0 .75rem;max-width:60ch;color:#4a5058;font-size:.9rem}
+/* The page is dark. This panel was authored against a light ground and was
+   near-illegible on it — caught by the release screenshot, not by a test that
+   only looked at the markup. It uses the page's own tokens now, and the level
+   colours are the ones the rest of the page already uses on this background. */
+.network-conditions{margin-block:1.5rem;padding:1rem 1.25rem;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.network-conditions h2{margin:0 0 .35rem;font-size:.95rem;letter-spacing:.04em;text-transform:uppercase;color:var(--text)}
+.nc-scope{margin:0 0 .75rem;max-width:60ch;color:var(--muted);font-size:.85rem;line-height:1.5}
 .nc-actions{display:flex;flex-wrap:wrap;gap:.5rem;margin-block-end:.75rem}
-.nc-actions button{padding:.45rem .8rem;border:1px solid #c3c8cf;border-radius:6px;background:#fff;cursor:pointer;font:inherit;font-size:.9rem}
-.nc-actions button:disabled{opacity:.5;cursor:not-allowed}
-.nc-actions button:focus-visible,.network-conditions a:focus-visible{outline:3px solid #1a5fb4;outline-offset:2px}
-.nc-state{font-size:.9rem;color:#3a4048}
-.nc-result{margin-block-start:.6rem;font-size:.9rem}
-.nc-level{display:inline-block;padding:.1rem .5rem;border-radius:4px;border:1px solid currentColor;font-weight:600}
-.nc-level.low{color:#1a7f37}.nc-level.medium{color:#8a5300}.nc-level.high{color:#b3261e}.nc-level.unknown{color:#4a5058}
-.nc-interval{padding:.35rem 0;border-block-start:1px solid #e6e8eb}
-.nc-note{color:#4a5058}
+.nc-actions button{padding:.5rem .85rem;border:1px solid #526695;border-radius:8px;background:var(--surface2);color:var(--text);cursor:pointer;font:inherit;font-size:.85rem;font-weight:600}
+.nc-actions button:hover:not(:disabled){border-color:var(--gold);color:var(--gold)}
+.nc-actions button:disabled{opacity:.45;cursor:not-allowed}
+.nc-actions button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.nc-state{font-size:.85rem;color:var(--muted)}
+.nc-result{margin-block-start:.6rem;font-size:.85rem;color:var(--text)}
+.nc-level{display:inline-block;padding:.1rem .5rem;border-radius:6px;border:1px solid currentColor;font-weight:700}
+.nc-level.low{color:var(--green)}.nc-level.medium{color:var(--amber)}.nc-level.high{color:var(--red)}.nc-level.unknown{color:var(--muted)}
+.nc-interval{padding:.4rem 0;border-block-start:1px solid var(--line)}
+.nc-note{color:var(--muted)}
 </style>
 <script src="/ui/i18n.js"></script>
 <script>
@@ -208,13 +213,27 @@ function provenance(source){
   if (normalized === 'local') return {label:'LOCAL · Isnad state', cls:''};
   return {label:'PROVENANCE · ' + normalized, cls:''};
 }
-function appendTrace(kind, title, detail, source, meta){
+function appendTrace(kind, title, detail, source, meta, detailKey){
   const row = document.createElement('div');
   row.className = 'trace-row ' + kind;
   const mark = document.createElement('div'); mark.className = 'mark'; mark.textContent = kind === 'pass' ? '✓' : kind === 'flag' ? '!' : '·';
   const body = document.createElement('div');
   const heading = document.createElement('div'); heading.className = 'trace-title'; heading.textContent = title;
-  const copy = document.createElement('div'); copy.className = 'trace-detail'; copy.textContent = detail || '';
+  const copy = document.createElement('div'); copy.className = 'trace-detail';
+  copy.textContent = detail || '';
+  if (detailKey){
+    // Falls back to the English sentence the server sent when a signal has no
+    // authored copy — visibly, never to a raw key.
+    copy.dataset.i18n = detailKey;
+    if (window.Isnad) window.Isnad.applyDictionary(copy);
+  } else {
+    // A planner or model sentence. It is not authored product copy and is not
+    // translated; marking it English keeps a screen reader from reading it with
+    // Arabic phonetics, and keeps the untranslated part honest rather than
+    // looking like a missing string.
+    copy.lang = 'en';
+    copy.dir = 'ltr';
+  }
   body.append(heading, copy);
   if (source){ const p = provenance(source); const badge = document.createElement('span'); badge.className = 'provenance ' + p.cls; badge.textContent = p.label; body.appendChild(badge); }
   const side = document.createElement('div'); side.className = 'trace-meta'; side.textContent = meta || '';
@@ -223,20 +242,32 @@ function appendTrace(kind, title, detail, source, meta){
 // The operator's date, rendered beside the check it explains — never merged
 // into it. The two are separate observations and the operator's own answers can
 // disagree, so both are shown with their own wording.
+// Keyed, not resolved-once. A string written straight into textContent at
+// insertion time never changes again: `setLocale` re-applies `[data-i18n]`, and
+// these `ui.*` keys are not in the exact-text catalog the observer walks, so a
+// switch after a result rendered would leave this row in the language it was
+// born in.
+function keyed(key, fallback, tag){
+  const el = document.createElement(tag || 'span');
+  el.dataset.i18n = 'ui.' + key;
+  el.textContent = fallback;
+  if (window.Isnad) window.Isnad.applyDictionary(el);
+  return el;
+}
 function appendTiming(event){
   const t = (key, fallback) => (window.Isnad ? window.Isnad.t('ui.' + key, fallback) : fallback);
   const row = document.createElement('div');
   row.className = 'trace-row info';
   const mark = document.createElement('div'); mark.className = 'mark'; mark.textContent = '·';
   const body = document.createElement('div');
-  const heading = document.createElement('div');
+  const heading = keyed('swap_date_heading', 'Operator change date', 'div');
   heading.className = 'trace-title';
-  heading.textContent = t('swap_date_heading', 'Operator change date');
   body.appendChild(heading);
 
   const copy = document.createElement('div'); copy.className = 'trace-detail';
   if (event.availability === 'available' && event.provider_time){
-    copy.append(document.createTextNode(t('swap_date_available', 'Operator reported the latest change at') + ' '));
+    copy.appendChild(keyed('swap_date_available', 'Operator reported the latest change at'));
+    copy.append(document.createTextNode(' '));
     // A timestamp is a signed-adjacent exact value: isolated LTR so the bidi
     // algorithm cannot reorder it under an RTL page.
     copy.appendChild(window.Isnad ? window.Isnad.isolate(event.provider_time)
@@ -244,32 +275,34 @@ function appendTiming(event){
     if (typeof event.age_seconds === 'number'){
       const days = Math.floor(event.age_seconds / 86400);
       const hours = Math.floor((event.age_seconds % 86400) / 3600);
-      copy.append(document.createTextNode(' · ' + t('swap_date_age', 'Age at the moment of the check') + ' '));
+      copy.append(document.createTextNode(' · '));
+      copy.appendChild(keyed('swap_date_age', 'Age at the moment of the check'));
+      copy.append(document.createTextNode(' '));
       copy.appendChild(window.Isnad ? window.Isnad.isolate(days + 'd ' + hours + 'h')
                                     : document.createTextNode(days + 'd ' + hours + 'h'));
     }
   } else {
-    copy.textContent = t('swap_date_' + event.availability, event.reason || 'No date is available.');
+    copy.appendChild(keyed('swap_date_' + event.availability,
+                           event.reason || 'No date is available.'));
   }
   body.appendChild(copy);
 
   const notes = [];
-  if (event.availability === 'available') notes.push(t('swap_date_may_be_activation', ''));
-  if (event.disagrees_with_window === true) notes.push(t('swap_date_disagrees', ''));
+  if (event.availability === 'available') notes.push('swap_date_may_be_activation');
+  if (event.disagrees_with_window === true) notes.push('swap_date_disagrees');
   if (event.monitored_period_days === null || event.monitored_period_days === undefined){
-    notes.push(t('swap_date_horizon_unknown', ''));
+    notes.push('swap_date_horizon_unknown');
   }
-  notes.filter(Boolean).forEach(text => {
-    const note = document.createElement('div');
+  notes.forEach(key => {
+    const note = keyed(key, t(key, ''), 'div');
     note.className = 'trace-detail';
     note.style.opacity = '.75';
-    note.textContent = text;
     body.appendChild(note);
   });
 
   const side = document.createElement('div'); side.className = 'trace-meta';
-  side.textContent = t('swap_date_separate_call', 'A separate operator call.')
-    + (typeof event.cost === 'number' ? ' · cost ' + event.cost : '');
+  side.appendChild(keyed('swap_date_separate_call', 'A separate operator call.'));
+  if (typeof event.cost === 'number') side.append(document.createTextNode(' · cost ' + event.cost));
   row.append(mark, body, side);
   trace.appendChild(row); trace.scrollTop = trace.scrollHeight;
 }
@@ -329,7 +362,14 @@ function onEvent(event){
   } else if (event.type === 'evidence'){
     setStep(2); const kind = event.result === 'PASS' ? 'pass' : event.result === 'FLAG' ? 'flag' : 'info';
     const windowText = typeof event.max_age_hours === 'number' ? ' · window ' + event.max_age_hours + 'h' : '';
-    appendTrace(kind, event.api || event.signal || 'Network evidence', event.detail || event.signal || '', event.source, 'risk score ' + event.p_fraud + windowText);
+    // Keyed on the SIGNAL, not on the sentence. `event.detail` is authored
+    // vocabulary with a window interpolated into it, so translating it by exact
+    // text would break the moment the window changed. The signal is the stable
+    // identity of what the network said.
+    appendTrace(kind, event.api || event.signal || 'Network evidence',
+      event.detail || event.signal || '', event.source,
+      'risk score ' + event.p_fraud + windowText,
+      event.signal ? 'ui.signal_' + event.signal : null);
     setStatus('Evidence received with its source and result.');
   } else if (event.type === 'enrichment'){
     appendTiming(event);
@@ -360,10 +400,20 @@ let ncSubscription = null;
 function currentPhoneNumber(){
   return (SCENARIO_COPY[activeScenario] || SCENARIO_COPY.replacement).phone;
 }
-function ncText(key, fallback){ return window.Isnad ? window.Isnad.t('ui.' + key, fallback) : fallback; }
-function ncSetState(text){ ncEls.state.textContent = text; }
+function ncSetState(key, fallback, suffix){
+  ncEls.state.replaceChildren(keyed(key, fallback));
+  if (suffix) ncEls.state.append(document.createTextNode(' '),
+    window.Isnad ? window.Isnad.isolate(suffix) : document.createTextNode(suffix));
+}
 function ncButtons(busy){
   const live = ncSubscription && !ncSubscription.terminal;
+  // Same gate the checkout buttons use. Without demo mode and a console token
+  // every one of these calls is a 401 the reader cannot act on.
+  if (!demoMode || !key()){
+    [ncEls.subscribe, ncEls.forecast, ncEls.history, ncEls.remove]
+      .forEach(button => { button.disabled = true; });
+    return;
+  }
   // Disabled while in flight so a second click cannot start a second call.
   ncEls.subscribe.disabled = busy || !!live;
   ncEls.forecast.disabled = busy || !live;
@@ -375,20 +425,24 @@ function ncLevelNode(level){
   span.className = 'nc-level ' + String(level || 'unknown').toLowerCase();
   // A glyph as well as a colour: colour alone is not a state.
   const glyph = level === 'High' ? '▲ ' : level === 'Medium' ? '◆ ' : level === 'Low' ? '● ' : '? ';
-  span.textContent = glyph + ncText('network_conditions_level_' + String(level || 'unknown').toLowerCase(), level || 'unknown');
+  span.append(document.createTextNode(glyph));
+  span.appendChild(keyed('network_conditions_level_' + String(level || 'unknown').toLowerCase(),
+                         level || 'unknown'));
   return span;
 }
 function ncRenderQuery(body){
   ncEls.result.replaceChildren();
   const header = document.createElement('div');
-  header.textContent = ncText('network_conditions_mode_' + body.mode, body.mode) + ' · '
-    + ncText('network_conditions_provenance', 'source') + ': ' + body.provenance;
+  header.appendChild(keyed('network_conditions_mode_' + body.mode, body.mode));
+  header.append(document.createTextNode(' · '));
+  header.appendChild(keyed('network_conditions_provenance', 'source'));
+  header.append(document.createTextNode(': ' + body.provenance));
   ncEls.result.appendChild(header);
   if (body.empty){
-    const empty = document.createElement('div');
-    empty.className = 'nc-note';
     // Explicitly not "Low": the operator returned nothing at all.
-    empty.textContent = ncText('network_conditions_empty', 'The operator returned no reading. The condition is unknown.');
+    const empty = keyed('network_conditions_empty',
+      'The operator returned no reading. The condition is unknown.', 'div');
+    empty.className = 'nc-note';
     ncEls.result.appendChild(empty);
   }
   (body.intervals || []).forEach(interval => {
@@ -400,28 +454,33 @@ function ncRenderQuery(body){
                                  : document.createTextNode(interval.start + ' → ' + interval.stop));
     const confidence = document.createElement('span');
     confidence.className = 'nc-note';
-    confidence.textContent = ' · ' + (interval.confidence === null || interval.confidence === undefined
-      ? ncText('network_conditions_confidence_unknown', 'confidence not reported')
-      : ncText('network_conditions_confidence', 'confidence') + ' ' + interval.confidence + '%');
+    confidence.append(document.createTextNode(' · '));
+    if (interval.confidence === null || interval.confidence === undefined){
+      confidence.appendChild(keyed('network_conditions_confidence_unknown', 'confidence not reported'));
+    } else {
+      confidence.appendChild(keyed('network_conditions_confidence', 'confidence'));
+      confidence.append(document.createTextNode(' ' + interval.confidence + '%'));
+    }
     row.appendChild(confidence);
     ncEls.result.appendChild(row);
   });
   const stamp = document.createElement('div');
   stamp.className = 'nc-note';
-  stamp.append(document.createTextNode(ncText('network_conditions_updated', 'Updated at') + ' '));
+  stamp.appendChild(keyed('network_conditions_updated', 'Updated at'));
+  stamp.append(document.createTextNode(' '));
   stamp.appendChild(window.Isnad ? window.Isnad.isolate(body.observed_at)
                                  : document.createTextNode(body.observed_at));
   ncEls.result.appendChild(stamp);
 }
 async function ncCall(run, busyKey){
   ncButtons(true);
-  ncSetState(ncText(busyKey, 'Working…'));
+  ncSetState(busyKey, 'Working…');
   try {
     await run();
   } catch (error){
     // The order, the form and any previous reading stay exactly as they were:
     // a failed network-condition request must never cost the reader their work.
-    ncSetState(ncText('network_conditions_failed', 'The request did not complete.') + ' ' + error.message);
+    ncSetState('network_conditions_failed', 'The request did not complete.', error.message);
   } finally {
     ncButtons(false);
   }
@@ -430,13 +489,13 @@ ncEls.subscribe.addEventListener('click', () => ncCall(async () => {
   ncSubscription = await apiJson('/v1/network-conditions/subscriptions', {
     method: 'POST', body: JSON.stringify({phone_number: currentPhoneNumber()})
   });
-  ncSetState(ncText('network_conditions_active', 'Subscription active until') + ' ' + ncSubscription.expires_at);
+  ncSetState('network_conditions_active', 'Subscription active until', ncSubscription.expires_at);
 }, 'network_conditions_working'));
 ncEls.forecast.addEventListener('click', () => ncCall(async () => {
   ncRenderQuery(await apiJson(`/v1/network-conditions/subscriptions/${ncSubscription.subscription_id}/query`, {
     method: 'POST', body: JSON.stringify({phone_number: currentPhoneNumber()})
   }));
-  ncSetState(ncText('network_conditions_read', 'Reading complete.'));
+  ncSetState('network_conditions_read', 'Reading complete.');
 }, 'network_conditions_working'));
 ncEls.history.addEventListener('click', () => ncCall(async () => {
   const end = new Date();
@@ -445,27 +504,62 @@ ncEls.history.addEventListener('click', () => ncCall(async () => {
     method: 'POST',
     body: JSON.stringify({phone_number: currentPhoneNumber(), start: start.toISOString(), end: end.toISOString()})
   }));
-  ncSetState(ncText('network_conditions_read', 'Reading complete.'));
+  ncSetState('network_conditions_read', 'Reading complete.');
 }, 'network_conditions_working'));
 ncEls.remove.addEventListener('click', () => ncCall(async () => {
   ncSubscription = await apiJson(`/v1/network-conditions/subscriptions/${ncSubscription.subscription_id}`, {method: 'DELETE'});
-  ncSetState(ncText('network_conditions_deleted', 'Subscription deleted at the operator.'));
+  ncSetState('network_conditions_deleted', 'Subscription deleted at the operator.');
 }, 'network_conditions_working'));
 
-function setFactGroup(group, list, items){
-  group.hidden = items.length === 0;
+// `items` are the server's English sentences; `links` are the chain rows they
+// were built from. When the chain is present each fact is rebuilt from the
+// link's SIGNAL, which is stable and has authored copy in both languages, and
+// the API name is kept verbatim beside it — a CAMARA product name is not
+// something to translate. Without the chain the server's sentence stands.
+function setFactGroup(group, list, items, links){
+  const rows = Array.isArray(links) && links.length ? links : null;
+  group.hidden = (rows ? rows.length : items.length) === 0;
   list.replaceChildren();
+  if (rows){
+    rows.forEach(link => {
+      const li = document.createElement('li');
+      const api = document.createElement('span');
+      api.lang = 'en'; api.dir = 'ltr'; api.textContent = (link.api || '') + ': ';
+      li.appendChild(api);
+      li.appendChild(keyed('signal_' + link.signal, link.detail || link.signal || ''));
+      list.appendChild(li);
+    });
+    return;
+  }
   items.forEach(text => { const li = document.createElement('li'); li.textContent = text; list.appendChild(li); });
 }
 function applyPresentation(data){
   const p = data.presentation;
   if (p && typeof p === 'object'){
-    presentationTitle.textContent = p.title || (data.decision || '—');
+    presentationTitle.replaceChildren(
+      keyed('decision_title_' + (data.decision || 'UNKNOWN'), p.title || (data.decision || '—'))
+    );
+    // The deterministic explanation is composed server-side from this chain's
+    // own numbers and thresholds, so there is no fixed sentence to key. It is
+    // marked English rather than left to look like a missing translation —
+    // see docs/TESTING_GUIDE.md for this limit.
     presentationSummary.textContent = p.summary || '';
-    presentationAction.textContent = p.next_action || '';
-    setFactGroup(supportingGroup, supportingFacts, Array.isArray(p.supporting_facts) ? p.supporting_facts : []);
-    setFactGroup(adverseGroup, adverseFacts, Array.isArray(p.adverse_facts) ? p.adverse_facts : []);
-    setFactGroup(unresolvedGroup, unresolvedFacts, Array.isArray(p.unresolved_checks) ? p.unresolved_checks : []);
+    presentationSummary.lang = 'en';
+    presentationSummary.dir = 'ltr';
+    presentationAction.replaceChildren(
+      keyed('next_action_' + (data.decision || 'UNKNOWN'), p.next_action || '')
+    );
+    const chain = Array.isArray(data.chain) ? data.chain : [];
+    const unresolvedSignals = ['CONSENT_REQUIRED', 'PROVIDER_UNAVAILABLE', 'EVIDENCE_UNAVAILABLE'];
+    setFactGroup(supportingGroup, supportingFacts,
+      Array.isArray(p.supporting_facts) ? p.supporting_facts : [],
+      chain.filter(link => link.result === 'PASS'));
+    setFactGroup(adverseGroup, adverseFacts,
+      Array.isArray(p.adverse_facts) ? p.adverse_facts : [],
+      chain.filter(link => link.result === 'FLAG'));
+    setFactGroup(unresolvedGroup, unresolvedFacts,
+      Array.isArray(p.unresolved_checks) ? p.unresolved_checks : [],
+      chain.filter(link => unresolvedSignals.indexOf(link.signal) !== -1));
     return;
   }
   // Backward-compatible fallback: an older cached response or an in-flight SSE

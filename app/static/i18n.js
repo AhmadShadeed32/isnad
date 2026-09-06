@@ -216,7 +216,15 @@ const Isnad = (() => {
       bar.append(label,select,note); document.body.prepend(bar);
       setLocale(preferred());
     }
-    observer = new MutationObserver(() => translatePage());
+    // Coalesced to one pass per frame. The observer fires per mutation and
+    // `translatePage` walks the whole body, so a console trace appending rows
+    // one at a time was O(n) work per row — quadratic over a long run, and
+    // visibly so on the surface that produces the most rows.
+    let pending = 0;
+    observer = new MutationObserver(() => {
+      if (pending) return;
+      pending = requestAnimationFrame(() => { pending = 0; translatePage(); });
+    });
     translatePage();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initializePage);
@@ -228,3 +236,11 @@ const Isnad = (() => {
     locale: () => activeLocale
   };
 })();
+
+/* `const` at top level of a classic script creates a lexical binding, not a
+   window property — so `Isnad` resolved and `window.Isnad` was undefined. Every
+   feature-detecting caller (`window.Isnad ? ... : fallback`) therefore took the
+   fallback branch forever, silently, and a browser test asking for
+   `window.Isnad` waited for something that was never going to arrive. Stated
+   explicitly rather than relying on which form a caller happens to use. */
+window.Isnad = Isnad;

@@ -77,6 +77,20 @@ class HybridProvider:
             log.warning("live swap date for %s failed; recording unavailable", action)
             return timing.failure(action, "invalid", "date request failed")
 
+    # Network conditions are not evidence, so there is no per-action live/mock
+    # split to route them by. Rather than half-answer, this provider says it
+    # does not offer them: the API then refuses cleanly instead of writing a
+    # failed subscription row and returning a 502 for a capability that was
+    # never wired up.
+    def create_congestion_subscription(self, *args, **kwargs):
+        raise NotImplementedError("hybrid does not offer network conditions")
+
+    def delete_congestion_subscription(self, *args, **kwargs):
+        raise NotImplementedError("hybrid does not offer network conditions")
+
+    def query_congestion(self, *args, **kwargs):
+        raise NotImplementedError("hybrid does not offer network conditions")
+
     async def gather(self, action: Action, request: VerificationRequest) -> EvidenceLink:
         if not self._is_live(action, request):
             return await self._fallback.gather(action, request)

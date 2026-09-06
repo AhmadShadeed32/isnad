@@ -221,3 +221,58 @@ def test_a_translated_label_inside_an_english_region_states_its_own_direction():
     for key in ("supporting_evidence", "adverse_evidence", "unresolved_checks"):
         block = JUDGE_HTML.split(f'data-i18n="ui.{key}"')[0].rsplit("<div", 1)[1]
         assert 'dir="auto"' in block, key
+
+
+# --- keys that must not drift from the server's own copy ---------------------
+
+
+def _ui(locale: str) -> dict:
+    import json
+    from pathlib import Path
+
+    return json.loads(
+        (Path("app/static/i18n") / f"{locale}.json").read_text(encoding="utf-8")
+    )["ui"]
+
+
+def test_the_english_decision_copy_matches_what_the_server_actually_sends():
+    """The dictionary wins over the element's literal text, so an English value
+    that drifts from `app/presentation.py` makes the screen say something the
+    API did not."""
+    from app.presentation import _NEXT_ACTION, _TITLE
+
+    english = _ui("en")
+    for decision, title in _TITLE.items():
+        assert english[f"decision_title_{decision.value}"] == title
+    for decision, action in _NEXT_ACTION.items():
+        assert english[f"next_action_{decision.value}"] == action
+
+
+def test_every_speakable_signal_has_copy_in_both_languages():
+    """Evidence sentences are keyed on the signal, not on the sentence: the
+    English detail interpolates a window that policy can change."""
+    from app.providers.vocabulary import SPEAKABLE_SIGNALS
+
+    english, arabic = _ui("en"), _ui("ar")
+    missing = [
+        signal
+        for signal in sorted(SPEAKABLE_SIGNALS)
+        if not english.get(f"signal_{signal}") or not arabic.get(f"signal_{signal}")
+    ]
+
+    assert missing == []
+
+
+def test_no_arabic_value_is_left_as_its_english_source():
+    """A key present in both files with the same value is an untranslated
+    string wearing a translated file's name."""
+    english, arabic = _ui("en"), _ui("ar")
+    identical = [
+        key
+        for key, value in arabic.items()
+        # Single words that are the same in both are possible; a whole sentence
+        # being identical is not a translation.
+        if english.get(key) == value and len(str(value).split()) > 2
+    ]
+
+    assert identical == []
