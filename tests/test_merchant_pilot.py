@@ -12,9 +12,17 @@ import json
 import os
 from pathlib import Path
 
+# The harness snapshots these into module constants at import time, and this
+# is not the only test module that seeds them — so `setdefault` alone does not
+# decide what the imported harness ends up believing. `_reset_pilot_state`
+# pins the module constants to these values; state them once here so the
+# environment, the pin and every `/login` post cannot drift apart.
+OPERATOR_USERNAME = "operator"
+OPERATOR_PASSWORD = "correct-horse-battery-staple"
+
 os.environ.setdefault("ISNAD_MERCHANT_API_KEY", "test-merchant-key")
-os.environ.setdefault("PILOT_OPERATOR_USERNAME", "operator")
-os.environ.setdefault("PILOT_OPERATOR_PASSWORD", "correct-horse-battery-staple")
+os.environ.setdefault("PILOT_OPERATOR_USERNAME", OPERATOR_USERNAME)
+os.environ.setdefault("PILOT_OPERATOR_PASSWORD", OPERATOR_PASSWORD)
 
 import httpx
 import pytest
@@ -28,10 +36,27 @@ PUBLIC_CLIENT = ("8.8.8.8", 51000)
 
 
 @pytest.fixture(autouse=True)
-def _reset_login_throttle():
+def _reset_pilot_state(monkeypatch):
+    """The harness is a module-level singleton: its operator credential, its
+    session store and its flow store are all process-wide, so whatever ran
+    before this test is still in them.
+
+    The credential is the one that bites. `demo.merchant_pilot.app` reads
+    PILOT_OPERATOR_USERNAME/PASSWORD into module constants once, at import,
+    and any test module importing it earlier — `test_review_regressions.py`
+    seeds its own pair — wins the `setdefault` above and leaves `/login`
+    rejecting this file's credential with a 401. Pin the constants the login
+    handler actually reads rather than the environment it no longer consults.
+    """
+    monkeypatch.setattr(pilot_module, "OPERATOR_USERNAME", OPERATOR_USERNAME)
+    monkeypatch.setattr(pilot_module, "OPERATOR_PASSWORD", OPERATOR_PASSWORD)
     pilot_module.login_throttle._failures.clear()
+    pilot_module.flows._flows.clear()
+    pilot_module.sessions._sessions.clear()
     yield
     pilot_module.login_throttle._failures.clear()
+    pilot_module.flows._flows.clear()
+    pilot_module.sessions._sessions.clear()
 
 
 def _client(**kwargs) -> TestClient:
@@ -52,7 +77,7 @@ def _patch_isnad(monkeypatch, handler) -> None:
 def _login(client: TestClient) -> str:
     response = client.post(
         "/login",
-        data={"username": "operator", "password": "correct-horse-battery-staple"},
+        data={"username": OPERATOR_USERNAME, "password": OPERATOR_PASSWORD},
         follow_redirects=False,
     )
     assert response.status_code == 303
@@ -75,10 +100,10 @@ def test_wrong_credentials_are_rejected_and_throttled():
     client = _client()
 
     for _ in range(pilot_module.login_throttle.max_attempts):
-        response = client.post("/login", data={"username": "operator", "password": "wrong"})
+        response = client.post("/login", data={"username": OPERATOR_USERNAME, "password": "wrong"})
         assert response.status_code == 401
 
-    locked_out = client.post("/login", data={"username": "operator", "password": "wrong"})
+    locked_out = client.post("/login", data={"username": OPERATOR_USERNAME, "password": "wrong"})
     assert locked_out.status_code == 429
 
 

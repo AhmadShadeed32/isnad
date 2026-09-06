@@ -26,6 +26,19 @@ from app.domain.schemas import VerificationRequest
 from app.providers.nac import NacProvider
 
 
+@pytest.fixture(autouse=True)
+def _reset_pilot_stores():
+    """`pilot.sessions` and `pilot.flows` are process-wide singletons, and
+    `add_flow` below writes a fixed `flow_id`. Leaving either populated hands
+    the next test — here or in `test_merchant_pilot.py`, whichever pytest
+    collects next — records it never created."""
+    pilot.flows._flows.clear()
+    pilot.sessions._sessions.clear()
+    yield
+    pilot.flows._flows.clear()
+    pilot.sessions._sessions.clear()
+
+
 def client_for(session) -> TestClient:
     c = TestClient(pilot.app, client=("127.0.0.1", 51000), raise_server_exceptions=False)
     c.cookies.set(pilot.SESSION_COOKIE, session.session_id)
