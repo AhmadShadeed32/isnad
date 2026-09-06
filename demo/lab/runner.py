@@ -28,7 +28,12 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # The same authored acts the console/judge page already drive, named for the
 # lab rather than duplicated. Extend this mapping, never fork DEMO_ACTS.
-SCENARIO_IDS: dict[str, str] = {"clean": "act3", "gap": "act5", "replacement": "act6"}
+SCENARIO_IDS: dict[str, str] = {
+    "clean": "act3",
+    "gap": "act5",
+    "replacement": "act6",
+    "ghost": "act2",
+}
 
 
 class UnknownScenario(ValueError):
@@ -78,11 +83,15 @@ def _planner_source(events: list[TraceEvent]) -> str:
     return "policy"
 
 
-async def run_scenario(scenario_id: str, *, planner=None, request_override=None) -> LabRun:
+async def run_scenario(
+    scenario_id: str, *, planner=None, request_override=None, provider_override=None
+) -> LabRun:
     """Run the named scenario's fixture, or `request_override` (a full
     VerificationRequest already derived from it) when a caller — I2's
     counterfactual comparator — needs one field changed while keeping the
-    scenario's own digests and identity for comparison."""
+    scenario's own digests and identity for comparison. `provider_override`
+    lets I4/I9 substitute a fresh FaultInjectingProvider wrapping a fresh
+    MockProvider — never a shared instance."""
     if scenario_id not in SCENARIO_IDS:
         raise UnknownScenario(scenario_id)
 
@@ -116,7 +125,8 @@ async def run_scenario(scenario_id: str, *, planner=None, request_override=None)
         )
 
     engine = get_engine(str(settings.policy_path))
-    investigator = build_investigator(MockProvider(), engine=engine, planner=planner, event_sink=sink)
+    provider = provider_override or MockProvider()
+    investigator = build_investigator(provider, engine=engine, planner=planner, event_sink=sink)
     request = request_override or DEMO_ACTS[SCENARIO_IDS[scenario_id]].model_copy(deep=True)
     verdict = await investigator.investigate(request, run_id=run_id)
 
