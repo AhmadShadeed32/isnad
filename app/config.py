@@ -149,6 +149,18 @@ class Settings(BaseSettings):
     # Clock skew tolerated when checking the id_token's exp/iat (seconds).
     nac_id_token_leeway_seconds: int = 60
 
+    # --- Congestion Insights callback (server-configured, never client-supplied) ---
+    # A subscription tells Nokia where to POST. That destination is ours to
+    # choose once, here: accepting one from a request would let a caller point
+    # an operator at any host. Empty (the default) means no subscription may be
+    # created at all, which is the honest state until a reachable HTTPS
+    # endpoint exists.
+    nac_congestion_callback_url: str = ""
+    # Bearer token the callback route requires, compared in constant time.
+    nac_congestion_callback_token: str = ""
+    # Short by design: a demo subscription that outlives the demo is a leak.
+    nac_congestion_subscription_ttl_seconds: int = 900
+
     # --- Offline fake operator (P4a, ISNAD_PROVIDER=nac_fake) ---
     # demo/fake_operator is a small separate ASGI app started on loopback; it
     # is never a network call and never billed. Local development / the

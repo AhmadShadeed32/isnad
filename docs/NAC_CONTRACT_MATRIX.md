@@ -24,7 +24,7 @@ separately pins normalization against the August simulator captures in `docs/nac
 | Account mode | **Simulator**. Catalog visibility and SDK availability do **not** establish live-network entitlement. | Portal banner, 2026-09-06 |
 | SDK default base URL | `https://network-as-code.p-eu.rapidapi.com` | SDK `NetworkAsCodeApiEnvironment.DEFAULT` |
 | Catalog-generated base URL | `https://network-as-code.p-eu.apihub.nokia.io` | Authenticated catalog |
-| Which host answers | **Unobserved.** Both are documented to take the same RapidAPI headers, and five locally intercepted requests agree on paths. Host compatibility is untested; do not change the application default until a response is observed. | — |
+| Which host answers | **The catalog host answers.** Eleven authenticated calls on 2026-09-06 returned 200/422/503 as documented from `https://network-as-code.p-eu.apihub.nokia.io`. The SDK default host is still untested, so the application default is unchanged and the probe passes the catalog host explicitly. | `docs/nac/observations/2026-09-06-hosted-simulator.jsonl` |
 | Authorization | `x-rapidapi-key` (from `ISNAD_NAC_API_KEY`) + `x-rapidapi-host` (`ISNAD_NAC_RAPIDAPI_HOST`, `network-as-code.nokia.rapidapi.com`), injected by the SDK client wrapper. `number_recycling.check` additionally accepts a per-call `authorization` header for a three-legged token. | SDK wire AST; asserted in `test_the_rapidapi_host_header_travels_with_the_catalog_base_url` |
 | Timeout | Application calls: `ISNAD_NAC_TIMEOUT_SECONDS`, enforced by `asyncio.wait_for` around the pooled SDK call in `app/providers/nac.py`. Probe calls: `request_options={"timeout_in_seconds": 10}`. | `app/providers/nac.py`, `scripts/nac_demo_probe.py` |
 | Retries | `request_options={"max_retries": 0}` on every probe call — one attempt per operation, asserted in `test_max_retries_zero_means_one_attempt_for_a_retryable_status`. The application path sets no retry and the SDK performs none by default. | — |
@@ -34,8 +34,8 @@ separately pins normalization against the August simulator captures in `docs/nac
 
 | Operation | SDK method | Method + path (relative to base URL) | Request fields | Response fields the app reads | Entitlement | Simulator scenario | Last observation | Response limitations |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| SIM swap check | `sim_swap.check` | `POST passthrough/camara/v1/sim-swap/sim-swap/v0/check` | `phoneNumber`, `maxAge` (hours) | `swapped` (required bool) | Simulator only | `+99999991000` swapped, `+99999991001` not | 2026-08-30 capture, `docs/nac/` | Boolean against the window we sent. It carries **no date**; the window is the whole answer. |
-| Device swap check | `device_swap.check` | `POST passthrough/camara/v1/device-swap/device-swap/v1/check` | `phoneNumber`, `maxAge` | `swapped` | Simulator only | Same two numbers | 2026-08-30 capture | Path is **v1** while SIM swap is v0; the v1.0.0 group label is not a per-path version. |
+| SIM swap check | `sim_swap.check` | `POST passthrough/camara/v1/sim-swap/sim-swap/v0/check` | `phoneNumber`, `maxAge` (hours) | `swapped` (required bool) | **Entitled** (200 observed) | `+99999991000` swapped, `+99999991001` not | 2026-09-06 hosted: `true` then `false`, as documented | Boolean against the window we sent. It carries **no date**; the window is the whole answer. |
+| Device swap check | `device_swap.check` | `POST passthrough/camara/v1/device-swap/device-swap/v1/check` | `phoneNumber`, `maxAge` | `swapped` | **Entitled** (200 observed) | Same two numbers | 2026-09-06 hosted: `true` then `false` | Path is **v1** while SIM swap is v0; the v1.0.0 group label is not a per-path version. |
 | Reachability | `device_status.retrieve_reachability_status` | `POST device-status/device-reachability-status/v1/retrieve` | `device` | `reachable`, `connectivity[]` | Simulator only | — | 2026-08-30 capture | `connectivity` is operator prose; it never enters a planner prompt. |
 | Roaming | `device_status.retrieve_roaming_status` | `POST device-status/device-roaming-status/v1/retrieve` | `device` | `roaming`, `countryName[]` | Simulator only | — | 2026-08-30 capture | Roaming is `INFO`, not a fraud signal on its own. |
 | Location verify | `location.verify_v1` | `POST location-verification/v1/verify` | `device`, `area` (CIRCLE, centre, radius), `maxAge` seconds | `verification_result` (`TRUE`/`FALSE`/`PARTIAL`/other) | Simulator only | — | 2026-08-30 capture | **Precondition:** a request with no `claimed_location` makes **zero** SDK calls — `tests/test_provider_preconditions.py::test_nac_location_with_no_claim_is_unavailable_and_never_touches_the_sdk`. Unknown verdicts stay `INFO`. |
@@ -45,15 +45,16 @@ separately pins normalization against the August simulator captures in `docs/nac
 
 | Operation | SDK method | Method + path | Request fields | Response fields | Entitlement | Simulator scenario | Last observation | Response limitations |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| SIM swap date | `sim_swap.retrieve_date` | `POST passthrough/camara/v1/sim-swap/sim-swap/v0/retrieve-date` | `phoneNumber` only — **no** `maxAge` | `latestSimChange`: nullable, RFC 3339, timezone-aware | Simulator only | `+99999991000` documents a swap; the *date value* is not documented | see gate 3 record | A **second billable operation**, not a field of `check`. `null` means no date was returned — never "never swapped". The date may be an activation or first-association time, not a replacement event. |
-| Device swap date | `device_swap.retrieve_date` | `POST passthrough/camara/v1/device-swap/device-swap/v1/retrieve-date` | `phoneNumber` | `latestDeviceChange` (nullable, tz-aware), `monitoredPeriod` (optional, **days**) | Simulator only | as above | see gate 3 record | Without `monitoredPeriod` a null date has no scope and must be shown as unknown-horizon, not "never". |
+| SIM swap date | `sim_swap.retrieve_date` | `POST passthrough/camara/v1/sim-swap/sim-swap/v0/retrieve-date` | `phoneNumber` only — **no** `maxAge` | `latestSimChange`: nullable, RFC 3339, timezone-aware | **Entitled** (200 observed) | `+99999991000` documents a swap; the *date value* is not documented | 2026-09-06 hosted: `2026-09-06T19:53:10.195822+00:00` — ten minutes old at observation, so the simulator appears to generate it relative to the request. No fixed date may be quoted as "the" value. | A **second billable operation**, not a field of `check`. `null` means no date was returned — never "never swapped". The date may be an activation or first-association time, not a replacement event. |
+| Device swap date | `device_swap.retrieve_date` | `POST passthrough/camara/v1/device-swap/device-swap/v1/retrieve-date` | `phoneNumber` | `latestDeviceChange` (nullable, tz-aware), `monitoredPeriod` (optional, **days**) | **Entitled** (200 observed) | as above | 2026-09-06 hosted: `2026-08-18T13:26:31.036260+00:00`, and **`monitoredPeriod` was absent**. This date is nineteen days older than the 24-hour boolean the same number returned — see the contradiction note below. | Without `monitoredPeriod` a null date has no scope and must be shown as unknown-horizon, not "never". |
 | Congestion create | `congestion_insights.create_subscription` | `POST congestion-insights/v0/subscriptions` | `device`, `webhook.notificationUrl` (+ auth token), `subscriptionExpireTime` | `subscriptionId`, `startedAt`, `expiresAt`, `subscriptionExpireTime` | Simulator only; needs a reachable HTTPS callback | one `+9999` device | **none** | SDK attributes are `subscription_id`/`started_at`. The public tutorial's `resource_id`/`starts_at` **do not exist** on the response. A successful create is not proof a notification was delivered. |
-| Congestion get | `congestion_insights.get_subscription` | `GET congestion-insights/v0/subscriptions/{resource_id}` | `resource_id` = the returned `subscriptionId` | subscription record | Simulator only | — | **none** | `resource_id` is the argument name; its value is the returned id. |
+| Congestion list | `congestion_insights.list_subscriptions` | `GET congestion-insights/v0/subscriptions` | — | list of subscriptions | **Entitled to read** (200 observed) | — | 2026-09-06 hosted: empty list, so nothing is leaked | Reconciles an uncertain create instead of repeating it. |
+| Congestion get | `congestion_insights.get_subscription` | `GET congestion-insights/v0/subscriptions/{resource_id}` | `resource_id` = the returned `subscriptionId` | subscription record | Read entitlement observed for the collection; create not attempted | — | **none** | `resource_id` is the argument name; its value is the returned id. |
 | Congestion query | `congestion_insights.query` | `POST congestion-insights/v0/query` | `device`, optional `start`, optional `end` | list of `timeIntervalStart`, `timeIntervalStop`, `congestionLevel`, nullable `confidenceLevel` | Requires an existing subscription | — | **none** | The catalog's query **example is wrong for its schema** (it carries webhook/expiry fields). Both bounds omitted = upcoming 15-minute forecast; one bound = a 15-minute interval on the other side. An empty list is unknown, **not** Low. Missing confidence stays null, never 0 or 100. The SDK does **not** constrain the level vocabulary — an unexpected string reaches the caller verbatim. |
 | Congestion delete | `congestion_insights.delete_subscription` | `DELETE congestion-insights/v0/subscriptions/{resource_id}` | `resource_id` | no body | Simulator only | — | **none** | Must be idempotent on our side; a leaked subscription outlives the demo. |
 | Number recycling | `number_recycling.check` | `POST passthrough/camara/v1/number-recycling/number-recycling/v0.2/check` | `phoneNumber`, `specifiedDate` (date, **required**) | `phoneNumberRecycled` | Simulator only | — | **none** | Path is **v0.2**. `specifiedDate` must be a genuine merchant-held last-verified date, not a backend guess. Out-of-range is unknown, not "not recycled". |
 | Consent info | `consent_info.retrieve` | `POST passthrough/camara/v1/consent-info/consent-info/v0.1/retrieve` | `phoneNumber`, `scopes[]`, `purpose`, `requestCaptureUrl` | `statusInfo[]` with per-scope status and optional capture URL | Simulator only | — | **none** | Path is **v0.1**. It reports status and may return an operator capture URL; it does **not** grant consent. Consent status is never fraud evidence. |
-| Call forwarding | `call_forwarding_signal.retrieve_unconditional_call_forwarding` | `POST passthrough/camara/v1/call-forwarding-signal/call-forwarding-signal/v0.3/unconditional-call-forwardings` | `phoneNumber` | forwarding state | Simulator only | `...1000` active, `...1001` inactive; `+99999990422`/`+99999990503` documented errors | **none** | Voice forwarding only. It does **not** imply SMS forwarding and is not fraud by itself. |
+| Call forwarding | `call_forwarding_signal.retrieve_unconditional_call_forwarding` | `POST passthrough/camara/v1/call-forwarding-signal/call-forwarding-signal/v0.3/unconditional-call-forwardings` | `phoneNumber` | forwarding state | **Entitled** (200 observed) | `...1000` active, `...1001` inactive; `+99999990422`/`+99999990503` documented errors | 2026-09-06 hosted: `active: true`, `active: false`, then **422 and 503 exactly as documented**. Both errors recorded as bounded codes with no body or headers. | Voice forwarding only. It does **not** imply SMS forwarding and is not fraud by itself. |
 | KYC tenure | `kyc.check_tenure` | `POST passthrough/camara/v1/kyc-tenure/kyc-tenure/v0.1/check-tenure` | `phoneNumber`, tenure date | tenure result | Simulator only | — | **none** | Operator tenure is not merchant history and not proof of identity. |
 | SIM swap subscriptions | **no SDK resource** | catalog lists v0.3.0 | — | — | **Unknown.** Catalog listing is not entitlement. | — | **none** | SDK 10.0.0 exposes only `sim_swap.check` and `sim_swap.retrieve_date` — verified against the exported operation list. Any implementation needs a narrowly scoped REST adapter or a justified, tested SDK upgrade, never a guessed method name. |
 
@@ -70,12 +71,26 @@ The `device_status` subscription families (v0.7/v0.8 reachability and roaming) a
 synchronous `retrieve` forms; adding a subscription family would need the same
 callback ownership, replay and cleanup contract as congestion.
 
+## The contradiction the demo must not hide
+
+For `+99999991000` on 2026-09-06 the hosted simulator answered
+`device_swap_check(maxAge=24h) = true` **and** `device_swap_date =
+2026-08-18T13:26:31Z`. Nineteen days apart. The boolean is scenario-driven and
+is not computed from the date the same account will return.
+
+So: the two are separate observations with separate provenance. Isnad shows
+both, never derives one from the other, never presents the date as the reason
+the boolean is true, and says so when they disagree.
+
 ## Unknowns recorded as unknown
 
-- Which base URL the account actually answers on.
-- Whether any date operation returns a non-null value for the simulator numbers.
-- Whether the account may create a congestion subscription at all, and whether a
-  15-minute `subscriptionExpireTime` is accepted.
+- Whether the SDK default host answers (only the catalog host was observed).
+- How a null date behaves on this account — both date calls returned a value.
+- What `monitoredPeriod` contains when present; it was absent on 2026-09-06, so
+  the device-date horizon is unknown.
+- Whether the account may **create** a congestion subscription, and whether a
+  15-minute `subscriptionExpireTime` is accepted. Only the read of the
+  subscription collection has been observed (200, empty).
 - Whether an unsolicited congestion notification is ever delivered to a callback.
 - Whether number recycling, consent info, call forwarding or KYC tenure are
   entitled on this account.
