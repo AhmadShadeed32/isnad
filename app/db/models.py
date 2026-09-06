@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, Float, Index, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, Index, Integer, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import TypeDecorator
 
@@ -207,6 +207,59 @@ class IdempotencyRecordRow(Base):
     response_json: Mapped[str] = mapped_column(Text)
     status_code: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=lambda: datetime.now(UTC))
+
+
+class MerchantOutcomeEventRow(Base):
+    """One merchant-reported outcome on an owned chain — order status or fraud
+    assessment (P5). Challenge execution, the third dimension the handoff
+    names, is deliberately NOT stored here: it is read from P3's own
+    `ChallengeAttemptRow`/`ChallengeEventRow` when a report is assembled, so
+    there is exactly one place that fact can come from.
+
+    Append-only and self-superseding rather than updatable: a correction is a
+    new row naming the row it replaces. The partial unique index below is what
+    actually enforces "exactly one current (non-superseded) event per owner,
+    chain and dimension" — the same reasoning as P3's CAS, extended to allow a
+    caller-initiated correction rather than only a timeout.
+    """
+
+    __tablename__ = "merchant_outcome_events"
+
+    event_id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    chain_id: Mapped[str] = mapped_column(String(40), index=True)
+    owner_hash: Mapped[str] = mapped_column(String(64), index=True)
+    dimension: Mapped[str] = mapped_column(String(24))
+    value: Mapped[str] = mapped_column(String(24))
+    # Required for CONFIRMED_FRAUD/CONFIRMED_LEGITIMATE, absent otherwise —
+    # enforced in the request schema, not here: a payment dispute or a lack of
+    # feedback alone must never look like it justified a confirmed label.
+    basis: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # Merchant-supplied, bounded by a documented future-clock tolerance.
+    occurred_at: Mapped[datetime] = mapped_column(UtcDateTime)
+    # Server-owned; never taken from the request, so a report cannot be
+    # backdated the way `signed_at` on a Verdict cannot (S5's same reasoning).
+    reported_at: Mapped[datetime] = mapped_column(UtcDateTime, default=lambda: datetime.now(UTC))
+    late_report: Mapped[bool] = mapped_column(Boolean, default=False)
+    supersedes_event_id: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    superseded_by: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
+    # Kept as columns, not only in the shared `idempotency_records` table:
+    # that table is TTL-purged (P3's own `purge_idempotency_records`), and an
+    # outcome report is exactly the kind of record an audit needs to trace
+    # back to its original request long after the idempotency window closes.
+    idempotency_key: Mapped[str] = mapped_column(String(128))
+    request_fingerprint: Mapped[str] = mapped_column(String(64))
+
+    __table_args__ = (
+        Index(
+            "ux_outcome_current_per_dimension",
+            "owner_hash",
+            "chain_id",
+            "dimension",
+            unique=True,
+            sqlite_where=text("superseded_by IS NULL"),
+            postgresql_where=text("superseded_by IS NULL"),
+        ),
+    )
 
 
 class AnnouncementUseRow(Base):

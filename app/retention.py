@@ -19,7 +19,7 @@ import logging
 
 from app import announce, velocity
 from app.config import settings
-from app.db import challenges
+from app.db import challenges, outcomes
 
 log = logging.getLogger("isnad")
 
@@ -31,6 +31,7 @@ def purge_once() -> dict[str, int]:
         "screen_events": velocity.purge_older_than(velocity.retention_seconds()),
         "challenge_followups": challenges.purge_followups(),
         "idempotency_records": challenges.purge_idempotency_records(),
+        "outcome_events": outcomes.purge_outcomes(),
     }
 
 

@@ -96,6 +96,16 @@ async def posture(request: Request) -> dict:
                     "dispute resolution, not indefinitely."
                 ),
             },
+            {
+                "name": "outcome_events",
+                "seconds": settings.outcome_retention_seconds,
+                "human": _human(settings.outcome_retention_seconds),
+                "why": (
+                    "Merchant-reported order status and fraud assessment. Purged by "
+                    "report time, current labels included — a report that ages out "
+                    "reverts to 'not yet reported' rather than being kept forever."
+                ),
+            },
         ],
         "sweeper": {
             "enabled": settings.purge_interval_seconds > 0,

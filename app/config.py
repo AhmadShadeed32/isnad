@@ -208,6 +208,15 @@ class Settings(BaseSettings):
     # events stay queryable before the retention sweeper drops them. 30 days.
     challenge_followup_retention_seconds: int = Field(2592000, gt=0)
 
+    # --- Merchant outcome reporting (P5) ---
+    # How far into the future a merchant-supplied occurred_at may sit before
+    # it is rejected — clock skew tolerance, not a business rule.
+    outcome_future_tolerance_seconds: int = Field(300, ge=0)
+    # How long an outcome event (current or already superseded) stays queryable
+    # before the retention sweeper drops it. 180 days: long enough to cover a
+    # calibration observation window, unlike P3's 30-day followup window.
+    outcome_retention_seconds: int = Field(15552000, gt=0)
+
     # --- Cache / idempotency ---
     cache_backend: str = "memory"  # memory | redis
     redis_url: str | None = None

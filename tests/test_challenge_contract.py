@@ -48,6 +48,19 @@ def _as_the_merchant():
     current_owner.reset(token)
 
 
+@pytest.fixture(autouse=True)
+def _reset_limiters():
+    """This file fires many requests against a couple of fixed keys; do not
+    leak that traffic into later tests' own rate-limit assertions."""
+    from app.api import rate_limit
+
+    rate_limit.per_key.reset()
+    rate_limit.per_ip.reset()
+    yield
+    rate_limit.per_key.reset()
+    rate_limit.per_ip.reset()
+
+
 def _seed(chain_id: str, decision: Decision = Decision.CHALLENGE):
     verdict = Verdict(
         decision=decision,

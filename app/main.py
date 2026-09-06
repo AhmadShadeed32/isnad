@@ -13,6 +13,7 @@ from app.api import (
     routes_consent,
     routes_console,
     routes_judge,
+    routes_outcomes,
     routes_privacy,
     routes_receipt,
     routes_registry,
@@ -86,6 +87,7 @@ def create_app() -> FastAPI:
     app.add_middleware(SecurityHeadersMiddleware)
     app.include_router(routes_verify.router)
     app.include_router(routes_challenge.router)
+    app.include_router(routes_outcomes.router)
     app.include_router(routes_consent.router)
     app.include_router(routes_consent.page_router)
     app.include_router(routes_reverse.router)

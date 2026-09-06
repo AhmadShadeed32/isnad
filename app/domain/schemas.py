@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.chain.models import EvidenceLink
 from app.config import settings
@@ -417,3 +417,93 @@ class ChallengeAttemptSummary(BaseModel):
 class ChallengeTimelineResponse(BaseModel):
     chain_id: str
     attempts: list[ChallengeAttemptSummary]
+
+
+# --- Merchant outcome reporting (P5) ---
+#
+# Order status and fraud assessment are independent dimensions, each its own
+# append-only correction chain. Challenge execution — the third dimension the
+# handoff names — is not reported through here at all: it already exists in
+# P3's own tables and is read fresh from there.
+
+OrderStatusValue = Literal["ACCEPTED", "FULFILLED", "CANCELLED", "UNKNOWN"]
+FraudAssessmentValue = Literal["CONFIRMED_FRAUD", "CONFIRMED_LEGITIMATE", "INCONCLUSIVE", "UNKNOWN"]
+FraudBasis = Literal["manual_investigation", "customer_confirmation"]
+
+_CONFIRMED_FRAUD_VALUES = {"CONFIRMED_FRAUD", "CONFIRMED_LEGITIMATE"}
+
+
+def _reject_naive(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        raise ValueError("occurred_at must be timezone-aware")
+    return value
+
+
+class OrderStatusReport(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    dimension: Literal["order_status"] = "order_status"
+    value: OrderStatusValue
+    occurred_at: datetime
+    # Set explicitly by the merchant when reporting outside the normal window
+    # — stored for the report to disclose, never itself a validation gate.
+    late_report: bool = False
+    # None for the first report on this dimension; the current head's
+    # event_id for a correction. A mismatch is a conflict, not silently
+    # accepted (P5's append-only rule).
+    supersedes_event_id: str | None = None
+
+    @field_validator("occurred_at")
+    @classmethod
+    def _tz_aware(cls, value: datetime) -> datetime:
+        return _reject_naive(value)
+
+
+class FraudAssessmentReport(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    dimension: Literal["fraud_assessment"] = "fraud_assessment"
+    value: FraudAssessmentValue
+    # Required for CONFIRMED_FRAUD/CONFIRMED_LEGITIMATE, forbidden otherwise:
+    # a payment dispute or a lack of feedback alone does not establish a
+    # confirmed label, and the schema — not a convention — is what keeps a
+    # weak basis off a confirmed value.
+    basis: FraudBasis | None = None
+    occurred_at: datetime
+    late_report: bool = False
+    supersedes_event_id: str | None = None
+
+    @field_validator("occurred_at")
+    @classmethod
+    def _tz_aware(cls, value: datetime) -> datetime:
+        return _reject_naive(value)
+
+    @model_validator(mode="after")
+    def _basis_matches_value(self) -> FraudAssessmentReport:
+        needs_basis = self.value in _CONFIRMED_FRAUD_VALUES
+        if needs_basis and self.basis is None:
+            raise ValueError("basis is required when value is CONFIRMED_FRAUD or CONFIRMED_LEGITIMATE")
+        if not needs_basis and self.basis is not None:
+            raise ValueError("basis must be omitted unless value is CONFIRMED_FRAUD or CONFIRMED_LEGITIMATE")
+        return self
+
+
+OutcomeReportRequest = Annotated[
+    OrderStatusReport | FraudAssessmentReport, Field(discriminator="dimension")
+]
+
+
+class OutcomeEventResponse(BaseModel):
+    event_id: str
+    chain_id: str
+    dimension: str
+    value: str
+    basis: str | None = None
+    occurred_at: str
+    reported_at: str
+    late_report: bool
+    supersedes_event_id: str | None = None
+
+
+class OutcomeTimelineResponse(BaseModel):
+    chain_id: str
+    current: dict[str, OutcomeEventResponse]
+    timeline: list[OutcomeEventResponse]
