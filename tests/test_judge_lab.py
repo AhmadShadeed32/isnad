@@ -72,11 +72,37 @@ async def test_every_run_has_a_named_planner_source():
 
 @pytest.mark.asyncio
 async def test_to_dict_round_trips_without_dataclass_leakage():
+    from demo.lab.models import SCHEMA_VERSION
+
     run = await run_scenario("clean")
     payload = run.to_dict()
-    assert payload["schema_version"] == 1
+    assert payload["schema_version"] == SCHEMA_VERSION
     assert isinstance(payload["events"], list)
     assert all(isinstance(e, dict) for e in payload["events"])
+
+
+@pytest.mark.asyncio
+async def test_an_evidence_event_records_what_the_network_answered():
+    """Schema 2. Without the answer, a trace row says only "evidence link #3"
+    and I1's acceptance — an auditor reconciling every check with its evidence
+    link — has nothing to reconcile against."""
+    run = await run_scenario("replacement")
+    evidence = [e for e in run.events if e.event_type == "evidence"]
+    assert evidence
+    for event in evidence:
+        assert event.api
+        assert event.signal
+        assert event.result in {"PASS", "FLAG", "INFO"}
+
+
+@pytest.mark.asyncio
+async def test_a_recorded_event_never_carries_provider_prose():
+    """`detail` on the NaC path is operator-supplied text, and these artifacts
+    are rendered on a public page. The capture is an allow-list, not a copy."""
+    run = await run_scenario("replacement")
+    for event in run.events:
+        assert "detail" not in event.to_dict()
+        assert "source" not in event.to_dict()
 
 
 # --- F3: the offline guarantee, under a live LLM configuration ----------------

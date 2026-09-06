@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 # What a diagnostic on a TraceEvent may say when a step did not simply pass or
 # flag. Never free text, never an exception message (I1 step 2).
@@ -32,6 +32,19 @@ class TraceEvent:
     budget_after: float | None = None
     evidence_step_ref: int | None = None
     diagnostic: str | None = None
+    # What the network actually answered, for the evidence events. Without
+    # these a trace row says only "evidence link #3", and I1's acceptance —
+    # an auditor reconciling every check with its evidence link — has nothing
+    # to reconcile against. Strictly the bounded vocabulary this codebase
+    # defines (see providers/vocabulary.py): `detail` is deliberately absent
+    # because on the NaC path it carries operator-supplied prose, and
+    # `max_age_hours` is the window the question covered, never the age of an
+    # event, because CAMARA answers with a boolean and no timestamp.
+    api: str | None = None
+    signal: str | None = None
+    result: str | None = None
+    max_age_hours: float | None = None
+    belief_after: float | None = None
 
     def __post_init__(self) -> None:
         if self.diagnostic is not None and self.diagnostic not in DIAGNOSTIC_CODES:

@@ -122,6 +122,15 @@ async def run_scenario(
                 budget_before=budget_left,
                 budget_after=budget_after,
                 evidence_step_ref=event.get("step"),
+                diagnostic=event.get("diagnostic"),
+                # An allow-list, not a copy of the event: `detail` is prose
+                # that on the NaC path carries operator-supplied strings, and
+                # this artifact is rendered on a public page.
+                api=event.get("api"),
+                signal=event.get("signal"),
+                result=event.get("result"),
+                max_age_hours=event.get("max_age_hours"),
+                belief_after=event.get("p_fraud"),
             )
         )
 
