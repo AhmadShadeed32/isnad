@@ -43,6 +43,10 @@ async def receipt_data(chain_id: str, request: Request) -> dict:
         )
     verdict = record.verdict
     return {
+        # I7's portable-download contract: lets an offline verifier and this
+        # endpoint's shape evolve independently without guessing a version
+        # from field presence.
+        "schema_version": 1,
         "chain_id": chain_id,
         # The bytes as stored, so the browser verifies what was actually signed
         # rather than a re-serialization — the detail most implementations get
