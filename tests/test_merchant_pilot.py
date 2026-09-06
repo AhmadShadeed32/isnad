@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 
 os.environ.setdefault("ISNAD_MERCHANT_API_KEY", "test-merchant-key")
 os.environ.setdefault("PILOT_OPERATOR_USERNAME", "operator")
@@ -735,6 +736,79 @@ def test_trust_session_and_release_require_a_session_and_csrf(monkeypatch):
 
     no_csrf = client.post(f"/api/flows/{flow_id}/trust-session", json={})
     assert no_csrf.status_code == 403
+
+
+# --- UI surfaces (static assertions, matching test_t6_receipt.py's own pattern) ---
+
+_STATIC = Path(__file__).resolve().parents[1] / "demo" / "merchant_pilot" / "static"
+INDEX_HTML = (_STATIC / "index.html").read_text(encoding="utf-8")
+FLOW_HTML = (_STATIC / "flow.html").read_text(encoding="utf-8")
+CAPABILITIES_HTML = (_STATIC / "capabilities.html").read_text(encoding="utf-8")
+
+
+def test_the_checkout_form_offers_a_claimed_location_labelled_as_a_claim():
+    """I11: the field must read as a customer/merchant CLAIM, never as an
+    observed device location, and omitting it must state the consequence."""
+    assert 'name="lat"' in INDEX_HTML
+    assert 'name="lon"' in INDEX_HTML
+    assert 'name="radius_m"' in INDEX_HTML
+    assert "claim" in INDEX_HTML.lower()
+    assert "location cannot be verified" in INDEX_HTML
+
+
+def test_the_claim_is_all_or_nothing():
+    """A latitude with no longitude is an incomplete claim, not a partial one."""
+    assert "incomplete" in INDEX_HTML.lower()
+
+
+def test_the_capabilities_page_separates_recorded_history_from_a_live_probe():
+    """I10: a green past capture is not an uptime probe or a coverage claim."""
+    assert "not a live probe" in CAPABILITIES_HTML
+    assert "uptime" in CAPABILITIES_HTML
+    assert "coverage" in CAPABILITIES_HTML
+    # Rendered with textContent, never innerHTML: the manifest is an
+    # operator-edited file and markup in it must not become markup here.
+    assert "textContent" in CAPABILITIES_HTML
+
+
+def test_the_capabilities_page_requires_a_session():
+    client = _client()
+    response = client.get("/capabilities", follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"] == "/login"
+
+
+def test_the_capabilities_page_renders_for_an_operator():
+    client = _client()
+    _login(client)
+    response = client.get("/capabilities")
+    assert response.status_code == 200
+    assert "Provider readiness" in response.text
+
+
+def test_the_session_panel_shows_every_state_distinctly():
+    """I8: ACTIVE, REVOKED, EXPIRED, ENDED and unknown each render
+    differently, and an unavailable lookup is never permission to proceed."""
+    for state in ("ACTIVE", "REVOKED", "EXPIRED", "ENDED", "UNKNOWN"):
+        assert f".session .state.{state}" in FLOW_HTML or f'"{state}"' in FLOW_HTML
+    assert "not permission to proceed" in FLOW_HTML
+
+
+def test_the_session_panel_is_labelled_a_simulator():
+    assert "Simulator." in FLOW_HTML
+    assert "durable across a restart" in FLOW_HTML
+    assert "not transactional enforcement" in FLOW_HTML
+
+
+def test_a_release_cannot_be_undone_by_a_later_revocation_in_the_copy():
+    assert "cannot undo a release that already happened" in FLOW_HTML
+
+
+def test_the_outcomes_panel_preserves_an_in_progress_selection_across_polls():
+    """P5 known gap #4: the panel re-renders every poll tick, which used to
+    reset a half-made selection under the operator's cursor."""
+    assert "inProgress" in FLOW_HTML
+    assert "Restore whatever the operator had selected" in FLOW_HTML
 
 
 def test_logout_clears_the_session():

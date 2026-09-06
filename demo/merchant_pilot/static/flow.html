@@ -24,6 +24,17 @@
   .outcomes button{padding:.35rem .8rem;border:0;border-radius:4px;background:#0969da;color:#fff;cursor:pointer}
   .outcomes .current{font-size:.85rem;color:#555;margin-top:.2rem}
   .outcomes .err{color:#b91c1c}
+  .session{border:1px solid #38556d;border-radius:6px;padding:.9rem;margin:.6rem 0;background:#f6f8fa}
+  .session h3{margin-top:0}
+  .session button{margin:.3rem .4rem .3rem 0;padding:.4rem .8rem;border:0;border-radius:4px;cursor:pointer;background:#0969da;color:#fff}
+  .session button.danger{background:#b45309}
+  .session .state{font:11px ui-monospace,Menlo,monospace;border-radius:999px;padding:2px 8px;margin-left:.3rem}
+  .session .state.ACTIVE{background:#dafbe1;color:#116329;border:1px solid #4ac26b}
+  .session .state.REVOKED{background:#ffebe9;color:#a40e26;border:1px solid #ff8182}
+  .session .state.EXPIRED,.session .state.ENDED{background:#eaeef2;color:#57606a;border:1px solid #afb8c1}
+  .session .state.UNKNOWN{background:#fff8c5;color:#7d4e00;border:1px solid #d4a72c}
+  .session .note{font-size:.78rem;color:#555;line-height:1.5;margin-top:.5rem}
+  .session .err{color:#b91c1c}
 </style>
 <h1>Number Verification consent</h1>
 <p>Scan this with the phone being verified. Disable Wi-Fi first if the provider
@@ -34,6 +45,7 @@ requires a mobile data connection.</p>
 <div id="outcome"></div>
 <div id="challenge-panel"></div>
 <div id="outcomes-panel"></div>
+<div id="session-panel"></div>
 <a class="back" href="/">← Start another consent</a>
 <script>
 const flowId = "__FLOW_ID__";
@@ -162,6 +174,17 @@ function renderOutcomesPanel(outcomes) {
   const panel = document.getElementById("outcomes-panel");
   const current = outcomes || {};
 
+  // P5 known gap #4: this panel re-renders on every poll tick, which used to
+  // reset an operator's half-made selection under their cursor — the poll
+  // interval decides whether your click lands on what you chose. Capture the
+  // live values first and restore them after, so a re-render only ever
+  // updates the *reported* state, never the in-progress one.
+  const inProgress = {};
+  for (const id of ["order-status-value", "fraud-value", "fraud-basis"]) {
+    const el = document.getElementById(id);
+    if (el) inProgress[id] = el.value;
+  }
+
   const optionsFor = (values) => values.map(v => `<option value="${v}">${v}</option>`).join("");
   const currentLine = (dimension) => current[dimension]
     ? `<p class="current">Current: <strong>${current[dimension].value}</strong>${current[dimension].basis ? " (" + current[dimension].basis + ")" : ""}</p>`
@@ -188,6 +211,12 @@ function renderOutcomesPanel(outcomes) {
       </div>
       <p class="err" id="outcomes-err"></p>
     </div>`;
+
+  // Restore whatever the operator had selected before this re-render.
+  for (const [id, value] of Object.entries(inProgress)) {
+    const el = document.getElementById(id);
+    if (el && value) el.value = value;
+  }
 
   const fraudValue = document.getElementById("fraud-value");
   const fraudBasis = document.getElementById("fraud-basis");
@@ -229,6 +258,94 @@ function renderOutcomesPanel(outcomes) {
   });
 }
 
+// I8. Four states are shown distinctly, and an unavailable lookup is its own
+// fifth — "we could not ask" is never rendered as permission to proceed, the
+// same distinction the whole product is built on.
+const KNOWN_SESSION_STATES = new Set(["ACTIVE", "REVOKED", "EXPIRED", "ENDED"]);
+
+function renderSessionPanel(session, decision) {
+  const panel = document.getElementById("session-panel");
+  if (decision !== "ALLOW") {
+    // Continuity monitoring is for an order that was actually allowed to
+    // proceed; a held order has nothing to revoke yet.
+    panel.innerHTML = "";
+    return;
+  }
+  if (!session) {
+    panel.innerHTML = `
+      <div class="session">
+        <h3>Trust continuity <span class="state UNKNOWN">not monitored</span></h3>
+        <p class="note">This checkout was allowed. Opening a trust session keeps
+        watching the SIM and device <em>after</em> the verdict, so a change before
+        fulfilment can put the order back on hold. The signed receipt above is
+        historical either way and never changes.</p>
+        <button id="open-session">Open a trust session</button>
+        <p class="err" id="session-err"></p>
+      </div>`;
+    document.getElementById("open-session").addEventListener("click", async () => {
+      const { ok, data } = await postJson("/api/flows/" + flowId + "/trust-session", {});
+      if (!ok) {
+        document.getElementById("session-err").textContent =
+          "Could not open a session: " + (data.detail || "error");
+        return;
+      }
+      poll();
+    });
+    return;
+  }
+
+  const state = KNOWN_SESSION_STATES.has(session.status) ? session.status : "UNKNOWN";
+  const released = session.fulfillment_state === "RELEASED";
+  const stateNote = state === "ACTIVE"
+    ? "The network has reported no SIM or device change since the verdict."
+    : state === "REVOKED"
+      ? "A SIM or device change was observed. Fulfilment stays held; releasing is refused."
+      : state === "UNKNOWN"
+        ? "The session's state could not be read. That is not permission to proceed — this is a hold, not an allow."
+        : `Monitoring is over (${state}). A new decision needs a fresh verification, not this receipt.`;
+
+  panel.innerHTML = `
+    <div class="session">
+      <h3>Trust continuity <span class="state ${state}">${state}</span></h3>
+      <p class="note">Session <code>${session.session_id}</code> ·
+      fulfilment <strong>${session.fulfillment_state}</strong></p>
+      <p class="note">${stateNote}</p>
+      ${released
+        ? `<p class="note"><strong>Order released.</strong> A later revocation holds
+           <em>future</em> fulfilment; it cannot undo a release that already happened.</p>`
+        : `<button id="release-order">Release the order</button>
+           <button class="danger" id="simulate-swap">Simulate a SIM swap</button>`}
+      <p class="err" id="session-err"></p>
+      <p class="note"><em>Simulator.</em> State lives in this process only; it is not
+      durable across a restart, and this is not transactional enforcement against a
+      real commerce backend.</p>
+    </div>`;
+
+  const release = document.getElementById("release-order");
+  if (release) {
+    release.addEventListener("click", async () => {
+      const { ok, data } = await postJson("/api/flows/" + flowId + "/release-order", {});
+      if (!ok) {
+        document.getElementById("session-err").textContent =
+          "Release refused: " + (data.detail || "error");
+      }
+      poll();
+    });
+  }
+  const swap = document.getElementById("simulate-swap");
+  if (swap) {
+    swap.addEventListener("click", async () => {
+      const { ok, data } = await postJson("/api/flows/" + flowId + "/simulate-swap", {});
+      if (!ok) {
+        document.getElementById("session-err").textContent =
+          "Could not simulate: " + (data.detail || "error");
+        return;
+      }
+      poll();
+    });
+  }
+}
+
 async function poll() {
   try {
     const response = await fetch("/api/flows/" + flowId);
@@ -246,6 +363,7 @@ async function poll() {
       renderOutcome(data.result);
       renderChallengePanel(data.challenge, data.result.decision);
       renderOutcomesPanel(data.outcomes);
+      renderSessionPanel(data.session, data.result.decision);
     }
     if (TERMINAL.has(data.status)) {
       return; // stop polling: a terminal state does not change again

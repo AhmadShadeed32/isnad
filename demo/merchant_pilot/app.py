@@ -679,6 +679,15 @@ async def release_order(
         return flow.session
 
 
+@app.get("/capabilities", response_class=HTMLResponse)
+async def capabilities_page(pilot_session: str | None = Cookie(default=None)) -> HTMLResponse:
+    """I10's read-only readiness view. Session-gated like every other page in
+    this harness; the manifest it renders is fetched from /api/capabilities."""
+    if sessions.get(pilot_session) is None:
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+    return HTMLResponse((_STATIC_DIR / "capabilities.html").read_text(encoding="utf-8"))
+
+
 @app.get("/api/capabilities")
 async def get_capabilities(pilot_session: str | None = Cookie(default=None)) -> dict:
     """I10 read-only readiness view: what is verified, unverified or
