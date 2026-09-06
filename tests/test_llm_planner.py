@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -145,45 +146,44 @@ def test_a_verdict_is_issued_on_the_evidence_gathered_when_the_model_stops(monke
 # --- every fallback path -----------------------------------------------------
 
 
-def test_an_unaffordable_action_falls_back_to_greedy():
+def test_an_unaffordable_response_stops_without_greedy():
     """step_up_otp is never in the affordable set for the gather loop."""
     choice = _planner(FakeClient(action="step_up_otp")).choose(
         Hypothesis.ACCOUNT_TAKEOVER, set(), 8.0, 0.3, []
     )
 
-    assert choice.source == "greedy"
-    assert choice.rationale == GREEDY_RATIONALE
-    assert choice.action == GreedyPlanner(_engine()).next_best(
-        Hypothesis.ACCOUNT_TAKEOVER, set(), 8.0
-    )
+    assert choice.source == "llm"
+    assert choice.stops
 
 
-def test_an_already_used_action_falls_back_to_greedy():
+def test_an_already_used_response_stops_without_greedy():
     choice = _planner(FakeClient(action="number_verify")).choose(
         Hypothesis.ACCOUNT_TAKEOVER, {Action.NUMBER_VERIFY}, 8.0, 0.3, []
     )
 
-    assert choice.source == "greedy"
+    assert choice.source == "llm"
+    assert choice.stops
     assert choice.action != Action.NUMBER_VERIFY
 
 
-def test_an_unknown_action_falls_back_to_greedy():
+def test_an_unknown_response_stops_without_greedy():
     choice = _planner(FakeClient(action="rm -rf /")).choose(Hypothesis.MULE, set(), 8.0, 0.3, [])
 
-    assert choice.source == "greedy"
-    assert choice.action is not None
+    assert choice.source == "llm"
+    assert choice.stops
 
 
-def test_a_prose_answer_instead_of_an_id_falls_back_to_greedy():
+def test_a_prose_response_stops_without_greedy():
     choice = _planner(FakeClient(action="I think you should check the SIM swap")).choose(
         Hypothesis.MULE, set(), 8.0, 0.3, []
     )
 
-    assert choice.source == "greedy"
+    assert choice.source == "llm"
+    assert choice.stops
 
 
 def test_a_client_exception_falls_back_to_greedy():
-    choice = _planner(FakeClient(raises=RuntimeError("connection reset"))).choose(
+    choice = _planner(FakeClient(raises=httpx.ConnectError("connection reset"))).choose(
         Hypothesis.MULE, set(), 8.0, 0.3, []
     )
 
@@ -199,7 +199,7 @@ def test_a_timeout_falls_back_to_greedy():
     assert choice.source == "greedy"
 
 
-def test_a_malformed_response_falls_back_to_greedy():
+def test_no_response_falls_back_to_greedy():
     class Malformed(FakeClient):
         def generate_json(self, **kwargs):
             self.calls += 1
@@ -221,7 +221,7 @@ def test_no_api_key_behaves_exactly_like_greedy():
     assert llm.choose(Hypothesis.MULE, set(), 8.0, 0.3, []).source == "greedy"
 
 
-def test_the_call_ceiling_hands_the_rest_of_the_run_to_greedy():
+def test_the_call_ceiling_stops_without_greedy():
     """Without a ceiling one request can burn unbounded model budget."""
     fake = FakeClient(action="sim_swap")
     planner = _planner(fake)
@@ -231,7 +231,8 @@ def test_the_call_ceiling_hands_the_rest_of_the_run_to_greedy():
         assert planner.choose(Hypothesis.ACCOUNT_TAKEOVER, set(), 8.0, 0.3, []).source == "llm"
 
     beyond = planner.choose(Hypothesis.ACCOUNT_TAKEOVER, set(), 8.0, 0.3, [])
-    assert beyond.source == "greedy"
+    assert beyond.source == "llm"
+    assert beyond.stops
     assert fake.calls == ceiling  # the model was not asked again
 
 

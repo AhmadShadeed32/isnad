@@ -137,7 +137,7 @@ flowchart LR
 ```
 
 1. **Form a hypothesis** from the interaction context.
-2. **Select evidence** using greedy planning or an explicitly enabled model planner.
+2. **Select evidence** using Gemini by default, or explicitly selected offline greedy planning.
 3. **Normalize provider answers** into the same `EvidenceLink` vocabulary.
 4. **Apply policy** to update the score, account for cost, and require relevant
    supporting evidence before allowing a suspicious interaction.
@@ -155,9 +155,10 @@ flowchart LR
 | Consent ownership, replay and cached completion | [Consent routes](app/api/routes_consent.py) |
 | Merchant challenge/outcome reference integration | [Pilot harness](demo/merchant_pilot/app.py) |
 
-The model can choose checks or STOP; it cannot waive policy gates. Failed model
-selection falls back to greedy, and output records the selection source that
-actually ran. Required checks can still be selected by policy. Costs are
+The model can choose checks or STOP; it cannot waive policy gates. Greedy takes over only when no model answer is available (missing key,
+transport failure, or empty candidate). Returned invalid output, explicit
+rejection, and the model call limit stop selection. Output records the source
+that actually ran. Required checks can still be selected by policy. Costs are
 normalized units, not quoted operator prices.
 
 ### What a signature proves

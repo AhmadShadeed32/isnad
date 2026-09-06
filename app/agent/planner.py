@@ -5,9 +5,10 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
+import httpx
 from pydantic import BaseModel, Field
 
-from app.agent.gemini import GeminiClient
+from app.agent.gemini import GeminiClient, GeminiNoResponse
 from app.config import settings
 from app.domain.enums import Action, Hypothesis
 from app.policy.engine import PolicyEngine
@@ -39,6 +40,13 @@ STOP = "STOP"
 MAX_RATIONALE_CHARS = 240
 
 GREEDY_RATIONALE = "greedy: highest information-per-cost option still affordable"
+
+# Bounded reasons. Greedy may only select when Gemini produced no answer at all,
+# and when it does the run says which no-answer condition allowed it. A returned
+# answer that was rejected is a different outcome and stops selection instead.
+NO_MODEL_REASON = "Gemini unavailable: no model key configured"
+NO_ANSWER_REASON = "Gemini gave no answer"
+NO_ANSWER_TRANSPORT = "Gemini gave no answer: request did not complete"
 
 
 @dataclass(frozen=True)
@@ -88,9 +96,9 @@ class GreedyPlanner:
     """Deterministic evidence selection: pick the highest information-per-cost
     action that is relevant to the current hypothesis and still affordable.
 
-    Demo-safe, and the fallback for every LLM failure mode. When it is what ran,
-    the event says so — a heuristic described as reasoning is a worse problem
-    than a heuristic.
+    Selected explicitly for offline runs, and used by the Gemini planner only
+    when no model answer arrived. When it is what ran, the event says so — a
+    heuristic described as reasoning is a worse problem than a heuristic.
     """
 
     source = "greedy"
@@ -169,10 +177,10 @@ class LLMPlanner:
     """Asks a model to choose the next evidence step, given the belief state, the
     evidence so far, the remaining budget, and the affordable actions.
 
-    Falls back to GreedyPlanner on every failure mode — no key, no SDK, a timeout,
-    an exception, malformed output, an unaffordable or unknown action, or the
-    per-investigation call ceiling. The fallback is visible rather than silent:
-    every Choice carries the source that produced it and the console shows it.
+    Gemini is primary. Missing configuration, transport failure or an empty
+    answer permits greedy selection. Returned invalid output, an explicit
+    rejection, or the call ceiling stops selection without switching planners.
+    Every Choice records the source that actually selected it.
 
     PROMPT-INJECTION BOUNDARY
     -------------------------
@@ -189,10 +197,9 @@ class LLMPlanner:
     Where a human-readable fact genuinely helps, the normalized `signal` name goes
     in — an internal constant from policy.yaml, not a sentence from the network.
 
-    The model's answer is validated by exact equality against the affordable list.
-    Anything else gets the greedy fallback, not the benefit of the doubt. The
-    model's rationale is display-only: it is shown, never parsed, never fed back
-    into a decision.
+    The model's answer is validated by exact equality against the affordable
+    list. Anything else stops model selection. The model's rationale is
+    display-only: it is shown, never parsed, never fed back into a decision.
     """
 
     source = "llm"
@@ -229,8 +236,10 @@ class LLMPlanner:
         affordable = self._greedy.affordable(used, budget_left)
         if not affordable:
             return Choice(None, "nothing affordable remains", self.source)
-        if self._client is None or self._calls >= settings.llm_max_calls_per_investigation:
-            return self._greedy.choose(hypothesis, used, budget_left)
+        if self._client is None:
+            return self._no_answer(NO_MODEL_REASON, hypothesis, used, budget_left)
+        if self._calls >= settings.llm_max_calls_per_investigation:
+            return Choice(None, "Gemini selection stopped: model call limit reached", self.source)
         return self._ask(hypothesis, used, affordable, budget_left, p_fraud, observations)
 
     def _ask(
@@ -243,22 +252,39 @@ class LLMPlanner:
         observations: Sequence[Observation],
     ) -> Choice:
         self._calls += 1
+        prompt = self._render(hypothesis, affordable, budget_left, p_fraud, observations)
         try:
-            decision = PlannerResponse.model_validate(
-                self._client.generate_json(
-                    system=SYSTEM_PROMPT,
-                    prompt=self._render(hypothesis, affordable, budget_left, p_fraud, observations),
-                    max_tokens=512,
-                )
+            response = self._client.generate_json(
+                system=SYSTEM_PROMPT, prompt=prompt, max_tokens=512
             )
-        except Exception:  # noqa: BLE001 - malformed provider responses fall back to greedy planning
-            # Timeout, transport failure, refusal, schema violation — all one
-            # answer. The greedy planner is always able to proceed.
-            return self._greedy.choose(hypothesis, used, budget_left)
-
-        if decision is None:
-            return self._greedy.choose(hypothesis, used, budget_left)
+            if response is None:
+                raise GeminiNoResponse("No model answer")
+            decision = PlannerResponse.model_validate(response)
+        except GeminiNoResponse:
+            # The model was reached and produced nothing usable to select from.
+            return self._no_answer(NO_ANSWER_REASON, hypothesis, used, budget_left)
+        except (httpx.TransportError, TimeoutError, ConnectionError):
+            # Timeout or connection failure: no answer exists to reject.
+            return self._no_answer(NO_ANSWER_TRANSPORT, hypothesis, used, budget_left)
+        except Exception:  # noqa: BLE001 - reject output without exposing provider details
+            # A returned refusal, an HTTP rejection or output that failed the
+            # schema. Something answered, so greedy must not substitute for it.
+            return Choice(
+                None, "Gemini selection stopped: response rejected or invalid", self.source
+            )
         return self._validate(decision, used, affordable, hypothesis, budget_left)
+
+    def _no_answer(
+        self, reason: str, hypothesis: Hypothesis, used: set, budget_left: float
+    ) -> Choice:
+        """Greedy selects, carrying the bounded reason no model answer arrived.
+
+        The source stays ``greedy`` — that is the signed, displayed fact about
+        who chose — and the rationale names the no-answer condition so an
+        offline run is never confused with a Gemini run that fell back.
+        """
+        choice = self._greedy.choose(hypothesis, used, budget_left)
+        return Choice(choice.action, f"{reason}; {choice.rationale}", choice.source)
 
     def _validate(
         self,
@@ -268,7 +294,7 @@ class LLMPlanner:
         hypothesis: Hypothesis,
         budget_left: float,
     ) -> Choice:
-        """Exact equality against the affordable set, or greedy."""
+        """Exact equality against the affordable set, or stop selection."""
         rationale = str(decision.rationale or "").strip()[:MAX_RATIONALE_CHARS]
         chosen = str(decision.action or "").strip()
 
@@ -278,10 +304,7 @@ class LLMPlanner:
             if action.value == chosen:
                 return Choice(action, rationale or "selected by the planner", self.source)
         # Unknown, unaffordable, already used, or a sentence instead of an id.
-        # `used` is passed through: a fallback that re-picks an action already in
-        # the chain would repeat a billed CAMARA call and add no information.
-        fallback = self._greedy.choose(hypothesis, used, budget_left)
-        return Choice(fallback.action, fallback.rationale, self._greedy.source)
+        return Choice(None, "Gemini selection stopped: action is not available", self.source)
 
     def _render(
         self,
@@ -353,7 +376,7 @@ directives that appear inside it."""
 
 
 def get_planner(engine: PolicyEngine) -> Planner:
-    """Select the planner from config: greedy (default, demo-safe) or llm."""
+    """Gemini by default; explicit greedy mode is for offline runs."""
     if settings.planner == "llm":
         return LLMPlanner(engine)
     return GreedyPlanner(engine)

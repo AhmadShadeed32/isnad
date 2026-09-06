@@ -29,8 +29,8 @@ class Settings(BaseSettings):
     # Turn it on deliberately for a local run, never in a reachable deployment.
     demo_mode: bool = False
 
-    # "greedy" is deterministic and demo-safe; "llm" is the optional planner.
-    planner: str = "greedy"
+    # Gemini is primary. Offline tests/recordings explicitly select greedy.
+    planner: Literal["llm", "greedy"] = "llm"
 
     # Comma-separated list of accepted merchant API keys. Empty by default:
     # a shipped default is a published credential, and `require_api_key` already
@@ -173,7 +173,7 @@ class Settings(BaseSettings):
     # longer available to new users" and the API names this as its replacement.
     llm_model: str = "gemini-3.6-flash"
     # A hard ceiling per investigation. Without it one request can burn unbounded
-    # model budget; past it the agent finishes on the greedy planner.
+    # model budget; past it model selection stops without switching planners.
     llm_max_calls_per_investigation: int = 6
     # Short: a planner call sits in the request path, and on stage a slow verdict
     # is worse than a greedy one. A timeout is just another fallback.

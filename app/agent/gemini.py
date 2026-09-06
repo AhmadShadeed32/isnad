@@ -7,8 +7,8 @@ growing a different provider contract, and a missing SDK silently turning an
 ``llm`` demo into a greedy one.
 
 The adapter intentionally knows nothing about decisions. Callers still validate
-model output against their own schemas and fall back deterministically on every
-transport, model, safety, or parsing failure.
+model output against their own schemas and decide whether an absent answer
+permits fallback or a returned rejection must stop selection.
 """
 
 from __future__ import annotations
@@ -22,6 +22,10 @@ import httpx
 
 class GeminiError(RuntimeError):
     """The provider did not return usable candidate text."""
+
+
+class GeminiNoResponse(GeminiError):
+    """No model answer arrived, as distinct from a returned invalid answer."""
 
 
 class GeminiClient:
@@ -98,22 +102,25 @@ class GeminiClient:
         """Extract text only from a normal candidate; never invent an answer."""
         if not isinstance(payload, dict):
             raise GeminiError("Gemini returned a non-object response")
+        feedback = payload.get("promptFeedback")
+        if isinstance(feedback, dict) and feedback.get("blockReason"):
+            raise GeminiError("Gemini declined the prompt")
         candidates = payload.get("candidates")
         if not isinstance(candidates, list) or not candidates:
-            # A safety-blocked prompt or a provider error has no candidate. It
-            # is no different from a timeout for Isnad: callers use their safe
-            # deterministic path rather than guessing why.
-            raise GeminiError("Gemini returned no candidate")
+            # Explicit safety blocks were rejected above; no answer remains.
+            raise GeminiNoResponse("Gemini returned no candidate")
         first = candidates[0] if isinstance(candidates[0], dict) else {}
         # Carried into every error below: an empty candidate from a safety block
         # and one from an exhausted token budget look identical otherwise, and
         # they call for opposite fixes.
         reason = first.get("finishReason") or "no finishReason"
+        if reason not in {"STOP", "MAX_TOKENS", "no finishReason"}:
+            raise GeminiError("Gemini declined or rejected the response")
         content = first.get("content")
         parts = content.get("parts") if isinstance(content, dict) else None
         if not isinstance(parts, list):
-            raise GeminiError(f"Gemini candidate had no text parts ({reason})")
+            raise GeminiNoResponse(f"Gemini candidate had no text parts ({reason})")
         text = "".join(part.get("text", "") for part in parts if isinstance(part, dict)).strip()
         if not text:
-            raise GeminiError(f"Gemini candidate contained no text ({reason})")
+            raise GeminiNoResponse(f"Gemini candidate contained no text ({reason})")
         return text
