@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from types import SimpleNamespace
 
 os.environ.setdefault("ISNAD_MERCHANT_API_KEY", "review-merchant-key")
@@ -21,6 +22,8 @@ import pytest
 from starlette.testclient import TestClient
 
 import demo.merchant_pilot.app as pilot
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 from app.consent import ConsentStore
 from app.domain.schemas import VerificationRequest
 from app.providers.nac import NacProvider
@@ -185,3 +188,81 @@ def test_review_invalid_context_returns_422_instead_of_500():
         json={"phone_number": "+99999991000", "event": "not_an_event", "account_age_days": -1},
     )
     assert response.status_code == 422, f"invalid context produced {response.status_code}"
+
+
+# --- F1: a COMPLETED flow with no receipt is still recovering -----------------
+#
+# The original R2 probe drove `_poll_and_maybe_complete` twice itself, so it
+# never touched the condition the operator actually hits: the browser stops
+# polling on every COMPLETED state, including one whose recovery has not
+# produced a receipt yet. `flow.status` is set from the consent *before* the
+# recovery attempt, so a failed recovery answers COMPLETED with no result and
+# the page goes quiet until a manual reload.
+
+FLOW_HTML = (REPO_ROOT / "demo" / "merchant_pilot" / "static" / "flow.html").read_text(
+    encoding="utf-8"
+)
+
+
+@pytest.mark.asyncio
+async def test_review_completed_without_a_receipt_is_reported_as_still_recovering(monkeypatch):
+    session = pilot.sessions.create()
+    flow = add_flow(session.session_id, status="PENDING", result=None)
+
+    def handler(req):
+        if req.method == "GET":
+            return httpx.Response(200, json={"status": "COMPLETED"})
+        raise httpx.ReadError("recovery attempt also lost", request=req)
+
+    upstream(monkeypatch, handler)
+    await pilot._poll_and_maybe_complete(flow)
+
+    assert flow.status == "COMPLETED"
+    assert flow.result is None, "the recovery failed; there is no receipt to show"
+
+    body = client_for(session).get("/api/flows/" + flow.flow_id).json()
+    assert body["status"] == "COMPLETED"
+    assert body["result"] is None
+    # The API must say this is not finished, so the page has something to act on
+    # other than inferring it from a null.
+    assert body["recovering"] is True
+
+
+@pytest.mark.asyncio
+async def test_review_a_recovered_flow_is_no_longer_marked_recovering(monkeypatch):
+    session = pilot.sessions.create()
+    flow = add_flow(session.session_id, status="PENDING", result=None)
+
+    def handler(req):
+        if req.method == "GET":
+            return httpx.Response(200, json={"status": "COMPLETED"})
+        return httpx.Response(200, json={"chain_id": "chn_f1", "decision": "CHALLENGE"})
+
+    upstream(monkeypatch, handler)
+    await pilot._poll_and_maybe_complete(flow)
+
+    body = client_for(session).get("/api/flows/" + flow.flow_id).json()
+    assert body["result"]["chain_id"] == "chn_f1"
+    assert body["recovering"] is False
+
+
+def test_review_the_page_keeps_polling_while_a_completed_flow_is_recovering():
+    """F1 step 1: stop only once the receipt is present."""
+    assert "data.recovering" in FLOW_HTML
+    assert "TERMINAL.has(data.status) && !data.recovering" in FLOW_HTML
+
+
+def test_review_the_page_says_recovery_is_in_progress_and_is_retryable():
+    """F1 step 2: a retryable message, not a silent quiet page."""
+    assert "recovering the signed result" in FLOW_HTML
+    assert "no check is bought again" in FLOW_HTML
+
+
+def test_review_a_missing_or_expired_upstream_consent_is_not_left_as_an_old_state():
+    """F1 step 2: an upstream consent that is gone must say so rather than
+    preserve whatever this harness last saw."""
+    assert "UNAVAILABLE" in FLOW_HTML
+    assert "no longer available" in FLOW_HTML
+    harness = (REPO_ROOT / "demo" / "merchant_pilot" / "app.py").read_text(encoding="utf-8")
+    assert 'flow.status = "UNAVAILABLE"' in harness
+    assert "flow.consent_gone = True" in harness

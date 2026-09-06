@@ -35,6 +35,12 @@
   .session .state.UNKNOWN{background:#fff8c5;color:#7d4e00;border:1px solid #d4a72c}
   .session .note{font-size:.78rem;color:#555;line-height:1.5;margin-top:.5rem}
   .session .err{color:#b91c1c}
+  /* F1: an upstream-complete flow whose receipt has not reached this harness
+     yet, and an upstream consent that is gone for good. Both used to be
+     invisible — the page simply stopped. */
+  .recovery-note{border:1px solid #d4a72c;background:#fff8c5;color:#7d4e00;
+                 border-radius:6px;padding:.7rem .8rem;margin:.6rem 0;
+                 font-size:.82rem;line-height:1.5}
 </style>
 <h1>Number Verification consent</h1>
 <p>Scan this with the phone being verified. Disable Wi-Fi first if the provider
@@ -42,6 +48,7 @@ requires a mobile data connection.</p>
 <div id="qr"></div>
 <p><a id="open-link" href="#" target="_blank" rel="noopener">Open the authorization link directly</a></p>
 <p class="status" id="status">Loading…</p>
+<p class="recovery-note" id="recovery-note" role="status" hidden></p>
 <div id="outcome"></div>
 <div id="challenge-panel"></div>
 <div id="outcomes-panel"></div>
@@ -50,7 +57,7 @@ requires a mobile data connection.</p>
 <script>
 const flowId = "__FLOW_ID__";
 const csrfToken = "__CSRF_TOKEN__";
-const TERMINAL = new Set(["COMPLETED", "DENIED", "FAILED", "EXPIRED"]);
+const TERMINAL = new Set(["COMPLETED", "DENIED", "FAILED", "EXPIRED", "UNAVAILABLE"]);
 let delayMs = 1500;
 const MAX_DELAY_MS = 8000;
 
@@ -354,7 +361,30 @@ async function poll() {
       return;
     }
     const data = await response.json();
-    document.getElementById("status").textContent = "Status: " + data.status;
+    // F1: COMPLETED is set from the upstream consent before the signed result
+    // is recovered, so a failed recovery answers COMPLETED with no receipt.
+    // Stopping here left the page quiet until a manual reload — the operator's
+    // order looked finished with nothing to show for it.
+    document.getElementById("status").textContent = data.recovering
+      ? "Status: COMPLETED upstream — recovering the signed result…"
+      : "Status: " + data.status;
+    const recoveryNote = document.getElementById("recovery-note");
+    if (data.recovering) {
+      recoveryNote.textContent =
+        "The network finished this verification, but its result did not reach this "
+        + "harness. Retrying automatically — Isnad returns the same completed result, "
+        + "so no check is bought again and no second investigation starts.";
+      recoveryNote.hidden = false;
+    } else if (data.status === "UNAVAILABLE") {
+      recoveryNote.textContent =
+        "The upstream consent for this order is no longer available — it passed its "
+        + "retention window or was revoked. Nothing further will arrive for it. Start "
+        + "a new verification if this order still needs one.";
+      recoveryNote.hidden = false;
+    } else {
+      recoveryNote.hidden = true;
+      recoveryNote.textContent = "";
+    }
     if (data.qr_svg && !document.getElementById("qr").innerHTML) {
       document.getElementById("qr").innerHTML = data.qr_svg;
       document.getElementById("open-link").href = data.authorization_url;
@@ -365,8 +395,11 @@ async function poll() {
       renderOutcomesPanel(data.outcomes);
       renderSessionPanel(data.session, data.result.decision);
     }
-    if (TERMINAL.has(data.status)) {
-      return; // stop polling: a terminal state does not change again
+    if (TERMINAL.has(data.status) && !data.recovering) {
+      // Stop only once there is nothing left to arrive: a terminal state does
+      // not change again, but a COMPLETED flow still recovering its receipt is
+      // not finished yet.
+      return;
     }
   } catch (err) {
     document.getElementById("status").textContent = "Request failed: " + err;

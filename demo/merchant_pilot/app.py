@@ -170,6 +170,10 @@ class FlowRecord:
     expires_at: datetime
     status: str = "PENDING"
     verifying: bool = False
+    # F1: the upstream consent this flow was built on is gone — past its
+    # retention window, or revoked. Distinct from "we have not heard yet":
+    # nothing further will arrive, so the page must stop implying it might.
+    consent_gone: bool = False
     result: dict[str, Any] | None = None
     # The merchant's own followup on a CHALLENGE decision (P3), sourced from
     # Isnad's /v1/chains/{chain_id}/challenges response — never mixed into
@@ -507,6 +511,13 @@ async def _poll_and_maybe_complete(flow: FlowRecord) -> None:
                 f"/v1/consents/{flow.consent_id}",
                 headers={"Authorization": f"Bearer {ISNAD_MERCHANT_API_KEY}"},
             )
+            if status_response.status_code == 404:
+                # F1: the upstream consent is gone — expired past retention, or
+                # revoked. Preserving whatever this harness last saw would leave
+                # an operator watching a state that no longer exists anywhere.
+                flow.status = "UNAVAILABLE"
+                flow.consent_gone = True
+                return
             if status_response.status_code != 200:
                 return
             consent_status = status_response.json().get("status")
@@ -568,6 +579,13 @@ async def get_flow(
         "authorization_url": flow.authorization_url,
         "qr_svg": flow.qr_svg,
         "result": flow.result,
+        # F1: COMPLETED is set from the consent *before* the receipt is
+        # recovered, so a failed recovery answers COMPLETED with no result. The
+        # browser stopped polling on every COMPLETED state and went quiet until
+        # a manual reload. Said explicitly here rather than left to be inferred
+        # from a null: the flow is upstream-complete but this harness does not
+        # hold the receipt yet, and the next poll will try again.
+        "recovering": flow.status == "COMPLETED" and flow.result is None,
         # The merchant's own CHALLENGE followup, if any — always a sibling of
         # `result`, never folded into it (P3).
         "challenge": flow.challenge,
