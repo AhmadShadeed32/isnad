@@ -26385,7 +26385,7 @@
       "node_kind": "heading",
       "norm_label": "8. latest session",
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L1304"
+      "source_location": "L1310"
     },
     {
       "id": "docs_phase2_handoff_agent_execution_and_release_checklist",
@@ -26397,7 +26397,7 @@
       "node_kind": "heading",
       "norm_label": "agent execution and release checklist",
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L1277"
+      "source_location": "L1283"
     },
     {
       "id": "docs_phase2_handoff_before_implementation",
@@ -26421,7 +26421,7 @@
       "node_kind": "heading",
       "norm_label": "evidence behind the recommendations",
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L727"
+      "source_location": "L733"
     },
     {
       "id": "docs_phase2_handoff_execution_order_and_completion_ledger",
@@ -26517,7 +26517,7 @@
       "node_kind": "heading",
       "norm_label": "i10 \u2014 provider capability and consent readiness",
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L1107"
+      "source_location": "L1113"
     },
     {
       "id": "docs_phase2_handoff_i11_reference_merchant_integration_and_location_claim_capture",
@@ -26529,7 +26529,7 @@
       "node_kind": "heading",
       "norm_label": "i11 \u2014 reference merchant integration and location-claim capture",
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L1138"
+      "source_location": "L1144"
     },
     {
       "id": "docs_phase2_handoff_i12_outcome_learning_and_safe_policy_comparison",
@@ -26541,7 +26541,7 @@
       "node_kind": "heading",
       "norm_label": "i12 \u2014 outcome learning and safe policy comparison",
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L1173"
+      "source_location": "L1179"
     },
     {
       "id": "docs_phase2_handoff_i13_expiring_reviewer_links_with_explicit_disclosure_scope",
@@ -26553,7 +26553,7 @@
       "node_kind": "heading",
       "norm_label": "i13 \u2014 expiring reviewer links with explicit disclosure scope",
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L1206"
+      "source_location": "L1212"
     },
     {
       "id": "docs_phase2_handoff_i14_durable_trace_recovery_after_a_disconnect",
@@ -26565,7 +26565,7 @@
       "node_kind": "heading",
       "norm_label": "i14 \u2014 durable trace recovery after a disconnect",
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L1243"
+      "source_location": "L1249"
     },
     {
       "id": "docs_phase2_handoff_i1_decision_trace_and_honest_ai_replay",
@@ -26577,7 +26577,7 @@
       "node_kind": "heading",
       "norm_label": "i1 \u2014 decision trace and honest ai replay",
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L824"
+      "source_location": "L830"
     },
     {
       "id": "docs_phase2_handoff_i2_one_fact_counterfactual_explorer",
@@ -26589,7 +26589,7 @@
       "node_kind": "heading",
       "norm_label": "i2 \u2014 one-fact counterfactual explorer",
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L864"
+      "source_location": "L870"
     },
     {
       "id": "docs_phase2_handoff_i3_evidence_budget_and_decision_comparison",
@@ -26601,7 +26601,7 @@
       "node_kind": "heading",
       "norm_label": "i3 \u2014 evidence budget and decision comparison",
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L895"
+      "source_location": "L901"
     },
     {
       "id": "docs_phase2_handoff_i4_network_failure_and_recovery_demonstration",
@@ -26613,7 +26613,7 @@
       "node_kind": "heading",
       "norm_label": "i4 \u2014 network failure and recovery demonstration",
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L925"
+      "source_location": "L931"
     },
     {
       "id": "docs_phase2_handoff_i5_customer_recovery_after_a_challenged_checkout",
@@ -26625,7 +26625,7 @@
       "node_kind": "heading",
       "norm_label": "i5 \u2014 customer recovery after a challenged checkout",
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L957"
+      "source_location": "L963"
     },
     {
       "id": "docs_phase2_handoff_i6_arabic_first_clarity_english_parity_and_accessible_receipts",
@@ -26637,7 +26637,7 @@
       "node_kind": "heading",
       "norm_label": "i6 \u2014 arabic-first clarity, english parity and accessible receipts",
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L986"
+      "source_location": "L992"
     },
     {
       "id": "docs_phase2_handoff_i7_portable_receipt_verification_and_privacy_explanation",
@@ -26649,7 +26649,7 @@
       "node_kind": "heading",
       "norm_label": "i7 \u2014 portable receipt verification and privacy explanation",
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L1015"
+      "source_location": "L1021"
     },
     {
       "id": "docs_phase2_handoff_i8_trust_continuity_connected_to_a_merchant_action",
@@ -26661,7 +26661,7 @@
       "node_kind": "heading",
       "norm_label": "i8 \u2014 trust continuity connected to a merchant action",
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L1046"
+      "source_location": "L1052"
     },
     {
       "id": "docs_phase2_handoff_i9_judge_controlled_scenario_challenge",
@@ -26673,7 +26673,7 @@
       "node_kind": "heading",
       "norm_label": "i9 \u2014 judge-controlled scenario challenge",
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L1082"
+      "source_location": "L1088"
     },
     {
       "id": "docs_phase2_handoff_isnad_compact_handoff",
@@ -26793,7 +26793,7 @@
       "node_kind": "heading",
       "norm_label": "shared implementation contract for i1\u2013i4 and i9",
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L772"
+      "source_location": "L778"
     },
     {
       "id": "docs_phase2_handoff_shortlist_dependencies_and_scope",
@@ -26805,7 +26805,7 @@
       "node_kind": "heading",
       "norm_label": "shortlist, dependencies and scope",
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L739"
+      "source_location": "L745"
     },
     {
       "id": "docs_phase2_handoff_verified_event_facts_and_unresolved_requirements",
@@ -72813,7 +72813,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L1015",
+      "source_location": "L1021",
       "weight": 1.0
     },
     {
@@ -72824,7 +72824,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L1046",
+      "source_location": "L1052",
       "weight": 1.0
     },
     {
@@ -72835,7 +72835,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L1082",
+      "source_location": "L1088",
       "weight": 1.0
     },
     {
@@ -72846,7 +72846,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L1107",
+      "source_location": "L1113",
       "weight": 1.0
     },
     {
@@ -72857,7 +72857,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L1138",
+      "source_location": "L1144",
       "weight": 1.0
     },
     {
@@ -72868,7 +72868,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L1173",
+      "source_location": "L1179",
       "weight": 1.0
     },
     {
@@ -72879,7 +72879,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L1206",
+      "source_location": "L1212",
       "weight": 1.0
     },
     {
@@ -72890,7 +72890,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L1243",
+      "source_location": "L1249",
       "weight": 1.0
     },
     {
@@ -72901,7 +72901,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L1277",
+      "source_location": "L1283",
       "weight": 1.0
     },
     {
@@ -72912,7 +72912,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L727",
+      "source_location": "L733",
       "weight": 1.0
     },
     {
@@ -72923,7 +72923,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L739",
+      "source_location": "L745",
       "weight": 1.0
     },
     {
@@ -72934,7 +72934,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L772",
+      "source_location": "L778",
       "weight": 1.0
     },
     {
@@ -72945,7 +72945,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L824",
+      "source_location": "L830",
       "weight": 1.0
     },
     {
@@ -72956,7 +72956,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L864",
+      "source_location": "L870",
       "weight": 1.0
     },
     {
@@ -72967,7 +72967,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L895",
+      "source_location": "L901",
       "weight": 1.0
     },
     {
@@ -72978,7 +72978,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L925",
+      "source_location": "L931",
       "weight": 1.0
     },
     {
@@ -72989,7 +72989,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L957",
+      "source_location": "L963",
       "weight": 1.0
     },
     {
@@ -73000,7 +73000,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L986",
+      "source_location": "L992",
       "weight": 1.0
     },
     {
@@ -73011,7 +73011,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "docs/PHASE2_HANDOFF.md",
-      "source_location": "L1304",
+      "source_location": "L1310",
       "weight": 1.0
     },
     {
@@ -101619,5 +101619,5 @@
       "source_file": "docs/nac/sim_swap.json"
     }
   ],
-  "built_at_commit": "b5b4a338dbfa557f5c642f5e0cae23b038b51206"
+  "built_at_commit": "69b4dc91c1b90f388df817389067e9444d6593e1"
 }

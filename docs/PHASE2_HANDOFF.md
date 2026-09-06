@@ -724,6 +724,12 @@ extension, even where it builds on working functionality. This section collects
 the competitive lessons and additional product suggestions in one build order.
 It does not supersede P1–P5's correctness contracts or H0–H5's submission gates.
 
+**Concurrent implementation update:** P4a, P3 and P5 are now recorded as DONE
+LOCALLY in §3/§8. Where I5/I11/I12 say to implement these dependencies, inspect
+and reuse that existing work first; do not recreate its harness, tables, routes
+or migrations. The additional competition experiences still require their own
+acceptance checks. Local fake-operator results do not complete physical proof P4b.
+
 ### Evidence behind the recommendations
 
 No other MENA Ignite submission was verified in the public search. These are
@@ -1320,8 +1326,12 @@ browser checks). These are previous implementation results, not tests rerun here
 P2 still needs actual keyboard traversal verification and the 375 px receipt table
 fix; P4a/I11 own the unresolved real merchant location-claim input contract.
 
-**Validation for this pass:** pending final documentation and graph checks.
-No model/provider trial, outreach, deployment, commit or push performed.
+**Validation for this planning pass:** local documentation links/anchors, the
+fourteen-item ledger and whitespace checked; graph refreshed and feature headings
+queried. P1/P2 archival content was verified against the preserved source. No
+application tests were rerun by this documentation pass. Concurrent implementation
+records below are preserved and attributed to their own sessions. No model/provider
+trial, outreach, deployment, commit or push was performed by the planning pass.
 
 **P4a implementation — 6 Sep (concurrent follow-up session):** built the
 local live-consent journey and current OAuth contract per §3 P4a — fixed

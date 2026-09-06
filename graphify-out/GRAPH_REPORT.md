@@ -1,7 +1,7 @@
 # Graph Report - isnad  (2026-09-06)
 
 ## Corpus Check
-- 198 files · ~169,587 words
+- 198 files · ~169,689 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `b5b4a338`
+- Built from commit: `69b4dc91`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
