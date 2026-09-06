@@ -29,6 +29,23 @@ all against the catalog host `https://network-as-code.p-eu.apihub.nokia.io`.
 | 10 | `forwarding_unconditional` | `…0422` | 422 | `http_422` | 342 |
 | 11 | `forwarding_unconditional` | `…0503` | 503 | `http_503` | 324 |
 
+### Two corrections to the 2026-09-06 file itself
+
+Both were found while reviewing the runner after the batch, and both are
+recorded rather than edited out of the data:
+
+1. **`request_correlator` was generated locally and never sent** on those eleven
+   calls. The runner created the UUID for the record but did not pass it to the
+   SDK, so no `x-correlator` header travelled and the operator never saw these
+   ids. They are local run ids for that file, nothing more. The runner now
+   threads the correlator into every operation whose CAMARA contract accepts
+   one, asserted by
+   `tests/test_nac_demo_probe.py::test_the_recorded_correlator_is_the_one_the_operator_actually_saw`.
+2. **Line 7 (`congestion_list`) records a device it never used.** That
+   operation addresses the subscription collection, not a device; the runner
+   demanded a number for it anyway. Fixed with a `needs_device` flag, so the
+   field is now null for collection-level operations.
+
 ## What these observations settled
 
 - **The catalog host answers.** `network-as-code.p-eu.apihub.nokia.io` returned

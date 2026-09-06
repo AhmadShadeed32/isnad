@@ -269,6 +269,24 @@ def test_an_unstructured_error_falls_back_to_a_bounded_code(capsys):
     assert len(json.dumps(record)) < 2000
 
 
+def test_the_recorded_correlator_is_the_one_the_operator_actually_saw():
+    """A record that names a correlator must have sent it. Generating an id
+    locally and filing it as a provider correlator is a fabricated trace."""
+    transport = Transport((200, {"swapped": False}))
+    run(["--operation", "sim_swap_check", "--number", "+99999991000", "--execute"], transport)
+
+    assert transport.requests[0].headers["x-correlator"]
+
+
+def test_a_device_less_operation_records_no_device(capsys):
+    """`congestion_list` addresses the collection. Demanding a number for it
+    would file a device into a record that never carried one."""
+    transport = Transport((200, []))
+    assert run(["--operation", "congestion_list", "--execute"], transport) == 0
+
+    assert output(capsys)["device"] is None
+
+
 def test_the_recorded_device_is_masked(capsys):
     transport = Transport((200, {"swapped": False}))
     run(["--operation", "sim_swap_check", "--number", "+99999991000", "--execute"], transport)

@@ -82,6 +82,9 @@ class Operation:
     mutating: bool = False
     needs_callback: bool = False
     needs_subscription: bool = False
+    # Some operations address the collection, not a device. Demanding a number
+    # for those puts a device into a record that never carried one.
+    needs_device: bool = True
 
 
 def _iso(value: Any) -> str | None:
@@ -163,7 +166,10 @@ OPERATIONS: dict[str, Operation] = {
         "passthrough/camara/v1/sim-swap/sim-swap/v0/check",
         "Boolean: was the SIM changed inside the window we send?",
         lambda c, a: c.sim_swap.check(
-            phone_number=a.number, max_age=a.max_age, request_options=REQUEST_OPTIONS
+            phone_number=a.number,
+            max_age=a.max_age,
+            correlator=a.correlator,
+            request_options=REQUEST_OPTIONS,
         ),
         _norm_swap_check,
     ),
@@ -172,7 +178,10 @@ OPERATIONS: dict[str, Operation] = {
         "passthrough/camara/v1/device-swap/device-swap/v1/check",
         "Boolean: was the handset changed inside the window we send?",
         lambda c, a: c.device_swap.check(
-            phone_number=a.number, max_age=a.max_age, request_options=REQUEST_OPTIONS
+            phone_number=a.number,
+            max_age=a.max_age,
+            correlator=a.correlator,
+            request_options=REQUEST_OPTIONS,
         ),
         _norm_swap_check,
     ),
@@ -181,7 +190,7 @@ OPERATIONS: dict[str, Operation] = {
         "passthrough/camara/v1/sim-swap/sim-swap/v0/retrieve-date",
         "Nullable timestamp of the latest SIM change. A separate billable call.",
         lambda c, a: c.sim_swap.retrieve_date(
-            phone_number=a.number, request_options=REQUEST_OPTIONS
+            phone_number=a.number, correlator=a.correlator, request_options=REQUEST_OPTIONS
         ),
         _norm_sim_date,
     ),
@@ -190,7 +199,7 @@ OPERATIONS: dict[str, Operation] = {
         "passthrough/camara/v1/device-swap/device-swap/v1/retrieve-date",
         "Nullable timestamp plus the monitored period in days.",
         lambda c, a: c.device_swap.retrieve_date(
-            phone_number=a.number, request_options=REQUEST_OPTIONS
+            phone_number=a.number, correlator=a.correlator, request_options=REQUEST_OPTIONS
         ),
         _norm_device_date,
     ),
@@ -200,7 +209,7 @@ OPERATIONS: dict[str, Operation] = {
         "/v0.3/unconditional-call-forwardings",
         "Voice forwarding only. Not SMS forwarding, and not fraud by itself.",
         lambda c, a: c.call_forwarding_signal.retrieve_unconditional_call_forwarding(
-            phone_number=a.number, request_options=REQUEST_OPTIONS
+            phone_number=a.number, correlator=a.correlator, request_options=REQUEST_OPTIONS
         ),
         _norm_forwarding,
     ),
@@ -256,6 +265,7 @@ OPERATIONS: dict[str, Operation] = {
         "Reconciles an uncertain create instead of repeating it.",
         lambda c, a: c.congestion_insights.list_subscriptions(request_options=REQUEST_OPTIONS),
         lambda r: {"count": len(list(r or []))},
+        needs_device=False,
     ),
 }
 
@@ -274,7 +284,7 @@ class Runner:
             raise ProbeError(f"unknown operation: {args.operation!r}")
         if args.host not in HOSTS:
             raise ProbeError(f"host must be one of {sorted(HOSTS)}, not {args.host!r}")
-        if not operation.needs_subscription:
+        if operation.needs_device and not operation.needs_subscription:
             number = args.number or ""
             if not E164.match(number):
                 raise ProbeError("number must be E.164, for example +99999991000")
@@ -316,7 +326,7 @@ class Runner:
                     "callback_host": (
                         _host_only(args.callback_url) if op.needs_callback else None
                     ),
-                    "device": _masked(args.number) if not op.needs_subscription else None,
+                    "device": _masked(args.number) if op.needs_device and not op.needs_subscription else None,
                     "expiry": args.expire_time if op.needs_callback else None,
                     "cleanup": (
                         "congestion_delete with the returned subscription_id"
@@ -330,7 +340,10 @@ class Runner:
 
     def execute(self, args: argparse.Namespace, operation: Operation, client: Any) -> dict[str, Any]:
         """Exactly one attempt. The record is written whether or not it worked."""
-        correlator = str(uuid.uuid4())
+        # Sent as CAMARA's `x-correlator` on the operations whose contract has
+        # one, so the id in this record is the id the operator saw. It is ours,
+        # random, and carries nothing about the subscriber.
+        args.correlator = str(uuid.uuid4())
         started = time.perf_counter()
         record: dict[str, Any] = {
             "operation": operation.name,
@@ -338,8 +351,12 @@ class Runner:
             "host": HOSTS[args.host],
             "path": operation.path,
             "observed_at_utc": dt.datetime.now(dt.UTC).isoformat(),
-            "device": _masked(args.number) if not operation.needs_subscription else None,
-            "request_correlator": correlator,
+            "device": (
+                _masked(args.number)
+                if operation.needs_device and not operation.needs_subscription
+                else None
+            ),
+            "request_correlator": args.correlator,
             "request_options": dict(REQUEST_OPTIONS),
         }
         self.attempts += 1

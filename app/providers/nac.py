@@ -28,6 +28,19 @@ from app.providers.vocabulary import detail_for, window_hours
 _NAC_POOL = ThreadPoolExecutor(max_workers=8, thread_name_prefix="nac")
 
 
+def _bounded() -> dict[str, object]:
+    """Per-call limits for every SDK operation this adapter makes.
+
+    The SDK retries a 408/429/500/502/503 twice by default, with a sleeping
+    backoff — three attempts, three billable calls, inside a thread this
+    adapter is already timing out from the outside. Measured, not assumed:
+    `tests/test_nac_wire_contract.py` asserts both the default and this
+    override. One attempt is what the cost accounting in a signed chain claims
+    happened, so one attempt is what happens.
+    """
+    return {"timeout_in_seconds": settings.nac_timeout_seconds, "max_retries": 0}
+
+
 class NacProvider:
     """Nokia Network-as-Code adapter.
 
@@ -206,6 +219,7 @@ class NacProvider:
             response = self.client.sim_swap.check(
                 phone_number=phone,
                 max_age=settings.nac_max_age_hours,
+                request_options=_bounded(),
             )
             swapped = bool(self._value(response, "swapped", False))
             signal = "SIM_SWAPPED" if swapped else "SIM_STABLE"
@@ -217,13 +231,16 @@ class NacProvider:
             response = self.client.device_swap.check(
                 phone_number=phone,
                 max_age=settings.nac_max_age_hours,
+                request_options=_bounded(),
             )
             swapped = bool(self._value(response, "swapped", False))
             signal = "DEVICE_SWAPPED" if swapped else "DEVICE_STABLE"
             return Result.FLAG if swapped else Result.PASS, signal, detail_for(signal)
 
         if action == Action.REACHABILITY:
-            response = self.client.device_status.retrieve_reachability_status(device=device)
+            response = self.client.device_status.retrieve_reachability_status(
+                device=device, request_options=_bounded()
+            )
             reachable = self._value(response, "reachable", None)
             connectivity = self._value(response, "connectivity", None)
             if reachable:
@@ -236,7 +253,9 @@ class NacProvider:
             return Result.FLAG, "REACHABLE_UNAVAILABLE", detail_for("REACHABLE_UNAVAILABLE")
 
         if action == Action.ROAMING:
-            response = self.client.device_status.retrieve_roaming_status(device=device)
+            response = self.client.device_status.retrieve_roaming_status(
+                device=device, request_options=_bounded()
+            )
             roaming = bool(self._value(response, "roaming", False))
             countries = self._value(response, "countryName", []) or []
             if roaming:
@@ -259,6 +278,7 @@ class NacProvider:
                     "radius": claim.radius_m,
                 },
                 max_age=settings.nac_location_max_age_seconds,
+                request_options=_bounded(),
             )
             verification = str(self._value(response, "verification_result", "UNKNOWN")).upper()
             if verification == "TRUE":

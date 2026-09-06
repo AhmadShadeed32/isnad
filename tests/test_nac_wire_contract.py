@@ -344,6 +344,47 @@ def test_max_retries_zero_means_one_attempt_for_a_retryable_status():
     assert len(rec.requests) == 1
 
 
+@pytest.fixture
+def no_backoff(monkeypatch):
+    """The SDK sleeps between retries. The count is the fact under test, not
+    the wall-clock cost of proving it."""
+    from network_as_code.core import http_client
+
+    monkeypatch.setattr(http_client.time, "sleep", lambda _seconds: None)
+
+
+@pytest.mark.parametrize("status", [408, 429, 500, 502, 503])
+def test_the_sdk_retries_by_default_which_is_why_every_call_site_overrides_it(status, no_backoff):
+    """Measured, not assumed. Without `max_retries=0` the SDK makes three
+    attempts at a retryable status, with a sleeping backoff — three billable
+    calls where the signed chain claims one. Every call site in
+    `app/providers/nac.py` and `scripts/nac_demo_probe.py` overrides it."""
+    rec = Recorder([(status, {"status": status})] * 3)
+
+    with pytest.raises(Exception):  # noqa: B017 - the SDK's own error type
+        api(rec).sim_swap.check(phone_number=SIMULATOR_NUMBER, max_age=24)
+
+    assert len(rec.requests) == 3
+
+
+def test_a_non_retryable_status_is_attempted_once_even_by_default():
+    rec = Recorder([(422, {"status": 422})] * 3)
+
+    with pytest.raises(Exception):  # noqa: B017 - the SDK's own error type
+        api(rec).sim_swap.check(phone_number=SIMULATOR_NUMBER, max_age=24)
+
+    assert len(rec.requests) == 1
+
+
+def test_a_correlator_travels_as_the_camara_x_correlator_header():
+    rec = Recorder([(200, {"swapped": False})])
+    api(rec).sim_swap.check(
+        phone_number=SIMULATOR_NUMBER, max_age=24, correlator="corr-1", request_options=BOUNDED
+    )
+
+    assert rec.requests[0].headers["x-correlator"] == "corr-1"
+
+
 def test_an_error_status_raises_rather_than_returning_a_false_negative():
     """A 422 must never normalize to `swapped=False`."""
     rec = Recorder([(422, {"status": 422, "code": "INVALID_ARGUMENT", "message": "bad number"})])
