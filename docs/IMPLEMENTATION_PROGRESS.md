@@ -17,7 +17,7 @@ a mock response or a dated test count.
 | 3 Bounded simulator probe | PASSED (congestion lifecycle EXTERNAL LIMIT) | `scripts/nac_demo_probe.py`, `tests/test_nac_demo_probe.py`, `app/config.py` (callback settings), `docs/nac/observations/` | `pytest -q tests/test_nac_demo_probe.py` → **38 passed, 0.17 s** (2026-09-06); ruff clean | **11 real authenticated calls** to the hosted simulator, one attempt each, catalog host, sanitized records in `docs/nac/observations/2026-09-06-hosted-simulator.jsonl`. Six planned swap calls + `congestion_list` + four call-forwarding calls incl. documented 422/503 | Congestion **create/get/query/delete and callback delivery were not attempted**: no reachable HTTPS callback is configured, and the probe refuses to point an operator at an unowned destination. `…1000`'s 24-hour device boolean contradicts its 19-day-old device date — recorded, and gate 5 must not merge them |
 | 4 Gemini-first selection | PASSED | `app/config.py`, `app/agent/gemini.py`, `app/agent/planner.py`, `tests/test_gemini_primary.py`, `tests/test_llm_planner.py`, `.env.example`, `README.md` | Runbook gate-4 line (`test_gemini_primary test_gemini test_llm_planner test_allow_evidence_gate test_hypothesis_relevance test_t4_ask_the_agent`) → **88 passed, 0.82 s** (2026-09-06) | Exception routing verified by test, not by reading: `httpx.TimeoutException`/`ConnectError` ⊂ `TransportError` → greedy with `NO_ANSWER_TRANSPORT`; `HTTPStatusError` (429/4xx/5xx), `JSONDecodeError`, schema failure, `blockReason`, non-STOP `finishReason` → stop, source `llm`. Alternate greedy paths audited: only `investigator._choreography`, labelled `policy`. Model prose rendered by `textContent` in `console.html:addRow` and `judge.html:appendTrace` | No live Gemini call yet — that is gate 11.2, deliberately separate from the Nokia probes |
 | 5 Swap timestamps | PASSED | `app/chain/models.py` (`EvidenceTiming`), `app/providers/timing.py` (new), `nac.py`, `mock.py`, `hybrid.py`, `base.py`, `app/agent/investigator.py`, `app/policy/policy.yaml`, `app/policy/engine.py`, `app/static/{judge,console}.html`, `app/static/i18n{.js,/en.json,/ar.json}`, `tests/test_swap_timestamps.py` (new, 37) | `pytest -q` → **1012 passed, 20.1 s** (2026-09-06); ruff clean | Legacy receipt verifies byte-for-byte against its own recorded key; a new receipt's `provider_time` and `disagrees_with_window` are inside the signature (tamper tests); the authored fixture reproduces the hosted contradiction | Documented cost delta: pricing the date as a second call changes evaluation numbers — the takeover fixture now spends 7 on three links instead of 8 on four. Gate 13 must record the difference rather than retune it |
-| 6 Congestion Insights | NOT STARTED | | | | |
+| 6 Congestion Insights | PASSED offline; hosted lifecycle **EXTERNAL LIMIT** | `app/network_conditions.py`, `app/api/routes_network_conditions.py`, `app/db/models.py`, `migrations/versions/0006_network_conditions.py`, `app/domain/schemas.py`, `app/config.py`, `app/providers/{nac,mock}.py`, `app/static/judge.html`, `app/static/i18n/*`, `tests/test_network_conditions.py` (new, 60) | `pytest -q` → **1072 passed, 20.5 s** (2026-09-06); ruff clean | Two-owner isolation on every operation, forged/missing/cross-subscription callback tokens, duplicate and out-of-order events, bounded event storage, provider denial, empty result, unknown confidence, expiry without a worker, idempotent delete, surfaced cleanup failure, and zero provider calls on verify/page-load/locale-change | **No hosted create/get/query/delete and no callback delivery.** No reachable HTTPS callback is configured, so `nac_congestion_callback_url` is empty and creation is refused by design. `congestion_list` on 2026-09-06 returned 200 with an empty collection: the account can read, and nothing is leaked |
 | 7 Identity extensions | NOT STARTED | | | | |
 | 8 Arabic + English | IN PROGRESS | `app/static/i18n.js`, `app/static/i18n/{en,ar}.json`, product HTML, `demo/merchant_pilot` | | | Executable DOM tests missing; translator is provisional |
 | 9 UI verification | NOT STARTED | | | | |
@@ -119,6 +119,37 @@ observation.
 
 Actually called: nothing external in this gate.
 
-Next action: gate 6 — Congestion Insights. Read the hosted status first: the
-account can read the subscription collection (200, empty) but no callback is
-configured, so create/query/delete stay unobserved and the UI must say so.
+Superseded by the gate 6 checkpoint below.
+
+### 2026-09-06 — gate 6 complete offline; hosted lifecycle is an external limit
+
+Finished: owner-scoped `/v1/network-conditions` create/get/query/delete plus a
+separately authenticated public callback; two new tables with an Alembic
+migration; finite limits for TTL, active count per owner and per device, query
+window, event age and stored events per subscription; and a judge-page panel that
+renders level, mode, period, confidence-or-unknown, updated-at, provenance and a
+retry that preserves the page.
+
+The three refusals the whole feature rests on are tested rather than commented:
+an empty interval list is `unknown` and not `Low`; a missing confidence stays
+`None` and never becomes 0 or 100; a successful create is never presented as a
+delivered notification. Congestion reaches no belief, no score and no signed
+chain — asserted by running a verification and checking the provider was not
+called at all.
+
+Mocked only: every provider exchange. `MockProvider.query_congestion` is an
+authored operator, including a number that returns nothing and one that returns
+a level with no confidence.
+
+Actually called: nothing external in this gate. The only hosted congestion
+observation remains `congestion_list` → 200, empty, from gate 3.
+
+External limit, stated plainly: **no subscription has ever been created at the
+operator, and no callback has ever been delivered.** That needs a reachable
+HTTPS endpoint this project owns; until one exists the probe and the API both
+refuse to point an operator at an unowned destination, which is the correct
+behaviour rather than a gap to work around.
+
+Next action: gate 7a — Number Recycling, with a merchant-supplied last-verified
+date and no automatic ALLOW from a non-recycled number. Record explicit
+dispositions for 7b, 7c and 7d.

@@ -332,3 +332,58 @@ class RunEventRow(Base):
     event_type: Mapped[str] = mapped_column(String(32))
     body_json: Mapped[str] = mapped_column(Text)
     server_time: Mapped[datetime] = mapped_column(UtcDateTime, index=True, default=lambda: datetime.now(UTC))
+
+
+class NetworkConditionSubscriptionRow(Base):
+    """One congestion subscription this service owns at the operator (gate 6).
+
+    Network conditions are INFORMATION, not evidence: nothing in this table
+    reaches a belief, a score or a signed chain. It exists so a subscription we
+    created can be found again — reconciled after an uncertain write, read back,
+    and above all deleted. A demo subscription that outlives the demo is a leak
+    at somebody else's expense.
+
+    The phone number is stored hashed under the same pepper as everything else:
+    a device binding is needed to reject a callback about a subscriber we never
+    asked about, and that does not require keeping the number.
+    """
+
+    __tablename__ = "network_condition_subscriptions"
+
+    subscription_id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    owner_hash: Mapped[str] = mapped_column(String(64), index=True)
+    # What the operator called it. Null while a create is unreconciled — the
+    # row is written BEFORE the provider call so an uncertain create can be
+    # reconciled by listing rather than repeated blindly.
+    provider_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    device_hash: Mapped[str] = mapped_column(String(64), index=True)
+    # "hosted_simulator" or "live_operator". Never inferred from a successful
+    # call: it is what the configured provider actually is.
+    scope: Mapped[str] = mapped_column(String(32), default="hosted_simulator")
+    status: Mapped[str] = mapped_column(String(24), default="pending", index=True)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime)
+    expires_at: Mapped[datetime] = mapped_column(UtcDateTime, index=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    # sha256 of the bearer token this subscription's callbacks must present.
+    # Per subscription, so one leaked token cannot authenticate another's events.
+    callback_token_digest: Mapped[str] = mapped_column(String(64))
+    last_error: Mapped[str] = mapped_column(String(120), default="")
+
+
+class NetworkConditionEventRow(Base):
+    """One congestion notification delivered to our callback.
+
+    Deduplicated by (subscription, event_id) and bounded per subscription, so a
+    replayed or flooded callback cannot grow this table without limit. Stale and
+    out-of-order events are rejected against `occurred_at` rather than stored
+    and sorted later: an old reading arriving late must not become the current
+    condition.
+    """
+
+    __tablename__ = "network_condition_events"
+
+    subscription_id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    event_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    level: Mapped[str] = mapped_column(String(16))
+    occurred_at: Mapped[datetime] = mapped_column(UtcDateTime, index=True)
+    received_at: Mapped[datetime] = mapped_column(UtcDateTime)

@@ -159,6 +159,51 @@ class NacProvider:
         status = getattr(exc, "status_code", None)
         return isinstance(status, int) and 400 <= status < 500
 
+    # --- network conditions (information, never evidence) --------------------
+
+    def create_congestion_subscription(
+        self, phone_number: str, callback_url: str, callback_token: str, expires_at
+    ) -> str:
+        """One create. Returns the operator's own id, which get/delete take."""
+        response = self.client.congestion_insights.create_subscription(
+            device={"phone_number": phone_number},
+            webhook={
+                "notification_url": callback_url,
+                "notification_auth_token": callback_token,
+            },
+            subscription_expire_time=expires_at.isoformat().replace("+00:00", "Z"),
+            request_options=_bounded(),
+        )
+        # `subscription_id`, not the public tutorial's `resource_id` — that
+        # attribute does not exist on the installed SDK's response.
+        return str(self._value(response, "subscription_id", "") or "")
+
+    def delete_congestion_subscription(self, provider_id: str) -> None:
+        self.client.congestion_insights.delete_subscription(
+            resource_id=provider_id, request_options=_bounded()
+        )
+
+    def query_congestion(self, phone_number: str, start=None, end=None) -> list[dict]:
+        """Both bounds absent asks for the forecast; both present asks history."""
+        period = {}
+        if start and end:
+            period = {
+                "start": start.isoformat().replace("+00:00", "Z"),
+                "end": end.isoformat().replace("+00:00", "Z"),
+            }
+        response = self.client.congestion_insights.query(
+            device={"phone_number": phone_number}, **period, request_options=_bounded()
+        )
+        return [
+            {
+                "start": self._value(item, "time_interval_start", None),
+                "stop": self._value(item, "time_interval_stop", None),
+                "level": self._value(item, "congestion_level", None),
+                "confidence": self._value(item, "confidence_level", None),
+            }
+            for item in (response or [])
+        ]
+
     async def begin_number_verification(
         self, phone_number: str, redirect_uri: str, state: str, nonce: str
     ) -> str:

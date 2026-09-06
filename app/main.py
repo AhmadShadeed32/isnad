@@ -15,6 +15,7 @@ from app.api import (
     routes_i18n,
     routes_judge,
     routes_lab,
+    routes_network_conditions,
     routes_outcomes,
     routes_privacy,
     routes_proof_shares,
@@ -104,6 +105,8 @@ def create_app() -> FastAPI:
     app.include_router(routes_registry.router)
     app.include_router(routes_verified_caller.router)
     app.include_router(routes_i18n.router)
+    app.include_router(routes_network_conditions.router)
+    app.include_router(routes_network_conditions.callback_router)
     app.include_router(routes_proof_shares.router)
     app.include_router(routes_proof_shares.page_router)
 

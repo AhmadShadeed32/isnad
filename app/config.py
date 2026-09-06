@@ -160,6 +160,19 @@ class Settings(BaseSettings):
     nac_congestion_callback_token: str = ""
     # Short by design: a demo subscription that outlives the demo is a leak.
     nac_congestion_subscription_ttl_seconds: int = 900
+    # Finite limits, because every one of these bounds a request we make to an
+    # operator on a caller's behalf.
+    network_conditions_max_active_per_owner: int = 5
+    network_conditions_max_active_per_device: int = 1
+    # The longest historical window a caller may ask about, and the shortest
+    # gap between two queries on one subscription.
+    network_conditions_max_query_hours: int = 24
+    network_conditions_min_query_interval_seconds: int = 5
+    # How many delivered notifications are retained per subscription. A callback
+    # is an endpoint someone else calls; unbounded storage is theirs to fill.
+    network_conditions_max_events_per_subscription: int = 50
+    # How far out of date a delivered event may be before it is refused.
+    network_conditions_max_event_age_seconds: int = 900
 
     # --- Offline fake operator (P4a, ISNAD_PROVIDER=nac_fake) ---
     # demo/fake_operator is a small separate ASGI app started on loopback; it

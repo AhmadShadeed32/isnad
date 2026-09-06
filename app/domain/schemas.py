@@ -543,3 +543,70 @@ class ProofShareAttestation(BaseModel):
     expires_at: str
     issuer_public_key: str
     signature: str
+
+
+# --- network conditions (gate 6) --------------------------------------------
+#
+# Deliberately its own family of schemas rather than fields on a verification.
+# A congested cell explains a slow or failed attempt; it is not evidence about
+# a person, and giving it a home inside the verification request would be the
+# first step towards it becoming one.
+
+
+class NetworkConditionSubscribeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    phone_number: str = Field(..., min_length=8, max_length=20)
+
+
+class NetworkConditionSubscription(BaseModel):
+    subscription_id: str
+    status: str
+    # hosted_simulator or live_operator. Never inferred from a call that worked.
+    scope: str
+    created_at: datetime
+    expires_at: datetime
+    # True when no further provider call will be made for this subscription, so
+    # a polling page knows to stop rather than to keep asking.
+    terminal: bool
+    reason: str = ""
+
+
+class NetworkConditionInterval(BaseModel):
+    start: datetime
+    stop: datetime
+    # Low | Medium | High | unknown. `unknown` is a real answer: the SDK does
+    # not constrain this vocabulary, so an unexpected value must not be shown
+    # as if it were a level.
+    level: str
+    # None means the operator did not say. Never 0, never 100.
+    confidence: int | None = None
+
+
+class NetworkConditionQueryRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    phone_number: str = Field(..., min_length=8, max_length=20)
+    # Both absent asks for the upcoming forecast. Both present asks for an
+    # explicit historical window; one alone is refused rather than silently
+    # becoming a fifteen-minute interval nobody asked for.
+    start: datetime | None = None
+    end: datetime | None = None
+
+
+class NetworkConditionQueryResponse(BaseModel):
+    subscription_id: str
+    mode: str  # forecast | history
+    intervals: list[NetworkConditionInterval] = Field(default_factory=list)
+    observed_at: datetime
+    provenance: str
+    # True when the operator returned nothing. A UI must render this as unknown
+    # and never as a Low reading.
+    empty: bool
+
+
+class NetworkConditionEvent(BaseModel):
+    """One notification the operator delivered to our callback."""
+
+    model_config = ConfigDict(extra="forbid")
+    event_id: str = Field(..., min_length=1, max_length=128)
+    level: str = Field(..., max_length=32)
+    occurred_at: datetime

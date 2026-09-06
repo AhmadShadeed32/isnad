@@ -102,6 +102,19 @@
     </article>
   </section>
 
+  <section class="network-conditions" aria-labelledby="ncTitle">
+    <h2 id="ncTitle" data-i18n="ui.network_conditions_title">Network conditions</h2>
+    <p class="nc-scope" data-i18n="ui.network_conditions_scope">Information about the network, shown separately from the trust decision. A congested cell can explain a slow or failed verification. It is not evidence about a person, it never changes the risk score, and it never waives a check.</p>
+    <div class="nc-actions">
+      <button id="ncSubscribe" type="button" data-i18n="ui.network_conditions_subscribe">Start a network condition subscription</button>
+      <button id="ncForecast" type="button" disabled data-i18n="ui.network_conditions_forecast">Check the forecast</button>
+      <button id="ncHistory" type="button" disabled data-i18n="ui.network_conditions_history">Check the last hour</button>
+      <button id="ncDelete" type="button" disabled data-i18n="ui.network_conditions_delete">Delete the subscription</button>
+    </div>
+    <div id="ncState" class="nc-state" data-i18n="ui.network_conditions_idle">No subscription. Nothing is requested from the operator until you ask.</div>
+    <div id="ncResult" class="nc-result"></div>
+  </section>
+
   <section class="proof" aria-label="Why this is different">
     <article class="card"><h3>MINIMUM NECESSARY EVIDENCE</h3><p>The agent spends its evidence budget only until the decision is justified. It can <b>stop early</b> rather than collect a surveillance profile.</p></article>
     <article class="card"><h3>VISIBLE ORCHESTRATION</h3><p>Each selected CAMARA check shows its <b>decision rationale, source, and result</b>, instead of hiding a fixed rules sequence behind “AI.”</p></article>
@@ -112,6 +125,21 @@
   <p class="technical">Need the full test console? <a href="/console">Open Isnad Live Agent Console</a></p>
 </main>
 <!-- Same origin, no CDN: the shared locale switch (I6). -->
+<style>
+.network-conditions{margin-block:1.5rem;padding:1rem 1.25rem;border:1px solid #d6d9de;border-radius:10px;background:#fbfbfc}
+.network-conditions h2{margin:0 0 .35rem;font-size:1rem;letter-spacing:.04em;text-transform:uppercase}
+.nc-scope{margin:0 0 .75rem;max-width:60ch;color:#4a5058;font-size:.9rem}
+.nc-actions{display:flex;flex-wrap:wrap;gap:.5rem;margin-block-end:.75rem}
+.nc-actions button{padding:.45rem .8rem;border:1px solid #c3c8cf;border-radius:6px;background:#fff;cursor:pointer;font:inherit;font-size:.9rem}
+.nc-actions button:disabled{opacity:.5;cursor:not-allowed}
+.nc-actions button:focus-visible,.network-conditions a:focus-visible{outline:3px solid #1a5fb4;outline-offset:2px}
+.nc-state{font-size:.9rem;color:#3a4048}
+.nc-result{margin-block-start:.6rem;font-size:.9rem}
+.nc-level{display:inline-block;padding:.1rem .5rem;border-radius:4px;border:1px solid currentColor;font-weight:600}
+.nc-level.low{color:#1a7f37}.nc-level.medium{color:#8a5300}.nc-level.high{color:#b3261e}.nc-level.unknown{color:#4a5058}
+.nc-interval{padding:.35rem 0;border-block-start:1px solid #e6e8eb}
+.nc-note{color:#4a5058}
+</style>
 <script src="/ui/i18n.js"></script>
 <script>
 'use strict';
@@ -315,6 +343,115 @@ function onEvent(event){
     renderVerdict(event, {persisted:false}); setStatus('Decision complete. Saving the signed evidence chain…');
   }
 }
+// --- network conditions ------------------------------------------------------
+//
+// Every provider request here starts from a click. Rendering this page, or
+// switching language, must never cause one: a passive surface that calls an
+// operator is a bill the reader did not agree to.
+const ncEls = {
+  subscribe: document.getElementById('ncSubscribe'),
+  forecast: document.getElementById('ncForecast'),
+  history: document.getElementById('ncHistory'),
+  remove: document.getElementById('ncDelete'),
+  state: document.getElementById('ncState'),
+  result: document.getElementById('ncResult')
+};
+let ncSubscription = null;
+function currentPhoneNumber(){
+  return (SCENARIO_COPY[activeScenario] || SCENARIO_COPY.replacement).phone;
+}
+function ncText(key, fallback){ return window.Isnad ? window.Isnad.t('ui.' + key, fallback) : fallback; }
+function ncSetState(text){ ncEls.state.textContent = text; }
+function ncButtons(busy){
+  const live = ncSubscription && !ncSubscription.terminal;
+  // Disabled while in flight so a second click cannot start a second call.
+  ncEls.subscribe.disabled = busy || !!live;
+  ncEls.forecast.disabled = busy || !live;
+  ncEls.history.disabled = busy || !live;
+  ncEls.remove.disabled = busy || !live;
+}
+function ncLevelNode(level){
+  const span = document.createElement('span');
+  span.className = 'nc-level ' + String(level || 'unknown').toLowerCase();
+  // A glyph as well as a colour: colour alone is not a state.
+  const glyph = level === 'High' ? '▲ ' : level === 'Medium' ? '◆ ' : level === 'Low' ? '● ' : '? ';
+  span.textContent = glyph + ncText('network_conditions_level_' + String(level || 'unknown').toLowerCase(), level || 'unknown');
+  return span;
+}
+function ncRenderQuery(body){
+  ncEls.result.replaceChildren();
+  const header = document.createElement('div');
+  header.textContent = ncText('network_conditions_mode_' + body.mode, body.mode) + ' · '
+    + ncText('network_conditions_provenance', 'source') + ': ' + body.provenance;
+  ncEls.result.appendChild(header);
+  if (body.empty){
+    const empty = document.createElement('div');
+    empty.className = 'nc-note';
+    // Explicitly not "Low": the operator returned nothing at all.
+    empty.textContent = ncText('network_conditions_empty', 'The operator returned no reading. The condition is unknown.');
+    ncEls.result.appendChild(empty);
+  }
+  (body.intervals || []).forEach(interval => {
+    const row = document.createElement('div');
+    row.className = 'nc-interval';
+    row.appendChild(ncLevelNode(interval.level));
+    row.append(document.createTextNode(' '));
+    row.appendChild(window.Isnad ? window.Isnad.isolate(interval.start + ' → ' + interval.stop)
+                                 : document.createTextNode(interval.start + ' → ' + interval.stop));
+    const confidence = document.createElement('span');
+    confidence.className = 'nc-note';
+    confidence.textContent = ' · ' + (interval.confidence === null || interval.confidence === undefined
+      ? ncText('network_conditions_confidence_unknown', 'confidence not reported')
+      : ncText('network_conditions_confidence', 'confidence') + ' ' + interval.confidence + '%');
+    row.appendChild(confidence);
+    ncEls.result.appendChild(row);
+  });
+  const stamp = document.createElement('div');
+  stamp.className = 'nc-note';
+  stamp.append(document.createTextNode(ncText('network_conditions_updated', 'Updated at') + ' '));
+  stamp.appendChild(window.Isnad ? window.Isnad.isolate(body.observed_at)
+                                 : document.createTextNode(body.observed_at));
+  ncEls.result.appendChild(stamp);
+}
+async function ncCall(run, busyKey){
+  ncButtons(true);
+  ncSetState(ncText(busyKey, 'Working…'));
+  try {
+    await run();
+  } catch (error){
+    // The order, the form and any previous reading stay exactly as they were:
+    // a failed network-condition request must never cost the reader their work.
+    ncSetState(ncText('network_conditions_failed', 'The request did not complete.') + ' ' + error.message);
+  } finally {
+    ncButtons(false);
+  }
+}
+ncEls.subscribe.addEventListener('click', () => ncCall(async () => {
+  ncSubscription = await apiJson('/v1/network-conditions/subscriptions', {
+    method: 'POST', body: JSON.stringify({phone_number: currentPhoneNumber()})
+  });
+  ncSetState(ncText('network_conditions_active', 'Subscription active until') + ' ' + ncSubscription.expires_at);
+}, 'network_conditions_working'));
+ncEls.forecast.addEventListener('click', () => ncCall(async () => {
+  ncRenderQuery(await apiJson(`/v1/network-conditions/subscriptions/${ncSubscription.subscription_id}/query`, {
+    method: 'POST', body: JSON.stringify({phone_number: currentPhoneNumber()})
+  }));
+  ncSetState(ncText('network_conditions_read', 'Reading complete.'));
+}, 'network_conditions_working'));
+ncEls.history.addEventListener('click', () => ncCall(async () => {
+  const end = new Date();
+  const start = new Date(end.getTime() - 3600000);
+  ncRenderQuery(await apiJson(`/v1/network-conditions/subscriptions/${ncSubscription.subscription_id}/query`, {
+    method: 'POST',
+    body: JSON.stringify({phone_number: currentPhoneNumber(), start: start.toISOString(), end: end.toISOString()})
+  }));
+  ncSetState(ncText('network_conditions_read', 'Reading complete.'));
+}, 'network_conditions_working'));
+ncEls.remove.addEventListener('click', () => ncCall(async () => {
+  ncSubscription = await apiJson(`/v1/network-conditions/subscriptions/${ncSubscription.subscription_id}`, {method: 'DELETE'});
+  ncSetState(ncText('network_conditions_deleted', 'Subscription deleted at the operator.'));
+}, 'network_conditions_working'));
+
 function setFactGroup(group, list, items){
   group.hidden = items.length === 0;
   list.replaceChildren();
@@ -384,18 +521,23 @@ const SCENARIO_COPY = {
     story: 'Her SIM was replaced, but her handset is unchanged. A rule that declines every SIM change loses her order. Isnad checks the surrounding evidence before deciding.',
     foot: 'Expected: CHALLENGE. Ask for the merchant’s step-up instead of automatically declining. Operator answers are simulated.',
     path: '/v1/console/run/act6',
+    // The fixture's own subscriber number, so the network-condition panel asks
+    // about the same device the checkout was about.
+    phone: '+962790000002',
   },
   clean: {
     title: 'A clean checkout.',
     story: 'A new customer has no merchant history. Supporting network evidence can let this checkout proceed without another step-up.',
     foot: 'Expected: ALLOW. Supporting evidence clears this fixed example. Operator answers are simulated.',
     path: '/v1/console/run/act3',
+    phone: '+962790000001',
   },
   gap: {
     title: 'Consent withheld, one operator gone quiet.',
     story: 'The customer has not granted Number Verification consent, and one operator check comes back unavailable rather than pass or fail. The chain has a real gap in it, not a contradiction.',
     foot: 'Expected: CHALLENGE, evidence unresolved. This is "we could not check," not "the check failed."',
     path: '/v1/console/run/act5',
+    phone: '+962790000005',
   },
 };
 async function runCheckout(scenario = 'replacement'){

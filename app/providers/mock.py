@@ -201,6 +201,16 @@ NO_DATE_NUMBERS: set[str] = {"+962790000005", "+99999991005"}
 DISAGREEING_NUMBERS: set[str] = {"+962790000002", "+99999991000"}
 _DISAGREEING_AGE = timedelta(days=19)
 
+# Authored network conditions. `None` confidence is deliberate: an operator
+# that reports a level without one is the case a UI turns into a fake 100%.
+NO_CONGESTION_DATA: set[str] = {"+962790000005", "+99999991005"}
+_MOCK_CONGESTION: dict[str, tuple[str, int | None]] = {
+    "+962790000002": ("High", None),
+    "+99999991000": ("High", None),
+    "+962790000001": ("Low", 82),
+    "+99999991001": ("Low", 82),
+}
+
 
 def trip_swap(phone: str) -> None:
     TRIPPED.add(phone)
@@ -244,6 +254,29 @@ class MockProvider:
         if request.phone_number in DISAGREEING_NUMBERS and signal in timing_lib.CHANGED_SIGNALS:
             age = _DISAGREEING_AGE
         return timing_lib.normalize(action, retrieved_at - age, retrieved_at)
+
+    # --- network conditions: an authored operator, clearly labelled ----------
+
+    def create_congestion_subscription(
+        self, phone_number: str, callback_url: str, callback_token: str, expires_at
+    ) -> str:
+        return "mock-congestion-" + str(abs(hash(phone_number)) % 100000)
+
+    def delete_congestion_subscription(self, provider_id: str) -> None:
+        return None
+
+    def query_congestion(self, phone_number: str, start=None, end=None) -> list[dict]:
+        """A scripted reading, including the two shapes a UI most often gets
+        wrong: nothing at all, and a level with no confidence attached."""
+        if phone_number in NO_CONGESTION_DATA:
+            return []
+        now = timing_lib.now_utc()
+        first = start or now
+        second = (end or now + timedelta(minutes=15))
+        level, confidence = _MOCK_CONGESTION.get(phone_number, ("Low", 82))
+        return [
+            {"start": first, "stop": second, "level": level, "confidence": confidence}
+        ]
 
     async def gather(self, action: Action, request: VerificationRequest) -> EvidenceLink:
         if self.step_delay_ms:
