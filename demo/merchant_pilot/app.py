@@ -500,6 +500,18 @@ async def get_flow(
     }
 
 
+@app.get("/api/capabilities")
+async def get_capabilities(pilot_session: str | None = Cookie(default=None)) -> dict:
+    """I10 read-only readiness view: what is verified, unverified or
+    unavailable in the current NaC integration, and why. No provider call —
+    this only reads the authored manifest that H2's own recorded captures
+    produced."""
+    _require_session(pilot_session)
+    from app.nac_capabilities import load_capabilities
+
+    return load_capabilities()
+
+
 @app.post("/api/flows/{flow_id}/outcomes")
 async def report_flow_outcome(
     flow_id: str,

@@ -519,6 +519,22 @@ def test_an_unknown_outcome_dimension_is_rejected(monkeypatch):
     assert resp.status_code == 422
 
 
+def test_capabilities_requires_a_session():
+    client = _client()
+    response = client.get("/api/capabilities")
+    assert response.status_code == 401
+
+
+def test_capabilities_lists_the_manifest_read_only():
+    client = _client()
+    _login(client)
+    response = client.get("/api/capabilities")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["schema_version"] == 1
+    assert len(body["capabilities"]) >= 6
+
+
 def test_logout_clears_the_session():
     client = _client()
     _login(client)
