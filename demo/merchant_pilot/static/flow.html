@@ -9,6 +9,13 @@
   .card{border:1px solid #ddd;border-radius:6px;padding:.9rem;margin:.6rem 0}
   ul{margin:.3rem 0;padding-left:1.2rem}
   a.back{display:inline-block;margin-top:1rem}
+  .challenge{border:1px solid #b45309;border-radius:6px;padding:.9rem;margin:.6rem 0;background:#fffbeb}
+  .challenge h3{margin-top:0}
+  .challenge button{margin:.3rem .4rem .3rem 0;padding:.4rem .8rem;border:0;border-radius:4px;cursor:pointer}
+  .challenge button.pass{background:#1a7f37;color:#fff}
+  .challenge button.fail{background:#b91c1c;color:#fff}
+  .challenge button.abandon{background:#6e7781;color:#fff}
+  .challenge .err{color:#b91c1c}
 </style>
 <h1>Number Verification consent</h1>
 <p>Scan this with the phone being verified. Disable Wi-Fi first if the provider
@@ -17,9 +24,11 @@ requires a mobile data connection.</p>
 <p><a id="open-link" href="#" target="_blank" rel="noopener">Open the authorization link directly</a></p>
 <p class="status" id="status">Loading…</p>
 <div id="outcome"></div>
+<div id="challenge-panel"></div>
 <a class="back" href="/">← Start another consent</a>
 <script>
 const flowId = "__FLOW_ID__";
+const csrfToken = "__CSRF_TOKEN__";
 const TERMINAL = new Set(["COMPLETED", "DENIED", "FAILED", "EXPIRED"]);
 let delayMs = 1500;
 const MAX_DELAY_MS = 8000;
@@ -41,6 +50,81 @@ function renderOutcome(result) {
     </div>`;
 }
 
+async function postJson(url, body) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
+    body: JSON.stringify(body),
+  });
+  const data = await response.json().catch(() => ({}));
+  return { ok: response.ok, status: response.status, data };
+}
+
+// This block is deliberately separate from renderOutcome(): the signed
+// CHALLENGE decision above never changes, and a merchant's own followup
+// report must always read as an addition next to it, never as a replacement
+// or an upgrade to ALLOW (P3).
+function renderChallengePanel(challenge, decision) {
+  const panel = document.getElementById("challenge-panel");
+  if (decision !== "CHALLENGE") {
+    panel.innerHTML = "";
+    return;
+  }
+  if (!challenge) {
+    panel.innerHTML = `
+      <div class="challenge">
+        <h3>Continue merchant verification</h3>
+        <p>This decision was CHALLENGE. Record what your own follow-up (a manual
+        review, a callback) found.</p>
+        <button id="start-challenge">Start a followup</button>
+        <p class="err" id="challenge-err"></p>
+      </div>`;
+    document.getElementById("start-challenge").addEventListener("click", async () => {
+      const { ok, data } = await postJson("/api/flows/" + flowId + "/challenge", {});
+      if (!ok) {
+        document.getElementById("challenge-err").textContent =
+          "Could not start followup: " + (data.detail || "error");
+        return;
+      }
+      poll();
+    });
+    return;
+  }
+  if (challenge.status === "PENDING") {
+    panel.innerHTML = `
+      <div class="challenge">
+        <h3>Continue merchant verification</h3>
+        <p>Followup attempt <code>${challenge.attempt_id}</code> is open. Report what
+        you found — this is separate from the signed decision above and never
+        changes it.</p>
+        <button class="pass" data-result="PASSED">Passed</button>
+        <button class="fail" data-result="FAILED">Failed</button>
+        <button class="abandon" data-result="ABANDONED">Abandoned</button>
+        <p class="err" id="challenge-err"></p>
+      </div>`;
+    for (const button of panel.querySelectorAll("button[data-result]")) {
+      button.addEventListener("click", async () => {
+        const { ok, data } = await postJson("/api/flows/" + flowId + "/challenge/events", {
+          result: button.dataset.result,
+        });
+        if (!ok) {
+          document.getElementById("challenge-err").textContent =
+            "Could not report result: " + (data.detail || "error");
+          return;
+        }
+        poll();
+      });
+    }
+    return;
+  }
+  panel.innerHTML = `
+    <div class="challenge">
+      <h3>Merchant verification: ${challenge.status}</h3>
+      <p>Reported at ${challenge.reported_at || challenge.created_at}. This is the
+      merchant's own followup — the signed decision above is unchanged.</p>
+    </div>`;
+}
+
 async function poll() {
   try {
     const response = await fetch("/api/flows/" + flowId);
@@ -56,6 +140,7 @@ async function poll() {
     }
     if (data.result) {
       renderOutcome(data.result);
+      renderChallengePanel(data.challenge, data.result.decision);
     }
     if (TERMINAL.has(data.status)) {
       return; // stop polling: a terminal state does not change again

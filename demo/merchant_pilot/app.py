@@ -165,6 +165,10 @@ class FlowRecord:
     status: str = "PENDING"
     verifying: bool = False
     result: dict[str, Any] | None = None
+    # The merchant's own followup on a CHALLENGE decision (P3), sourced from
+    # Isnad's /v1/chains/{chain_id}/challenges response — never mixed into
+    # `result`, which is the signed verdict.
+    challenge: dict[str, Any] | None = None
     lock: threading.Lock = field(default_factory=threading.Lock)
 
 
@@ -202,6 +206,13 @@ class NewFlowRequest(BaseModel):
     phone_number: str
     event: str = "checkout"
     account_age_days: int | None = None
+
+
+_REPORTABLE_RESULTS = {"PASSED", "FAILED", "ABANDONED"}
+
+
+class ChallengeEventBody(BaseModel):
+    result: str
 
 
 # --- app ---
@@ -341,7 +352,7 @@ async def flow_page(flow_id: str, pilot_session: str | None = Cookie(default=Non
     if flows.get(flow_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no such flow")
     html = (_STATIC_DIR / "flow.html").read_text(encoding="utf-8")
-    html = html.replace("__FLOW_ID__", flow_id)
+    html = html.replace("__FLOW_ID__", flow_id).replace("__CSRF_TOKEN__", session.csrf_token)
     return HTMLResponse(html)
 
 
@@ -468,4 +479,88 @@ async def get_flow(
         "authorization_url": flow.authorization_url,
         "qr_svg": flow.qr_svg,
         "result": flow.result,
+        # The merchant's own CHALLENGE followup, if any — always a sibling of
+        # `result`, never folded into it (P3).
+        "challenge": flow.challenge,
     }
+
+
+@app.post("/api/flows/{flow_id}/challenge")
+async def create_flow_challenge(
+    flow_id: str,
+    request: Request,
+    pilot_session: str | None = Cookie(default=None),
+    x_csrf_token: str | None = Header(default=None),
+) -> dict:
+    """Open a followup on this flow's CHALLENGE decision.
+
+    Idempotency-Key is derived from the flow id, not generated fresh: a
+    double-submit of this button (a slow network, an impatient click) must
+    reopen the same attempt, not mint a second one.
+    """
+    session = _require_session(pilot_session)
+    _require_csrf(request, session, x_csrf_token)
+    flow = flows.get(flow_id)
+    if flow is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no such flow")
+    if flow.result is None or flow.result.get("decision") != "CHALLENGE":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="this flow's decision is not CHALLENGE"
+        )
+
+    chain_id = flow.result["chain_id"]
+    async with httpx.AsyncClient(base_url=ISNAD_BASE_URL, timeout=15.0) as client:
+        response = await client.post(
+            f"/v1/chains/{chain_id}/challenges",
+            headers={
+                "Authorization": f"Bearer {ISNAD_MERCHANT_API_KEY}",
+                "Idempotency-Key": f"pilot-challenge-create-{flow_id}",
+            },
+            json={"method": "manual_review"},
+        )
+    if response.status_code not in (200, 201):
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Isnad rejected the challenge attempt")
+    flow.challenge = response.json()
+    return flow.challenge
+
+
+@app.post("/api/flows/{flow_id}/challenge/events")
+async def report_flow_challenge_event(
+    flow_id: str,
+    request: Request,
+    pilot_session: str | None = Cookie(default=None),
+    x_csrf_token: str | None = Header(default=None),
+) -> dict:
+    """Report what the merchant found. One result per attempt: a repeat click
+    with the same result replays; a different result after resolution is a 409
+    forwarded from Isnad, not silently accepted."""
+    session = _require_session(pilot_session)
+    _require_csrf(request, session, x_csrf_token)
+    flow = flows.get(flow_id)
+    if flow is None or flow.challenge is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no open challenge attempt for this flow")
+
+    try:
+        body = ChallengeEventBody.model_validate(await request.json())
+    except ValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.errors())
+    if body.result not in _REPORTABLE_RESULTS:
+        raise HTTPException(status_code=422, detail="result must be PASSED, FAILED or ABANDONED")
+
+    chain_id = flow.result["chain_id"]
+    attempt_id = flow.challenge["attempt_id"]
+    async with httpx.AsyncClient(base_url=ISNAD_BASE_URL, timeout=15.0) as client:
+        response = await client.post(
+            f"/v1/chains/{chain_id}/challenges/{attempt_id}/events",
+            headers={
+                "Authorization": f"Bearer {ISNAD_MERCHANT_API_KEY}",
+                "Idempotency-Key": f"pilot-challenge-event-{flow_id}-{attempt_id}-{body.result}",
+            },
+            json={"result": body.result},
+        )
+    if response.status_code == status.HTTP_409_CONFLICT:
+        raise HTTPException(status_code=409, detail=response.json().get("detail"))
+    if response.status_code != 200:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Isnad rejected the challenge report")
+    flow.challenge = {**flow.challenge, **response.json()}
+    return flow.challenge
