@@ -162,7 +162,7 @@ function renderOutcomesPanel(outcomes) {
       <div class="row">
         <label>Fraud assessment</label>
         <select id="fraud-value">${optionsFor(FRAUD_VALUES)}</select>
-        <select id="fraud-basis" style="display:none">
+        <select id="fraud-basis">
           <option value="manual_investigation">manual_investigation</option>
           <option value="customer_confirmation">customer_confirmation</option>
         </select>
@@ -174,9 +174,15 @@ function renderOutcomesPanel(outcomes) {
 
   const fraudValue = document.getElementById("fraud-value");
   const fraudBasis = document.getElementById("fraud-basis");
-  fraudValue.addEventListener("change", () => {
+  // The select's own default (its first option, CONFIRMED_FRAUD) needs a
+  // basis just as much as one reached by an explicit change — initialize
+  // from the live value, not only react to a 'change' event that a default
+  // selection never fires.
+  const syncBasisVisibility = () => {
     fraudBasis.style.display = CONFIRMED_FRAUD_VALUES.has(fraudValue.value) ? "" : "none";
-  });
+  };
+  syncBasisVisibility();
+  fraudValue.addEventListener("change", syncBasisVisibility);
 
   document.getElementById("order-status-submit").addEventListener("click", async () => {
     const value = document.getElementById("order-status-value").value;
