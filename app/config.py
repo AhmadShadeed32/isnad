@@ -148,6 +148,12 @@ class Settings(BaseSettings):
     # Clock skew tolerated when checking the id_token's exp/iat (seconds).
     nac_id_token_leeway_seconds: int = 60
 
+    # --- Offline fake operator (P4a, ISNAD_PROVIDER=nac_fake) ---
+    # demo/fake_operator is a small separate ASGI app started on loopback; it
+    # is never a network call and never billed. Local development / the
+    # browser journey only — never a production posture.
+    nac_fake_base_url: str = "http://127.0.0.1:8801"
+
     # --- One live CAMARA link inside a scripted chain (ISNAD_PROVIDER=hybrid) ---
     # Every winner found of this hackathon series demoed on a live network and
     # this demo makes no live call at all. Naming an action and a number here

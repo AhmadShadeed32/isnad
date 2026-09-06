@@ -27,6 +27,8 @@ dev = [
     "ruff>=0.4",
     "pip-audit>=2.10",
     "alembic>=1.14",
+    # demo/fake_operator (P4a): dev/test-only, never imported by app.main.
+    "python-multipart>=0.0.20",
 ]
 # Retained as a no-op compatibility extra: the provider is a core runtime
 # dependency so `pip install .` and the Docker image have the same contract.

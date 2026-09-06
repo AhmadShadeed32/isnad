@@ -11,6 +11,10 @@ setuptools>=83.0.0
 pip-audit>=2.10
 # Database migrations are a release operation, not an application import.
 alembic>=1.14
+# demo/fake_operator (P4a) is dev/test-only fixture infrastructure — it is
+# never imported by app.main — so its FastAPI Form() parsing dependency lives
+# here rather than in the production requirements.txt.
+python-multipart>=0.0.20
 
 # NOTE on pip: network-as-code==10.0.0 declares `pip==25.3` as a runtime
 # dependency and will DOWNGRADE your pip when installed. pip 25.3 carries six
