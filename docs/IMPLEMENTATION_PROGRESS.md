@@ -16,7 +16,7 @@ a mock response or a dated test count.
 | 2 Nokia contract matrix | PASSED | `docs/NAC_CONTRACT_MATRIX.md` (new), `docs/NAC_SDK_CONTRACTS.json`, `scripts/export_nac_contracts.py`, `tests/test_nac_wire_contract.py` (new), `.gitignore` | `pytest -q tests/test_nac_wire_contract.py` → **19 passed, 0.14 s** (2026-09-06); `ruff check app tests scripts demo` → clean | Wire assertions drive the real `NetworkAsCodeApi` through `httpx.MockTransport`, not an imitation of our adapter: paths, bodies, `subscription_id`/`started_at`, nullable dates, `monitoredPeriod`, null confidence, unconstrained level vocabulary, `x-rapidapi-*` headers on the catalog host, and one attempt under `max_retries=0`. Zero external requests | Every row's "Last observation" for the new operations is **none** — entitlement and host compatibility stay unknown until gate 3 |
 | 3 Bounded simulator probe | PASSED (congestion lifecycle EXTERNAL LIMIT) | `scripts/nac_demo_probe.py`, `tests/test_nac_demo_probe.py`, `app/config.py` (callback settings), `docs/nac/observations/` | `pytest -q tests/test_nac_demo_probe.py` → **38 passed, 0.17 s** (2026-09-06); ruff clean | **11 real authenticated calls** to the hosted simulator, one attempt each, catalog host, sanitized records in `docs/nac/observations/2026-09-06-hosted-simulator.jsonl`. Six planned swap calls + `congestion_list` + four call-forwarding calls incl. documented 422/503 | Congestion **create/get/query/delete and callback delivery were not attempted**: no reachable HTTPS callback is configured, and the probe refuses to point an operator at an unowned destination. `…1000`'s 24-hour device boolean contradicts its 19-day-old device date — recorded, and gate 5 must not merge them |
 | 4 Gemini-first selection | PASSED | `app/config.py`, `app/agent/gemini.py`, `app/agent/planner.py`, `tests/test_gemini_primary.py`, `tests/test_llm_planner.py`, `.env.example`, `README.md` | Runbook gate-4 line (`test_gemini_primary test_gemini test_llm_planner test_allow_evidence_gate test_hypothesis_relevance test_t4_ask_the_agent`) → **88 passed, 0.82 s** (2026-09-06) | Exception routing verified by test, not by reading: `httpx.TimeoutException`/`ConnectError` ⊂ `TransportError` → greedy with `NO_ANSWER_TRANSPORT`; `HTTPStatusError` (429/4xx/5xx), `JSONDecodeError`, schema failure, `blockReason`, non-STOP `finishReason` → stop, source `llm`. Alternate greedy paths audited: only `investigator._choreography`, labelled `policy`. Model prose rendered by `textContent` in `console.html:addRow` and `judge.html:appendTrace` | No live Gemini call yet — that is gate 11.2, deliberately separate from the Nokia probes |
-| 5 Swap timestamps | NOT STARTED | | | | |
+| 5 Swap timestamps | PASSED | `app/chain/models.py` (`EvidenceTiming`), `app/providers/timing.py` (new), `nac.py`, `mock.py`, `hybrid.py`, `base.py`, `app/agent/investigator.py`, `app/policy/policy.yaml`, `app/policy/engine.py`, `app/static/{judge,console}.html`, `app/static/i18n{.js,/en.json,/ar.json}`, `tests/test_swap_timestamps.py` (new, 37) | `pytest -q` → **1012 passed, 20.1 s** (2026-09-06); ruff clean | Legacy receipt verifies byte-for-byte against its own recorded key; a new receipt's `provider_time` and `disagrees_with_window` are inside the signature (tamper tests); the authored fixture reproduces the hosted contradiction | Documented cost delta: pricing the date as a second call changes evaluation numbers — the takeover fixture now spends 7 on three links instead of 8 on four. Gate 13 must record the difference rather than retune it |
 | 6 Congestion Insights | NOT STARTED | | | | |
 | 7 Identity extensions | NOT STARTED | | | | |
 | 8 Arabic + English | IN PROGRESS | `app/static/i18n.js`, `app/static/i18n/{en,ar}.json`, product HTML, `demo/merchant_pilot` | | | Executable DOM tests missing; translator is provisional |
@@ -90,7 +90,35 @@ Findings that change later gates:
    quoted anywhere as the simulator's value.
 4. `monitoredPeriod` was absent, so the device-date horizon is unknown.
 
-Next action: gate 5 — read `app/chain/models.py` and `app/chain/builder.py`
-canonicalization before adding any field, decide and document where temporal
-metadata lives, and keep `tests/fixtures/legacy_receipt_pre_swap_dates.json`
-verifying byte-exact.
+Superseded by the gate 5 checkpoint below.
+
+### 2026-09-06 — gate 5 complete
+
+Decision, recorded because the runbook asked for it before any field was added:
+temporal metadata lives in an **optional nested `EvidenceLink.timing`** carrying
+`schema_version: "swap_timing/1"`, not in new top-level link fields. The signed
+bytes are `Verdict.model_dump_json()` stored verbatim and served back for
+verification, so an additive optional field leaves every historical
+`verdict_json` byte-identical while new receipts commit to the metadata inside
+the same signature. Signing behaviour is unchanged.
+
+Also decided: **no new `Action`.** A date is an enrichment of a link that already
+ran, not evidence the planner may choose — giving it an action would have pulled
+it into affordability, hypothesis relevance and chain grading. It is priced
+separately in `policy.yaml` under `enrichments.swap_date` (cost 1, no gain), and
+the investigator charges it at each of the four sites where budget is accounted.
+
+Preserved: the boolean's `result`, `signal` and `delta_logodds` are untouched by
+the date. A failed, denied, timed-out or unaffordable date leaves the check
+exactly as it was and says which of those happened.
+
+Mocked only: every provider exchange in the tests. `MockProvider.enrich_timing`
+is an authored fixture — including the number that reproduces the hosted
+`swapped: true` / 19-day-old-date contradiction, which is never presented as an
+observation.
+
+Actually called: nothing external in this gate.
+
+Next action: gate 6 — Congestion Insights. Read the hosted status first: the
+account can read the subscription collection (200, empty) but no callback is
+configured, so create/query/delete stay unobserved and the UI must say so.

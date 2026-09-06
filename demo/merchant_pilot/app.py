@@ -333,6 +333,10 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Isnad merchant pilot harness (P4a)", lifespan=lifespan)
+# Same-origin, allowlisted presentation assets for the separate pilot service.
+from app.api.routes_i18n import router as locale_router
+
+app.include_router(locale_router)
 
 
 def _client_is_private(request: Request) -> bool:
@@ -393,7 +397,8 @@ button{{width:100%;padding:.6rem;background:#1a7f37;color:#fff;border:0;border-r
 <label>Username<input type="text" name="username" autocomplete="username" required></label>
 <label>Password<input type="password" name="password" autocomplete="current-password" required></label>
 <button type="submit">Sign in</button>
-</form>"""
+</form>
+<script src="/ui/i18n.js" defer></script>"""
 
 
 @app.get("/login", response_class=HTMLResponse)

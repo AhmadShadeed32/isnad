@@ -100,11 +100,19 @@ async def test_parallel_costs_more_on_a_clean_chain():
     the number match that used to close it cannot distinguish one. The point of
     this test is the gap between the two modes, and the gap narrowed rather
     than closed — parallel still buys a check sequential never needed.
+
+    Parallel moved 5 -> 6 when the swap date became a separately priced second
+    operation. The extra unit is the `retrieve-date` call on the sim_swap link
+    parallel bought and sequential never needed, and it belongs in this number:
+    pricing that call inside sim_swap's own cost is exactly the hidden second
+    call the enrichment accounting exists to prevent. Sequential is unchanged
+    because it clears on number_verify and reachability, neither of which has a
+    date operation.
     """
     sequential = await _run_req(_CLEAN, parallel=False)
     parallel = await _run_req(_CLEAN, parallel=True)
     assert sequential.evidence_cost == 3.0 and len(sequential.chain) == 2
-    assert parallel.evidence_cost == 5.0 and len(parallel.chain) == 3
+    assert parallel.evidence_cost == 6.0 and len(parallel.chain) == 3
     assert parallel.evidence_cost > sequential.evidence_cost
 
 

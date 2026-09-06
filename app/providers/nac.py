@@ -14,7 +14,7 @@ from app.config import settings
 from app.domain.enums import API_LABEL, Action, Result
 from app.domain.schemas import VerificationRequest
 from app.oidc import IdTokenError, validate_id_token
-from app.providers import oidc_flow
+from app.providers import oidc_flow, timing
 from app.providers.vocabulary import detail_for, window_hours
 
 # A dedicated, bounded pool for the blocking SDK (S12).
@@ -110,6 +110,54 @@ class NacProvider:
             max_age_hours=window_hours(action),
             latency_ms=self._latency_ms(started),
         )
+
+    async def enrich_timing(self, action: Action, request: VerificationRequest, signal: str):
+        """One extra operator call: `retrieve-date` for a swap that was checked.
+
+        Separate from `gather` on purpose. It is a separate priced operation on
+        Nokia's side, the investigator charges it separately, and its failure
+        must leave the boolean evidence exactly as it was — a date that did not
+        arrive is not evidence of anything.
+        """
+        if action not in timing.TIMED_ACTIONS:
+            return timing.unsupported(action, "no date operation for this action")
+        try:
+            return await asyncio.wait_for(
+                self._in_pool(self._enrich_timing_sync, action, request),
+                timeout=settings.nac_timeout_seconds,
+            )
+        except TimeoutError:
+            return timing.failure(action, "timeout", "date request timed out")
+        except Exception as exc:  # noqa: BLE001 - never expose a provider payload
+            availability = "denied" if self._is_rejection(exc) else "invalid"
+            return timing.failure(action, availability, self._error_signal(exc))
+
+    def _enrich_timing_sync(self, action: Action, request: VerificationRequest):
+        retrieved_at = timing.now_utc()
+        if action == Action.SIM_SWAP:
+            response = self.client.sim_swap.retrieve_date(
+                phone_number=request.phone_number, request_options=_bounded()
+            )
+            return timing.normalize(
+                action, self._value(response, "latest_sim_change", None), retrieved_at
+            )
+        response = self.client.device_swap.retrieve_date(
+            phone_number=request.phone_number, request_options=_bounded()
+        )
+        return timing.normalize(
+            action,
+            self._value(response, "latest_device_change", None),
+            retrieved_at,
+            # Days the operator actually looked back. Absent on the hosted
+            # simulator on 2026-09-06, so this is genuinely often unknown.
+            monitored_period_days=self._value(response, "monitored_period", None),
+        )
+
+    @staticmethod
+    def _is_rejection(exc: Exception) -> bool:
+        """A 4xx is the operator refusing; anything else is not a refusal."""
+        status = getattr(exc, "status_code", None)
+        return isinstance(status, int) and 400 <= status < 500
 
     async def begin_number_verification(
         self, phone_number: str, redirect_uri: str, state: str, nonce: str
@@ -223,8 +271,10 @@ class NacProvider:
             )
             swapped = bool(self._value(response, "swapped", False))
             signal = "SIM_SWAPPED" if swapped else "SIM_STABLE"
-            # The window is the answer: the API returns a boolean against the
-            # max_age we just sent, never a date. See providers/vocabulary.py.
+            # The window is the answer here: `check` returns a boolean against
+            # the max_age we just sent. A date exists, but only from the
+            # separate priced `retrieve-date` operation — see enrich_timing —
+            # and the two can disagree. See providers/vocabulary.py.
             return Result.FLAG if swapped else Result.PASS, signal, detail_for(signal)
 
         if action == Action.DEVICE_SWAP:

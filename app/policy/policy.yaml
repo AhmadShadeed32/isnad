@@ -114,6 +114,19 @@ actions:
   # itself the instruction to step the customer up; the merchant runs it.
   step_up_otp:         { cost: 6, gain: 2.5, friction: 5 }
 
+# Enrichments: extra provider operations attached to a link that already ran.
+#
+# `retrieve-date` is a SECOND billable CAMARA call, not a field of the check's
+# response. Pricing it here is what keeps the cost story true: hiding it inside
+# the boolean's cost would let a receipt claim one call where two were made.
+#
+# It carries no `gain`, deliberately. Gain is what the planner trades against
+# cost when choosing evidence, and this is not evidence the planner may choose:
+# it explains a link that already exists and never moves the score. `enabled`
+# turns the extra spend off for a deployment that does not want it.
+enrichments:
+  swap_date: { cost: 1, enabled: true }
+
 # What each hypothesis may buy. This is not a list of good checks: it is the
 # list of checks that can move THIS hypothesis, in either direction. The
 # planner selects from it, the ALLOW gate requires a supporting fact from it,

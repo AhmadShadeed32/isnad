@@ -59,13 +59,13 @@
   </header>
   <p id="localeNote" class="locale-note" hidden></p>
 
-  <section class="lead" lang="en" dir="ltr">
+  <section class="lead">
     <div><div class="eyebrow">One SIM change. A customer worth investigating.</div><h1>A replaced SIM should start a check, not end a customer relationship.</h1><p>Isnad investigates a risky checkout, gathers corroborating network evidence, and gives the merchant a decision with a signed receipt.</p></div>
     <div class="trust-note">This judge flow uses a deterministic stage fixture when the environment says <strong>SIMULATOR</strong>. Every evidence item carries its own provenance—nothing scripted is presented as live network evidence.</div>
   </section>
 
   <section class="grid" aria-label="Isnad customer checkout demonstration">
-    <article class="card checkout" lang="en" dir="ltr">
+    <article class="card checkout">
       <div class="merchant"><div style="display:flex;align-items:center;gap:10px"><span class="merchant-badge">N</span><div><div class="merchant-name">Noura Market</div><div class="merchant-meta">Cross-border COD checkout</div></div></div><span class="provenance">merchant demo</span></div>
       <h2 id="customerTitle">New SIM. Same customer.</h2>
       <p id="customerStory">Her SIM was replaced, but her handset is unchanged. A rule that declines every SIM change loses her order. Isnad checks the surrounding evidence before deciding.</p>
@@ -76,7 +76,7 @@
       <div id="checkoutFoot" class="checkout-foot"><strong>Expected: CHALLENGE.</strong> Ask for the merchant’s step-up instead of automatically declining. All three examples use simulated operator answers.</div>
     </article>
 
-    <article class="card journey" lang="en" dir="ltr">
+    <article class="card journey">
       <div class="journey-head"><div><h2>Evidence decision trace</h2><p class="caption">The selected checks, their sources, and the evidence behind the decision.</p></div><span id="planner" class="provenance">planner: —</span></div>
       <div id="statusline" class="statusline">Ready for checkout.</div>
       <div class="steps" aria-hidden="true"><span id="s1" class="step"></span><span id="s2" class="step"></span><span id="s3" class="step"></span><span id="s4" class="step"></span></div>
@@ -102,14 +102,14 @@
     </article>
   </section>
 
-  <section class="proof" aria-label="Why this is different" lang="en" dir="ltr">
+  <section class="proof" aria-label="Why this is different">
     <article class="card"><h3>MINIMUM NECESSARY EVIDENCE</h3><p>The agent spends its evidence budget only until the decision is justified. It can <b>stop early</b> rather than collect a surveillance profile.</p></article>
     <article class="card"><h3>VISIBLE ORCHESTRATION</h3><p>Each selected CAMARA check shows its <b>decision rationale, source, and result</b>, instead of hiding a fixed rules sequence behind “AI.”</p></article>
     <article class="card"><h3>VERIFIABLE AFTER THE SALE</h3><p>The final decision is stored as an <b>Ed25519-signed evidence receipt</b>. A merchant, customer, or dispute team can verify it later.</p></article>
   </section>
-  <div id="fallback" class="fallback" lang="en" dir="ltr"></div>
-  <p class="technical" lang="en" dir="ltr">Risk scores are policy-derived and uncalibrated, not measured fraud probabilities. Signed receipts prove issuance by Isnad.</p>
-  <p class="technical" lang="en" dir="ltr">Need the full test console? <a href="/console">Open Isnad Live Agent Console</a></p>
+  <div id="fallback" class="fallback"></div>
+  <p class="technical">Risk scores are policy-derived and uncalibrated, not measured fraud probabilities. Signed receipts prove issuance by Isnad.</p>
+  <p class="technical">Need the full test console? <a href="/console">Open Isnad Live Agent Console</a></p>
 </main>
 <!-- Same origin, no CDN: the shared locale switch (I6). -->
 <script src="/ui/i18n.js"></script>
@@ -192,6 +192,59 @@ function appendTrace(kind, title, detail, source, meta){
   const side = document.createElement('div'); side.className = 'trace-meta'; side.textContent = meta || '';
   row.append(mark, body, side); trace.appendChild(row); trace.scrollTop = trace.scrollHeight;
 }
+// The operator's date, rendered beside the check it explains — never merged
+// into it. The two are separate observations and the operator's own answers can
+// disagree, so both are shown with their own wording.
+function appendTiming(event){
+  const t = (key, fallback) => (window.Isnad ? window.Isnad.t('ui.' + key, fallback) : fallback);
+  const row = document.createElement('div');
+  row.className = 'trace-row info';
+  const mark = document.createElement('div'); mark.className = 'mark'; mark.textContent = '·';
+  const body = document.createElement('div');
+  const heading = document.createElement('div');
+  heading.className = 'trace-title';
+  heading.textContent = t('swap_date_heading', 'Operator change date');
+  body.appendChild(heading);
+
+  const copy = document.createElement('div'); copy.className = 'trace-detail';
+  if (event.availability === 'available' && event.provider_time){
+    copy.append(document.createTextNode(t('swap_date_available', 'Operator reported the latest change at') + ' '));
+    // A timestamp is a signed-adjacent exact value: isolated LTR so the bidi
+    // algorithm cannot reorder it under an RTL page.
+    copy.appendChild(window.Isnad ? window.Isnad.isolate(event.provider_time)
+                                  : document.createTextNode(event.provider_time));
+    if (typeof event.age_seconds === 'number'){
+      const days = Math.floor(event.age_seconds / 86400);
+      const hours = Math.floor((event.age_seconds % 86400) / 3600);
+      copy.append(document.createTextNode(' · ' + t('swap_date_age', 'Age at the moment of the check') + ' '));
+      copy.appendChild(window.Isnad ? window.Isnad.isolate(days + 'd ' + hours + 'h')
+                                    : document.createTextNode(days + 'd ' + hours + 'h'));
+    }
+  } else {
+    copy.textContent = t('swap_date_' + event.availability, event.reason || 'No date is available.');
+  }
+  body.appendChild(copy);
+
+  const notes = [];
+  if (event.availability === 'available') notes.push(t('swap_date_may_be_activation', ''));
+  if (event.disagrees_with_window === true) notes.push(t('swap_date_disagrees', ''));
+  if (event.monitored_period_days === null || event.monitored_period_days === undefined){
+    notes.push(t('swap_date_horizon_unknown', ''));
+  }
+  notes.filter(Boolean).forEach(text => {
+    const note = document.createElement('div');
+    note.className = 'trace-detail';
+    note.style.opacity = '.75';
+    note.textContent = text;
+    body.appendChild(note);
+  });
+
+  const side = document.createElement('div'); side.className = 'trace-meta';
+  side.textContent = t('swap_date_separate_call', 'A separate operator call.')
+    + (typeof event.cost === 'number' ? ' · cost ' + event.cost : '');
+  row.append(mark, body, side);
+  trace.appendChild(row); trace.scrollTop = trace.scrollHeight;
+}
 async function apiJson(path, options = {}){
   const response = await fetch(path, { ...options, headers:{'Authorization':'Bearer ' + key(), ...(options.body ? {'Content-Type':'application/json'} : {}), ...(options.headers || {})} });
   const data = await response.json().catch(() => ({}));
@@ -250,6 +303,8 @@ function onEvent(event){
     const windowText = typeof event.max_age_hours === 'number' ? ' · window ' + event.max_age_hours + 'h' : '';
     appendTrace(kind, event.api || event.signal || 'Network evidence', event.detail || event.signal || '', event.source, 'risk score ' + event.p_fraud + windowText);
     setStatus('Evidence received with its source and result.');
+  } else if (event.type === 'enrichment'){
+    appendTiming(event);
   } else if (event.type === 'verdict'){
     if (event.run_id === completedRunId) return; // already rendered from a persistence-confirmed response
     stepEls.forEach((s, index) => s.className = 'step ' + (index === 3 ? (event.decision === 'DECLINE' ? 'bad' : 'good') : 'good'));
@@ -452,14 +507,6 @@ simulateSwap.addEventListener('click', simulateTrustSwap);
 
 // --- I6: language ------------------------------------------------------------
 //
-// A deliberately narrow slice. The evidence narrative on this page is written
-// server-side by app/presentation.py in English, and re-keying that into the
-// dictionaries would mean either translating provider provenance and signed
-// vocabulary — which I6 forbids — or shipping a half-translated narrative
-// while claiming parity. So the switch translates the labels the dictionaries
-// actually cover, flips the layout, and says outright which parts stayed in
-// English. An honest partial translation beats a confident-looking one.
-//
 // The module is loaded from this origin. If it does not arrive, the page keeps
 // working in English: a checkout demonstration must not be lost because a
 // presentation concern failed to load.
@@ -473,14 +520,6 @@ Locale.onChange((active) => {
   const parts = [];
   const review = Locale.reviewStatus();
   if (review) parts.push(review);
-  if (active !== 'en'){
-    // Named plainly rather than left for the reader to discover: the result
-    // narrative, the evidence rows and the provider provenance labels are
-    // produced in English and are not translated here.
-    parts.push('The decision narrative, evidence rows and provider provenance '
-      + 'labels below are produced in English and are not translated. Marked '
-      + 'English text is a missing translation, not a choice.');
-  }
   localeNote.textContent = parts.join(' ');
   localeNote.hidden = parts.length === 0;
   renderSignatureResult();

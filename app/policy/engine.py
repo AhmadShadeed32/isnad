@@ -120,6 +120,22 @@ class PolicyEngine:
             return 0.0
         return float(self._action(action)["cost"])
 
+    def enrichment_cost(self, name: str) -> float:
+        """What one extra provider operation costs, in the same budget units.
+
+        Missing configuration means the enrichment is not priced, so it is not
+        performed — never "free". An unpriced call is exactly the hidden second
+        call this field exists to prevent.
+        """
+        cfg = (self.cfg.get("enrichments") or {}).get(name)
+        if not cfg or not cfg.get("enabled", False):
+            return 0.0
+        return float(cfg.get("cost", 0.0))
+
+    def enrichment_enabled(self, name: str) -> bool:
+        cfg = (self.cfg.get("enrichments") or {}).get(name)
+        return bool(cfg and cfg.get("enabled", False) and float(cfg.get("cost", 0)) > 0)
+
     def action_gain(self, action: Action) -> float:
         if action in self._FREE:
             return 0.0

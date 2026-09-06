@@ -887,6 +887,20 @@ function renderStreamEvent(ev){
     // corroboration checks are policy choreography carrying planner:'policy',
     // and badging those made the pill read "planner: policy" mid-run.
     if (ev.phase === 'investigation') setPlannerBadge(ev.planner);
+  } else if (ev.type === 'enrichment'){
+    // A separate priced operator call, on its own row so the cost story stays
+    // readable: the boolean and the date were two calls, not one.
+    const t = (key, fallback) => (window.Isnad ? window.Isnad.t('ui.' + key, fallback) : fallback);
+    const said = ev.availability === 'available'
+      ? `${t('swap_date_available','latest change')} ${ev.provider_time}`
+      : t('swap_date_' + ev.availability, ev.reason || ev.availability);
+    const flags = [];
+    if (ev.disagrees_with_window === true) flags.push('disagrees-with-window');
+    if (ev.monitored_period_days === null || ev.monitored_period_days === undefined){
+      flags.push('horizon-unknown');
+    } else { flags.push(`horizon=${ev.monitored_period_days}d`); }
+    addRow(clock(), ev.operation || 'retrieve-date', `[date] ${said}`, 'info',
+      `· ${flags.join(' · ')} · cost=${ev.cost}`);
   } else if (ev.type === 'announce'){
     // The calling number is deliberately absent from a recovered row: it is a
     // subscriber number and the journal does not keep one.
@@ -1453,5 +1467,6 @@ askInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') askTheAgent
 buttons.forEach(b => b.addEventListener('click', () => run(b.dataset.act)));
 clearBtn.addEventListener('click', () => clearConsole(true));
 </script>
+<script src="/ui/i18n.js" defer></script>
 </body>
 </html>

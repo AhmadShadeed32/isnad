@@ -187,10 +187,7 @@ def test_the_judge_page_translates_only_dictionary_covered_labels():
     assert keys <= set(en["ui"]), f"untranslatable keys: {keys - set(en['ui'])}"
 
 
-def test_the_judge_page_says_which_parts_stayed_in_english():
-    """A half-translated page that does not admit it is worse than an English
-    one. Naming the untranslated regions is the honest version of parity."""
-    assert "are produced in English and are not translated" in JUDGE_SCRIPT
+def test_the_judge_page_discloses_translation_review_status():
     assert 'id="localeNote"' in JUDGE_HTML
     assert "Locale.reviewStatus()" in JUDGE_SCRIPT
 
@@ -212,15 +209,11 @@ def test_the_judge_page_isolates_its_identifier_line():
     assert 'bdi{unicode-bidi:isolate}' in JUDGE_HTML
 
 
-def test_the_judge_pages_english_regions_keep_their_own_direction():
-    """An RTL page reorders untagged English at its neutral edges — a sentence's
-    full stop lands at the front. The narrative this page openly declares is
-    English is marked so it renders in its own direction and is announced in
-    its own language."""
+def test_the_judge_page_regions_inherit_the_selected_direction():
     for region in ('class="lead"', 'class="card checkout"', 'class="card journey"',
                    'class="proof"', 'class="technical"'):
         marked = JUDGE_HTML.split(region)[1].split(">")[0]
-        assert 'lang="en"' in marked and 'dir="ltr"' in marked, region
+        assert 'dir="ltr"' not in marked, region
 
 
 def test_a_translated_label_inside_an_english_region_states_its_own_direction():

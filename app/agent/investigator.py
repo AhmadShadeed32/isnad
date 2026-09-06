@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 
 from app.agent import hypothesis as hypo
@@ -13,9 +14,15 @@ from app.domain.schemas import VerificationRequest
 from app.events import emit
 from app.policy.engine import PolicyEngine, get_engine
 from app.presentation import present
+from app.providers import timing as timing_lib
 from app.providers.base import EvidenceProvider
 
+log = logging.getLogger(__name__)
+
 _UNRESOLVED_SIGNALS = {"CONSENT_REQUIRED", "PROVIDER_UNAVAILABLE", "EVIDENCE_UNAVAILABLE"}
+
+# The one enrichment priced in policy.yaml today.
+_SWAP_DATE = "swap_date"
 
 
 class Investigator:
@@ -139,6 +146,9 @@ class Investigator:
             belief.apply(link.detail, link.delta_logodds)
             evidence_cost += action_cost
             budget_left -= action_cost
+            spent = await self._enrich_timing(link, request, budget_left, run_id)
+            evidence_cost += spent
+            budget_left -= spent
             if link.signal in _UNRESOLVED_SIGNALS:
                 unresolved_signals.add(link.signal)
             used.add(required_action)
@@ -253,6 +263,9 @@ class Investigator:
             action_cost = self.engine.action_cost(action)
             evidence_cost += action_cost
             budget_left -= action_cost
+            spent = await self._enrich_timing(link, request, budget_left, run_id)
+            evidence_cost += spent
+            budget_left -= spent
             if link.signal in _UNRESOLVED_SIGNALS:
                 unresolved_signals.add(link.signal)
             used.add(action)
@@ -278,7 +291,11 @@ class Investigator:
                 )
                 link = await self._call(action, request, chain)
                 belief.apply(link.detail, link.delta_logodds)
-                evidence_cost += self.engine.action_cost(action)
+                step_up_cost = self.engine.action_cost(action)
+                evidence_cost += step_up_cost
+                evidence_cost += await self._enrich_timing(
+                    link, request, budget_left - step_up_cost, run_id
+                )
                 if link.signal in _UNRESOLVED_SIGNALS:
                     unresolved_signals.add(link.signal)
                 used.add(action)
@@ -405,6 +422,9 @@ class Investigator:
             cost = self.engine.action_cost(link.action)
             evidence_cost += cost
             budget_left -= cost
+            spent = await self._enrich_timing(link, request, budget_left, run_id)
+            evidence_cost += spent
+            budget_left -= spent
             if link.signal in _UNRESOLVED_SIGNALS:
                 unresolved_signals.add(link.signal)
             used.add(link.action)
@@ -505,6 +525,86 @@ class Investigator:
         link.delta_logodds = self.engine.signal_delta(link.signal)
         chain.add(link)
         return link
+
+    async def _enrich_timing(
+        self,
+        link: EvidenceLink,
+        request: VerificationRequest,
+        budget_left: float,
+        run_id: str | None,
+    ) -> float:
+        """Attach the operator's date to a swap link. Returns what it cost.
+
+        Kept out of `_call` on purpose. This is a second billable operation, so
+        it is decided where the budget is decided — and a link that could not
+        afford it still says so, rather than looking like a provider that had
+        no date to give.
+
+        It never touches `result`, `signal` or `delta_logodds`. The score came
+        from the boolean; a date that arrives afterwards explains the link, it
+        does not re-decide it.
+        """
+        if link.action not in timing_lib.TIMED_ACTIONS:
+            return 0.0
+        if not self.engine.enrichment_enabled(_SWAP_DATE):
+            return 0.0
+        cost = self.engine.enrichment_cost(_SWAP_DATE)
+        if cost > budget_left:
+            link.timing = timing_lib.not_attempted(
+                link.action, "budget did not cover the extra date call"
+            )
+            await self._emit_timing(link, 0.0, run_id)
+            return 0.0
+
+        enrich = getattr(self.provider, "enrich_timing", None)
+        if enrich is None:
+            # A provider with no date operation costs nothing: no call was made.
+            link.timing = timing_lib.unsupported(link.action)
+            await self._emit_timing(link, 0.0, run_id)
+            return 0.0
+        try:
+            result = await enrich(link.action, request, link.signal)
+        except Exception:
+            log.warning("swap date enrichment failed for %s", link.action, exc_info=True)
+            result = timing_lib.failure(link.action, "invalid", "date request failed")
+        link.timing = timing_lib.with_window_agreement(
+            result, link.signal, link.max_age_hours
+        )
+        # Charged whenever the call was actually attempted, including when it
+        # failed: the operator was asked either way. `unsupported` means no call
+        # left the process, so it is not charged.
+        spent = 0.0 if link.timing.availability == "unsupported" else cost
+        await self._emit_timing(link, spent, run_id)
+        return spent
+
+    async def _emit_timing(self, link: EvidenceLink, cost: float, run_id: str | None) -> None:
+        """A separate trace row, because it was a separate call.
+
+        Labelled `enrichment`, never a planner selection: nothing chose this.
+        """
+        timing = link.timing
+        if timing is None:
+            return
+        await self._emit(
+            self._with_run_id(
+                {
+                    "type": "enrichment",
+                    "step": link.step,
+                    "api": link.api,
+                    "operation": timing.source_operation,
+                    "availability": timing.availability,
+                    "provider_time": (
+                        timing.provider_time.isoformat() if timing.provider_time else None
+                    ),
+                    "age_seconds": timing.age_seconds_at_decision,
+                    "monitored_period_days": timing.monitored_period_days,
+                    "disagrees_with_window": timing.disagrees_with_window,
+                    "reason": timing.reason,
+                    "cost": cost,
+                },
+                run_id,
+            )
+        )
 
     async def _emit_link(self, link: EvidenceLink, belief: Belief, run_id: str | None) -> None:
         await self._emit(

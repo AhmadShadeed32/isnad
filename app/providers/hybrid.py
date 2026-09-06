@@ -26,6 +26,7 @@ import logging
 from app.chain.models import EvidenceLink
 from app.domain.enums import Action
 from app.domain.schemas import VerificationRequest
+from app.providers import timing
 from app.providers.base import EvidenceProvider
 
 log = logging.getLogger(__name__)
@@ -59,6 +60,22 @@ class HybridProvider:
         # unconfigured-means-scripted contract is covered by a test regardless.
         label = str(getattr(action, "value", action)).lower()
         return label in self._actions and request.phone_number in self._numbers
+
+    async def enrich_timing(self, action: Action, request: VerificationRequest, signal: str):
+        """Route the date the same way the boolean was routed.
+
+        Enriching a scripted boolean from the live network — or the reverse —
+        would produce one link whose two halves came from different worlds.
+        """
+        provider = self._live if self._is_live(action, request) else self._mock
+        enrich = getattr(provider, "enrich_timing", None)
+        if enrich is None:
+            return timing.unsupported(action, "provider has no date operation")
+        try:
+            return await enrich(action, request, signal)
+        except Exception:  # noqa: BLE001 - a live failure degrades, never raises
+            log.warning("live swap date for %s failed; recording unavailable", action)
+            return timing.failure(action, "invalid", "date request failed")
 
     async def gather(self, action: Action, request: VerificationRequest) -> EvidenceLink:
         if not self._is_live(action, request):

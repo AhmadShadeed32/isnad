@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import timedelta
 
 from app.chain.models import EvidenceLink
 from app.domain.enums import API_LABEL, Action, Result
 from app.domain.schemas import VerificationRequest
+from app.providers import timing as timing_lib
 from app.providers.vocabulary import detail_for, window_hours
 
 # Consent basis recorded per action (privacy-by-design audit trail).
@@ -168,6 +170,37 @@ SCENARIOS: dict[str, Scenario] = {
 # Lets the stage demo swap a SIM live and watch the session die.
 TRIPPED: set[str] = set()
 
+# --- authored swap dates -----------------------------------------------------
+#
+# Offsets from the observation instant, not absolute dates: an absolute date in
+# a fixture goes stale, and a stale "swapped 400 days ago" that is really 800
+# days ago is a fixture quietly lying about its own scenario. Ages stay
+# deterministic because they are computed from one instant per run.
+#
+# `None` means the operator answered with no date — the case a UI must show as
+# unknown rather than as "never changed".
+_FRESH_SWAP = timedelta(hours=6)
+_OLD_CHANGE = timedelta(days=417)
+
+_MOCK_SWAP_AGE: dict[str, timedelta | None] = {
+    "SIM_SWAPPED": _FRESH_SWAP,
+    "DEVICE_SWAPPED": _FRESH_SWAP,
+    "SIM_STABLE": _OLD_CHANGE,
+    "DEVICE_STABLE": _OLD_CHANGE,
+}
+
+# Numbers whose date operation answers with an explicit null, so the "operator
+# has the boolean but no date" path is reachable on stage.
+NO_DATE_NUMBERS: set[str] = {"+962790000005", "+99999991005"}
+
+# The contradiction observed on Nokia's hosted simulator on 2026-09-06:
+# `device_swap.check` said a change happened inside a 24-hour window while
+# `device_swap.retrieve_date` returned a date nineteen days old. Reproduced
+# here as a VISIBLY AUTHORED fixture so the UI path can be demonstrated without
+# a hosted call — never presented as an observation.
+DISAGREEING_NUMBERS: set[str] = {"+962790000002", "+99999991000"}
+_DISAGREEING_AGE = timedelta(days=19)
+
 
 def trip_swap(phone: str) -> None:
     TRIPPED.add(phone)
@@ -193,6 +226,24 @@ class MockProvider:
         self.scenarios = scenarios or SCENARIOS
         # step_delay_ms > 0 paces the console so each link reveals visibly on stage.
         self.step_delay_ms = step_delay_ms
+
+    async def enrich_timing(self, action: Action, request: VerificationRequest, signal: str):
+        """The mock's own `retrieve-date`, with the same contract as the real one.
+
+        It is a separate call here too — the investigator pays for it separately
+        — so an offline rehearsal exercises the same accounting as a hosted run.
+        """
+        if action not in timing_lib.TIMED_ACTIONS:
+            return timing_lib.unsupported(action, "no date operation for this action")
+        retrieved_at = timing_lib.now_utc()
+        if request.phone_number in NO_DATE_NUMBERS:
+            return timing_lib.normalize(action, None, retrieved_at)
+        age = _MOCK_SWAP_AGE.get(signal)
+        if age is None:
+            return timing_lib.normalize(action, None, retrieved_at)
+        if request.phone_number in DISAGREEING_NUMBERS and signal in timing_lib.CHANGED_SIGNALS:
+            age = _DISAGREEING_AGE
+        return timing_lib.normalize(action, retrieved_at - age, retrieved_at)
 
     async def gather(self, action: Action, request: VerificationRequest) -> EvidenceLink:
         if self.step_delay_ms:
