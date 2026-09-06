@@ -21,10 +21,12 @@ class RecordingProvider:
     def __init__(self) -> None:
         self.exchanged_codes: list[str] = []
 
-    async def begin_number_verification(self, phone_number, redirect_uri, state):
+    async def begin_number_verification(self, phone_number, redirect_uri, state, nonce):
+        assert nonce and nonce != state
         return f"https://consent.test/authorize?state={state}"
 
-    async def exchange_number_verification_code(self, code, redirect_uri):
+    async def exchange_number_verification_code(self, code, redirect_uri, nonce):
+        assert nonce
         self.exchanged_codes.append(code)
         return f"token-for-{code}"
 

@@ -17,8 +17,11 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="ISNAD_", env_file=".env", extra="ignore")
 
     # "mock" runs the scripted providers (tests + stage demo);
-    # "nac" talks to the real Nokia Network-as-Code sandbox.
-    provider: Literal["mock", "nac", "hybrid"] = "mock"
+    # "nac" talks to the real Nokia Network-as-Code sandbox;
+    # "nac_fake" talks to the offline fake operator (P4a): the same OAuth/OIDC
+    # consent contract as "nac", against `demo/fake_operator` instead of Nokia.
+    # It never leaves localhost and is excluded from makes_billable_calls below.
+    provider: Literal["mock", "nac", "hybrid", "nac_fake"] = "mock"
 
     # Demo-only routes and controls. Off by default: on, it opens write
     # endpoints that a stranger can fire into the judges' console mid-demo (S4).
@@ -126,6 +129,24 @@ class Settings(BaseSettings):
         "dpv:FraudPreventionAndDetection number-verification:verify"
     )
     nac_consent_ttl_seconds: int = 300
+    # How long a COMPLETED/DENIED/FAILED/EXPIRED consent's result stays
+    # retrievable after it finishes, even while other merchants' consents are
+    # being created (P4a). Before this existed, ConsentStore._sweep() removed a
+    # terminal record the instant *any* create() call ran, so a merchant
+    # polling a just-completed flow could see it vanish into a 404 mid-poll.
+    nac_consent_terminal_retention_seconds: int = 300
+
+    # --- Number Verification OIDC contract (P4a) ---
+    # The V1 documentation (networkascode.nokia.io, reviewed 6 Sep 2026) returns
+    # both access_token and id_token from the token endpoint, and requires the
+    # nonce sent in the authorization request to be validated as an id_token
+    # claim. These three are only used on the manual (non-SDK) exchange path;
+    # they have no effect on network-as-code's own OIDC client, if the
+    # installed SDK version handles Number Verification internally.
+    nac_issuer: str | None = None
+    nac_jwks_uri: str | None = None
+    # Clock skew tolerated when checking the id_token's exp/iat (seconds).
+    nac_id_token_leeway_seconds: int = 60
 
     # --- One live CAMARA link inside a scripted chain (ISNAD_PROVIDER=hybrid) ---
     # Every winner found of this hackathon series demoed on a live network and

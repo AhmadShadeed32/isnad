@@ -6,7 +6,6 @@ from app.agent.investigator import build_engine_for_pricing, build_investigator
 from app.api.deps import get_live_provider, require_api_key
 from app.api.rate_limit import limit_per_key
 from app.chain.models import Verdict
-from app.chain.subject import request_commitment
 from app.chain.vault import vault
 from app.config import settings
 from app.consent import ConsentCapacityExceeded, ConsentRecord, consents
@@ -92,6 +91,7 @@ async def start_number_verification_consent(
             phone_number=req.phone_number,
             redirect_uri=record.redirect_uri,
             state=record.state,
+            nonce=record.nonce,
         )
     except Exception as exc:
         consents.fail(record, "could not create provider authorization request")
@@ -156,7 +156,9 @@ async def number_verification_callback(
         raise _consent_unavailable("provider does not support Number Verification token exchange")
 
     try:
-        access_token = await exchange(code=code, redirect_uri=record.redirect_uri)
+        access_token = await exchange(
+            code=code, redirect_uri=record.redirect_uri, nonce=record.nonce
+        )
     except Exception as exc:
         consents.fail(record, "provider token exchange failed")
         if isinstance(exc, RuntimeError):
@@ -221,7 +223,11 @@ async def complete_number_verification(
         await store.save_async(
             verdict,
             subject=record.request.phone_number,
-            request_hash=request_commitment(record.request),
+            # The commitment frozen at consent creation (app/consent.py), not
+            # recomputed here — the receipt must attest to what the merchant
+            # actually asked for at approval time, not to `record.request` as
+            # it happens to read now.
+            request_hash=record.request_hash,
         )
         response = _verification_response(verdict, record.request)
         consents.complete(record, response)

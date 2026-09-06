@@ -17,6 +17,11 @@ httpx>=0.28.1
 sqlalchemy>=2.0.51
 # It signs the chains. 50.0.0 is the first release clear of PYSEC-2026-3552.
 cryptography>=50.0.0
+# Validates the Number Verification consent flow's ID token (issuer, audience,
+# expiry, nonce) against the operator's JWKS (P4a). 2.13.0 has no open advisory
+# at time of pinning; RS256 support comes from the `cryptography` dependency
+# above, already required, so this adds no new native dependency.
+pyjwt>=2.13.0
 # Transitive, both with advisories reachable through httpx.
 idna>=3.15
 urllib3>=2.7.0

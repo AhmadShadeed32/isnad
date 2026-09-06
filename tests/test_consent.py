@@ -18,12 +18,14 @@ class FakeConsentProvider:
         self.received_tokens = []
         self.received_actions = []
 
-    async def begin_number_verification(self, phone_number, redirect_uri, state):
+    async def begin_number_verification(self, phone_number, redirect_uri, state, nonce):
         assert phone_number == "+99999991000"
+        assert nonce and nonce != state
         return f"https://consent.test/authorize?state={state}"
 
-    async def exchange_number_verification_code(self, code, redirect_uri):
+    async def exchange_number_verification_code(self, code, redirect_uri, nonce):
         assert code == "operator-code"
+        assert nonce
         return "opaque-token-never-returned"
 
     async def gather(self, action, request):

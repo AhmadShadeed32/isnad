@@ -7,7 +7,13 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
+from app.chain.subject import request_commitment
+from app.config import settings
 from app.domain.schemas import VerificationRequest, VerificationResponse
+
+# Statuses that no longer accept a transition; a record in one of these is
+# waiting only to be read (once) and then swept.
+_TERMINAL = {"COMPLETED", "DENIED", "FAILED", "EXPIRED"}
 
 
 def _now() -> datetime:
@@ -22,8 +28,18 @@ def _owner_hash(api_key: str) -> str:
 class ConsentRecord:
     consent_id: str
     state: str
+    # Separate from `state` (P4a): `state` round-trips through the provider's
+    # authorization URL as CSRF protection, `nonce` is carried inside the
+    # returned OIDC id_token and is never itself sent back to us in the query
+    # string, so the two must not be the same value or a state-only replay
+    # defense would also cover a forged/replayed id_token.
+    nonce: str
     owner_hash: str
     request: VerificationRequest
+    # Computed once, from the same frozen `request` snapshot, at creation —
+    # never recomputed later from a `request` object a caller might still hold
+    # a mutable reference to. See request_commitment()'s docstring.
+    request_hash: str
     redirect_uri: str
     created_at: datetime
     expires_at: datetime
@@ -33,6 +49,11 @@ class ConsentRecord:
     chain_id: str | None = None
     reason: str | None = None
     response_json: str | None = None
+    # Set the moment `status` first enters _TERMINAL. Retention is measured
+    # from here, not from `created_at` or `expires_at` — a consent that takes
+    # nearly its whole TTL to complete must still get its full retention
+    # window afterwards.
+    terminal_at: datetime | None = None
 
 
 # Consent records were never swept except on access, so a stream of started-
@@ -56,12 +77,18 @@ class ConsentStore:
         self,
         max_records: int = MAX_CONSENT_RECORDS,
         max_records_per_owner: int = MAX_CONSENT_RECORDS_PER_OWNER,
+        terminal_retention_seconds: int | None = None,
     ) -> None:
         self._records: dict[str, ConsentRecord] = {}
         self._states: dict[str, str] = {}
         self._lock = threading.RLock()
         self.max_records = max_records
         self.max_records_per_owner = max_records_per_owner
+        self.terminal_retention_seconds = (
+            settings.nac_consent_terminal_retention_seconds
+            if terminal_retention_seconds is None
+            else terminal_retention_seconds
+        )
 
     def create(
         self,
@@ -72,11 +99,18 @@ class ConsentStore:
     ) -> ConsentRecord:
         created_at = _now()
         owner = _owner_hash(api_key)
+        # Snapshot the request now, deep-copied, and commit to it now. A
+        # caller that still holds `request` and mutates it afterwards (or a
+        # future code path that reassigns `record.request`) must not be able
+        # to change what the eventual receipt's request_hash attests to.
+        frozen_request = request.model_copy(deep=True)
         record = ConsentRecord(
             consent_id="cns_" + uuid.uuid4().hex[:24],
             state=secrets.token_urlsafe(32),
+            nonce=secrets.token_urlsafe(32),
             owner_hash=owner,
-            request=request,
+            request=frozen_request,
+            request_hash=request_commitment(frozen_request),
             redirect_uri=redirect_uri,
             created_at=created_at,
             expires_at=created_at + timedelta(seconds=ttl_seconds),
@@ -95,11 +129,25 @@ class ConsentStore:
         return record
 
     def _sweep(self) -> None:
-        """Drop expired and terminal records. Caller holds the lock."""
+        """Drop terminal records once their retention window has passed.
+
+        Caller holds the lock. Every record is offered to _expire() first, so
+        one past its TTL that nobody polled is promoted to EXPIRED (and given
+        a terminal_at) before the retention check runs — otherwise it would
+        wait here forever, since only a terminal record is ever swept. A
+        record must survive being terminal for `terminal_retention_seconds`:
+        completing consent B must not make consent A's just-issued result
+        vanish mid-poll because A also happened to be terminal.
+        """
         now = _now()
         for consent_id, record in list(self._records.items()):
-            terminal = record.status in {"COMPLETED", "DENIED", "FAILED", "EXPIRED"}
-            if record.expires_at <= now or terminal:
+            self._expire(record, now=now)
+            if record.status not in _TERMINAL:
+                continue
+            retain_until = (record.terminal_at or now) + timedelta(
+                seconds=self.terminal_retention_seconds
+            )
+            if now >= retain_until:
                 del self._records[consent_id]
                 self._states.pop(record.state, None)
 
@@ -163,13 +211,16 @@ class ConsentStore:
             self._states.pop(record.state, None)  # single-use, like the success path
             if record.status in {"PENDING", "EXCHANGING"}:
                 record.status = "DENIED"
+                record.access_token = None
                 record.reason = "user denied consent"
+                record.terminal_at = _now()
 
     def fail(self, record: ConsentRecord, reason: str) -> None:
         with self._lock:
             record.status = "FAILED"
             record.access_token = None
             record.reason = reason
+            record.terminal_at = _now()
 
     def authorize(self, record: ConsentRecord, access_token: str) -> None:
         with self._lock:
@@ -195,12 +246,14 @@ class ConsentStore:
             record.chain_id = response.chain_id
             record.response_json = response.model_dump_json()
             record.reason = response.reason
+            record.terminal_at = _now()
 
     def fail_verification(self, record: ConsentRecord, reason: str) -> None:
         with self._lock:
             record.status = "FAILED"
             record.access_token = None
             record.reason = reason
+            record.terminal_at = _now()
 
     def public(self, record: ConsentRecord) -> dict:
         with self._lock:
@@ -214,18 +267,15 @@ class ConsentStore:
                 "reason": record.reason,
             }
 
-    def _expire(self, record: ConsentRecord | None) -> None:
+    def _expire(self, record: ConsentRecord | None, now: datetime | None = None) -> None:
         if record is None:
             return
-        if record.expires_at <= _now() and record.status not in {
-            "COMPLETED",
-            "DENIED",
-            "FAILED",
-            "EXPIRED",
-        }:
+        now = now or _now()
+        if record.expires_at <= now and record.status not in _TERMINAL:
             record.status = "EXPIRED"
             record.access_token = None
             record.reason = "consent request expired"
+            record.terminal_at = now
 
 
 consents = ConsentStore()

@@ -189,12 +189,16 @@ def run_contract(output: Path) -> dict[str, Any]:
             self.exchanged_codes: list[str] = []
             self.gathered_actions: list[Action] = []
 
-        async def begin_number_verification(self, phone_number, redirect_uri, state):
+        async def begin_number_verification(self, phone_number, redirect_uri, state, nonce):
             if phone_number != CONTRACT_PHONE:
                 raise AssertionError("unexpected contract phone")
+            if not nonce or nonce == state:
+                raise AssertionError("nonce must be a separate random value from state")
             return f"https://consent.invalid/authorize?state={state}"
 
-        async def exchange_number_verification_code(self, code, redirect_uri):
+        async def exchange_number_verification_code(self, code, redirect_uri, nonce):
+            if not nonce:
+                raise AssertionError("nonce was not forwarded to the token exchange")
             self.exchanged_codes.append(code)
             return "contract-access-token-never-returned"
 
