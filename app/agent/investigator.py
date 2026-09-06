@@ -22,10 +22,21 @@ class Investigator:
     """The orchestrator. Forms a hypothesis, gathers the cheapest useful evidence,
     escalates only when suspicion warrants, and issues a verdict + chain."""
 
-    def __init__(self, engine: PolicyEngine, provider: EvidenceProvider):
+    def __init__(
+        self,
+        engine: PolicyEngine,
+        provider: EvidenceProvider,
+        *,
+        planner=None,
+        event_sink=None,
+    ):
         self.engine = engine
         self.provider = provider
-        self.planner = get_planner(engine)
+        self.planner = planner or get_planner(engine)
+        # Defaults to the shared SSE bus; a lab/replay caller can inject its own
+        # per-run recording sink instead without touching that bus, so a demo
+        # run never leaks into (or is throttled by) another owner's stream.
+        self._emit = event_sink or emit
         # Choreographed steps NEVER go through self.planner.
         #
         # This is the fourth time the same trap has been walked into. A rule the
@@ -63,7 +74,7 @@ class Investigator:
         chain = Chain(hypothesis=hypothesis.value)
         used: set = set()
 
-        await emit(
+        await self._emit(
             self._with_run_id(
                 {
                     "type": "start",
@@ -113,7 +124,7 @@ class Investigator:
                 "policy: use the provider authorization granted for this request",
                 "policy",
             )
-            await emit(
+            await self._emit(
                 self._with_run_id(
                     self._selection_event(
                         required,
@@ -213,7 +224,7 @@ class Investigator:
                 planner_sources.add(choice.source)
             if choice.stops:
                 # The agent decided it has enough. A first-class outcome.
-                await emit(
+                await self._emit(
                     self._with_run_id(
                         {
                             "type": "decision",
@@ -231,7 +242,7 @@ class Investigator:
                 )
                 break
             action = choice.action
-            await emit(
+            await self._emit(
                 self._with_run_id(
                     self._selection_event(choice, hypothesis, budget_left, phase=phase),
                     run_id,
@@ -259,7 +270,7 @@ class Investigator:
                 # The step-up is a policy choreography, not a planner decision:
                 # it is the cheapest doubt-resolving move, chosen deterministically.
                 stepup = Choice(action, "cheapest step that could resolve the doubt", "policy")
-                await emit(
+                await self._emit(
                     self._with_run_id(
                         self._selection_event(stepup, hypothesis, budget_left, phase="step_up"),
                         run_id,
@@ -310,7 +321,7 @@ class Investigator:
             latency_ms=int((time.perf_counter() - started) * 1000),
             provider_sources=sorted({link.source for link in chain.links}),
         )
-        await emit(
+        await self._emit(
             self._with_run_id(
                 {
                     "type": "verdict",
@@ -373,7 +384,7 @@ class Investigator:
 
         for action in batch:
             choice = Choice(action, "policy: parallel batch", "policy")
-            await emit(
+            await self._emit(
                 self._with_run_id(
                     self._selection_event(choice, hypothesis, budget_left, phase="parallel"),
                     run_id,
@@ -467,7 +478,7 @@ class Investigator:
         return link
 
     async def _emit_link(self, link: EvidenceLink, belief: Belief, run_id: str | None) -> None:
-        await emit(
+        await self._emit(
             self._with_run_id(
                 {
                     "type": "evidence",
@@ -537,9 +548,15 @@ class Investigator:
         }
 
 
-def build_investigator(provider: EvidenceProvider) -> Investigator:
-    engine = get_engine(str(settings.policy_path))
-    return Investigator(engine, provider)
+def build_investigator(
+    provider: EvidenceProvider,
+    *,
+    engine: PolicyEngine | None = None,
+    planner=None,
+    event_sink=None,
+) -> Investigator:
+    engine = engine or get_engine(str(settings.policy_path))
+    return Investigator(engine, provider, planner=planner, event_sink=event_sink)
 
 
 def build_engine_for_pricing() -> PolicyEngine:
