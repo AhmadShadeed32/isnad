@@ -18,7 +18,7 @@
 -->
 <style>
   :root{--bg:#0d1117;--fg:#e6edf3;--mut:#8b949e;--green:#3fb950;--red:#f85149;
-        --line:#30363d;--card:#161b22}
+        --line:#30363d;--card:#161b22;--amber:#d29922}
   *{box-sizing:border-box}
   body{margin:0;padding:1.2rem;background:var(--bg);color:var(--fg);
        font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
@@ -47,24 +47,68 @@
   button:disabled{opacity:.5;cursor:default}
   .mono{font-size:11px;color:var(--mut);word-break:break-all}
   .note{font-size:11px;color:var(--mut);margin-top:.5rem}
+  /* I6: logical properties so a dir="rtl" flip needs no separate rules. */
+  .toolbar{display:flex;gap:.5rem;align-items:center;margin-block-end:.8rem;flex-wrap:wrap}
+  .toolbar select{background:#21262d;border:1px solid var(--line);color:inherit;
+                  font:inherit;padding:.35rem .5rem;border-radius:4px}
+  .toolbar select:focus-visible{outline:2px solid var(--green);outline-offset:1px}
+  .draft{font-size:11px;color:var(--amber)}
+  th,td{text-align:start}
+  .row{text-align:start}
+  /* I6 step 2: an unknown key falls back to English *visibly*. An English
+     string surviving inside an Arabic page is a missing translation, not an
+     editorial choice, so it is marked rather than left to look deliberate. */
+  [dir="rtl"] [lang="en"]{border-block-end:1px dotted var(--mut)}
+  /* Anything the signature covers stays LTR whatever the page direction: a
+     chain id, hex key or ISO timestamp reordered by the bidi algorithm would
+     no longer be the string the reader is meant to compare. */
+  bdi{unicode-bidi:isolate}
 </style>
 <main>
-  <p class="note"><a href="/judge" style="color:inherit">&larr; Back to the checkout demo</a></p>
+  <p class="note"><a href="/judge" style="color:inherit" id="backLink"><span
+    id="backArrow" aria-hidden="true">&larr;</span> <span
+    data-i18n="ui.back_to_demo">Back to the checkout demo</span></a></p>
   <h1>Isnad — evidence receipt</h1>
-  <div class="sub" id="chainId">loading…</div>
+  <div class="sub"><bdi id="chainId" dir="ltr">loading…</bdi></div>
+
+  <div class="toolbar">
+    <label for="locale" class="note">Language / اللغة</label>
+    <select id="locale">
+      <option value="en">English</option>
+      <option value="ar">العربية</option>
+    </select>
+    <span class="draft" id="draftNote" hidden></span>
+  </div>
 
   <div class="card">
     <div class="status pending" id="status">⋯ verifying signature…</div>
     <div class="note" id="statusNote"></div>
     <button id="tamperBtn" disabled>tamper with one byte and re-verify</button>
     <button id="resetBtn" hidden>restore the original bytes</button>
+    <!-- I7: hands the reader the exact bytes the server signed, so the same
+         check can be redone with no Isnad involvement at all. -->
+    <button id="downloadBtn" disabled>download this receipt</button>
+    <p class="note" id="downloadNote">
+      The download is the bytes this page just checked, saved exactly as the
+      server sent them — not this page's re-rendering of them. Verify it with
+      no network and no Isnad involvement:
+      <bdi dir="ltr" class="mono">python scripts/verify_receipt.py receipt.json</bdi>
+    </p>
+    <p class="note">
+      It contains the signed payload, its signature, the public key and the
+      algorithm — and no phone number. The subject and owner commitments inside
+      it are pseudonymous and potentially linkable, not anonymous. It proves
+      issuance and integrity at signing time; current session status, who owns
+      the key, and whether the operator evidence was true all need separate
+      evidence. A downloaded copy cannot be revoked or erased remotely.
+    </p>
   </div>
 
   <div class="card" id="summaryCard" hidden>
     <div class="row"><span class="k">decision</span><span id="decision"></span></div>
     <div class="row"><span class="k">chain grade</span><span id="grade"></span></div>
-    <div class="row"><span class="k">risk score</span><span id="confidence"></span></div>
-    <p class="note">Policy-derived, uncalibrated score from 0 to 1. It is not a measured fraud probability.</p>
+    <div class="row"><span class="k" data-i18n="ui.risk_score">risk score</span><span id="confidence"></span></div>
+    <p class="note" data-i18n="ui.risk_score_note">Policy-derived, uncalibrated score from 0 to 1. It is not a measured fraud probability.</p>
     <div class="row"><span class="k">hypothesis</span><span id="hypothesis"></span></div>
     <div class="row"><span class="k">planner</span><span id="planner"></span></div>
     <div class="row"><span class="k">signed at</span><span id="signedAt"></span></div>
@@ -111,6 +155,104 @@ const rawChainId = location.pathname.split('/').pop() || '';
 let chainId = '';
 try { chainId = decodeURIComponent(rawChainId); } catch (_) { /* handled by main */ }
 let payloadBytes = null, originalBytes = null, sigBytes = null, keyBytes = null;
+// I7: the response body exactly as it arrived, held so the download hands the
+// reader the same bytes this page verified.
+let bundleText = null;
+
+// --- I6: locale ------------------------------------------------------------
+// Locale is presentation only. It never enters a request commitment, never
+// reaches a policy decision, and never rewrites a signed value: a translated
+// phrase is shown *beside* the signed token, never in place of it.
+const LOCALE_KEY = 'isnad.locale';
+const SUPPORTED = ['en', 'ar'];
+const dicts = {};
+let activeLocale = 'en';
+let signedState = null;      // re-rendered when the language changes
+let lastSignature = null;    // true | false, or null when not yet checked
+
+const lookup = (dict, path) =>
+  path.split('.').reduce((o, k) => (o && typeof o === 'object' ? o[k] : undefined), dict);
+
+/* Unknown keys fall back to English *visibly*: the reader gets the English
+   sentence — never a raw key and never a blank — and the element is marked
+   lang="en" so assistive technology switches voice and the stylesheet can
+   show that this string is untranslated rather than an editorial choice. */
+function applyText(el, path, literal, prefix){
+  const local = path ? lookup(dicts[activeLocale], path) : undefined;
+  let value = local;
+  let fellBack = false;
+  if (typeof value !== 'string'){
+    value = path ? lookup(dicts.en, path) : undefined;
+    fellBack = true;
+  }
+  if (typeof value !== 'string'){ value = literal; fellBack = true; }
+  el.textContent = (prefix || '') + value;
+  if (fellBack && activeLocale !== 'en') el.setAttribute('lang', 'en');
+  else el.removeAttribute('lang');
+}
+
+const ORIGINAL_TEXT = new WeakMap();
+
+function applyDictionary(){
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    if (!ORIGINAL_TEXT.has(el)) ORIGINAL_TEXT.set(el, el.textContent.trim());
+    applyText(el, el.dataset.i18n, ORIGINAL_TEXT.get(el));
+  });
+}
+
+/* A signed enum shown as signed, LTR-isolated, with the translation beside it.
+   Replacing "CHALLENGE" with a translated phrase would mean the receipt no
+   longer displays the value the signature actually covers. */
+function renderCoded(id, code, group){
+  const el = $(id);
+  const isolated = document.createElement('bdi');
+  isolated.dir = 'ltr';
+  isolated.textContent = code;
+  el.replaceChildren(isolated);
+  const path = group + '.' + code;
+  const local = lookup(dicts[activeLocale], path);
+  const phrase = typeof local === 'string' ? local : lookup(dicts.en, path);
+  if (typeof phrase !== 'string') return;   // e.g. UNGRADED: the code stands alone
+  const gloss = document.createElement('span');
+  gloss.className = 'k';
+  gloss.textContent = ' · ' + phrase;
+  if (typeof local !== 'string' && activeLocale !== 'en') gloss.setAttribute('lang', 'en');
+  el.appendChild(gloss);
+}
+
+async function loadDictionary(locale){
+  if (dicts[locale]) return;
+  try{
+    const response = await fetch(`/ui/i18n/${locale}.json`);
+    if (response.ok) dicts[locale] = await response.json();
+  }catch(_){ /* stay in English: the visible fallback below is the point */ }
+}
+
+async function setLocale(requested){
+  const locale = SUPPORTED.includes(requested) ? requested : 'en';
+  // English is the fallback dictionary, so it is loaded whatever the reader
+  // chose. Without it, a key the Arabic dictionary is missing would fall back
+  // to whatever the markup happened to say rather than to the English string.
+  await Promise.all(locale === 'en' ? [loadDictionary('en')]
+                                    : [loadDictionary('en'), loadDictionary(locale)]);
+  activeLocale = dicts[locale] ? locale : 'en';
+  document.documentElement.lang = activeLocale;
+  document.documentElement.dir = activeLocale === 'ar' ? 'rtl' : 'ltr';
+  $('locale').value = activeLocale;
+  // The arrow is a direction, not a word, so it flips with the page.
+  $('backArrow').textContent = activeLocale === 'ar' ? '→' : '←';
+  // An unreviewed translation says so on the page, not only in its JSON file.
+  const review = dicts[activeLocale] && dicts[activeLocale].review_status;
+  $('draftNote').textContent = review || '';
+  $('draftNote').hidden = !review;
+  applyDictionary();
+  if (lastSignature !== null) showSignature(lastSignature);
+  if (signedState){
+    renderCoded('decision', signedState.decision, 'decision');
+    renderCoded('grade', signedState.chain_grade || 'UNGRADED', 'chain_grade');
+  }
+  try{ localStorage.setItem(LOCALE_KEY, activeLocale); }catch(_){ /* private mode */ }
+}
 
 function hexToBytes(hex){
   const out = new Uint8Array(hex.length / 2);
@@ -122,7 +264,24 @@ function setStatus(state, text, note){
   const el = $('status');
   el.className = 'status ' + state;
   el.textContent = text;
+  el.removeAttribute('lang');
   $('statusNote').textContent = note || '';
+}
+
+/* The one status with a dictionary entry, and the one that must never be
+   readable from colour alone: it keeps its glyph and its sentence in both
+   languages. */
+function showSignature(ok){
+  lastSignature = ok;
+  const el = $('status');
+  el.className = 'status ' + (ok ? 'ok' : 'bad');
+  applyText(el,
+    ok ? 'ui.signature_valid' : 'ui.signature_invalid',
+    ok ? 'signature valid' : 'signature INVALID',
+    ok ? '✓ ' : '✗ ');
+  $('statusNote').textContent = ok
+    ? 'These bytes match the key below. Compare that public key with a trusted source to establish the signer’s identity.'
+    : 'The bytes do not match the signature. This receipt has been altered.';
 }
 
 async function verify(){
@@ -145,28 +304,34 @@ async function verify(){
 
 async function showVerification(){
   const ok = await verify();
-  if (ok === null) return null;
-  if (ok){
-    setStatus('ok', '✓ signature valid',
-      'These bytes match the key below. Compare that public key with a trusted source to establish the signer’s identity.');
-  } else {
-    setStatus('bad', '✗ signature INVALID',
-      'The bytes do not match the signature. This receipt has been altered.');
-  }
+  if (ok === null){ lastSignature = null; return null; }
+  showSignature(ok);
   return ok;
 }
 
-function render(signed, publicKey, signature){
-  $('chainId').textContent = signed.chain_id;
-  $('publicKey').textContent = publicKey;
-  $('signature').textContent = signature;
-  $('signedAt').textContent = signed.signed_at || '—';
+/* LTR isolation for anything the signature covers. Under dir="rtl" the bidi
+   algorithm reorders a bare chain id, hex digest, ISO timestamp or signed
+   number at its neutral edges, and a reordered string is no longer the one the
+   reader is being asked to compare. */
+function setIsolated(id, value){
+  const isolated = document.createElement('bdi');
+  isolated.dir = 'ltr';
+  isolated.textContent = value;        // textContent throughout: never markup
+  $(id).replaceChildren(isolated);
+}
 
-  $('decision').textContent = signed.decision;
-  $('grade').textContent = signed.chain_grade || 'UNGRADED';
-  $('confidence').textContent = signed.confidence;
+function render(signed, publicKey, signature){
+  signedState = signed;
+  $('chainId').textContent = signed.chain_id;   // already a <bdi dir="ltr">
+  setIsolated('publicKey', publicKey);
+  setIsolated('signature', signature);
+  setIsolated('signedAt', signed.signed_at || '—');
+
+  renderCoded('decision', signed.decision, 'decision');
+  renderCoded('grade', signed.chain_grade || 'UNGRADED', 'chain_grade');
+  setIsolated('confidence', signed.confidence);
   $('hypothesis').textContent = signed.hypothesis;
-  $('planner').textContent = signed.planner;
+  setIsolated('planner', signed.planner);
   $('summaryCard').hidden = false;
 
   const body = $('steps');
@@ -187,7 +352,12 @@ function render(signed, publicKey, signature){
       ? `last ${step.max_age_hours}h` : '—';
     [step.step, step.api, step.signal, step.result, delta, window].forEach(v => {
       const td = document.createElement('td');
-      td.textContent = v;              // textContent throughout: never markup
+      // API names, signed signal tokens and signed numbers, isolated so an
+      // RTL page cannot reorder a "+0.90" into "0.90+" or split an API name.
+      const isolated = document.createElement('bdi');
+      isolated.dir = 'ltr';
+      isolated.textContent = v;        // textContent throughout: never markup
+      td.appendChild(isolated);
       tr.appendChild(td);
     });
     body.appendChild(tr);
@@ -216,10 +386,10 @@ function renderArithmetic(signed, steps){
   const p = 1 / (1 + Math.exp(-total));
 
   const fixed = n => (n >= 0 ? '+' : '') + n.toFixed(4);
-  $('mPrior').textContent = prior.toFixed(4);
-  $('mDeltas').textContent = fixed(sum);
-  $('mTotal').textContent = total.toFixed(4);
-  $('mP').textContent = p.toFixed(3);
+  setIsolated('mPrior', prior.toFixed(4));
+  setIsolated('mDeltas', fixed(sum));
+  setIsolated('mTotal', total.toFixed(4));
+  setIsolated('mP', p.toFixed(3));
   const snapshot = signed.policy_snapshot || {};
   const allowBelow = snapshot.allow_below;
   const declineAbove = snapshot.decline_above;
@@ -233,8 +403,8 @@ function renderArithmetic(signed, steps){
     return;
   }
   const expected = p <= allowBelow ? 'ALLOW' : p >= declineAbove ? 'DECLINE' : 'CHALLENGE';
-  $('mThresholds').textContent = `ALLOW ≤ ${allowBelow.toFixed(3)} · DECLINE ≥ ${declineAbove.toFixed(3)}`;
-  $('mVerdict').textContent = expected;
+  setIsolated('mThresholds', `ALLOW ≤ ${allowBelow.toFixed(3)} · DECLINE ≥ ${declineAbove.toFixed(3)}`);
+  setIsolated('mVerdict', expected);
   if (expected === signed.decision){
     $('mNote').textContent = 'Recomputed in this browser from the signed prior, link deltas, and policy snapshot.';
     $('mNote').style.color = '';
@@ -267,7 +437,33 @@ $('resetBtn').addEventListener('click', async () => {
   $('resetBtn').hidden = true;
 });
 
+/* I7 — hand over the exact bytes, not a re-rendering of them.
+
+   `bundleText` is the response body verbatim. Downloading a parse-and-then-
+   re-serialize round trip would ship the reader a file this page never
+   verified: key order, escaping and number formatting are all the serializer's
+   choices, and the one string that must survive byte-for-byte is precisely the
+   one an offline verifier re-encodes and checks. */
+$('downloadBtn').addEventListener('click', () => {
+  if (bundleText === null) return;
+  const url = URL.createObjectURL(new Blob([bundleText], {type: 'application/json'}));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'isnad-receipt-' + chainId.replace(/[^A-Za-z0-9_-]/g, '_') + '.json';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  // Deferred: revoking in the same task can cancel the download before the
+  // browser has read the blob.
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+});
+
+$('locale').addEventListener('change', (event) => { setLocale(event.target.value); });
+
 (async function main(){
+  let preferred = null;
+  try{ preferred = localStorage.getItem(LOCALE_KEY); }catch(_){ /* private mode */ }
+  await setLocale(preferred || 'en');
   try{
     if (!chainId){
       setStatus('bad', '✗ invalid receipt link', 'This receipt URL does not contain a valid chain id.');
@@ -279,7 +475,13 @@ $('resetBtn').addEventListener('click', async () => {
       $('chainId').textContent = chainId;
       return;
     }
-    const data = await response.json();
+    // .text() first, .json() never: the download must be able to hand over
+    // these bytes, and once parsed they cannot be reconstructed faithfully.
+    bundleText = await response.text();
+    const data = JSON.parse(bundleText);
+    // Downloadable whatever the signature says. A receipt that fails to verify
+    // is exactly the one a reader most needs to keep and check elsewhere.
+    $('downloadBtn').disabled = false;
     originalBytes = new TextEncoder().encode(data.signed_payload);
     payloadBytes = Uint8Array.from(originalBytes);
     sigBytes = hexToBytes(data.signature);

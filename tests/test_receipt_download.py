@@ -9,6 +9,7 @@ offline script that verifies it without any request to Isnad.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -109,3 +110,54 @@ def test_a_malformed_bundle_is_rejected_not_crashed(tmp_path):
     bundle_path.write_text('{"not": "a receipt"}', encoding="utf-8")
     result = _run_verify_script(bundle_path)
     assert result.returncode != 0
+
+
+# --- the browser download (I7 step 1) ----------------------------------------
+
+RECEIPT_HTML = (REPO_ROOT / "app" / "static" / "receipt.html").read_text(encoding="utf-8")
+RECEIPT_SCRIPT = RECEIPT_HTML.split("<script>")[-1].split("</script>")[0]
+
+
+def test_the_page_offers_a_download():
+    assert 'id="downloadBtn"' in RECEIPT_HTML
+
+
+def test_the_download_saves_the_response_body_verbatim():
+    """The one mistake that would make an honestly-signed receipt look
+    tampered: reconstructing the bundle from parsed values. The page holds the
+    response text and writes *that*."""
+    assert "bundleText = await response.text()" in RECEIPT_SCRIPT
+    assert "new Blob([bundleText]" in RECEIPT_SCRIPT
+    # Never a parse/re-serialize round trip anywhere on the page.
+    assert "JSON.stringify" not in RECEIPT_SCRIPT
+
+
+def test_the_download_never_rebuilds_the_bundle_from_display_fields():
+    """A download assembled from the rendered summary would omit exactly the
+    fields the signature covers, while looking complete."""
+    assert re.search(r"new Blob\(\s*\[\s*JSON\.", RECEIPT_SCRIPT) is None
+    assert "signed_payload:" not in RECEIPT_SCRIPT  # no hand-built bundle object
+
+
+def test_a_receipt_that_fails_to_verify_is_still_downloadable():
+    """The receipt a reader most needs to keep and check elsewhere is the one
+    that did not verify here, so the button is enabled from the fetch, not
+    from the verification result."""
+    enable = RECEIPT_SCRIPT.index("$('downloadBtn').disabled = false;")
+    fetched = RECEIPT_SCRIPT.index("bundleText = await response.text()")
+    verified = RECEIPT_SCRIPT.index("const verified = await showVerification();")
+    assert fetched < enable < verified
+
+
+def test_the_page_says_what_the_download_proves_and_what_it_does_not():
+    """I7 step 4: pseudonymous is not anonymous, and a downloaded file cannot
+    be recalled."""
+    prose = RECEIPT_HTML.split("<script>")[0]
+    assert "pseudonymous" in prose
+    assert "not anonymous" in prose
+    assert "cannot be revoked or erased remotely" in prose
+    assert "issuance and integrity at signing time" in prose
+
+
+def test_the_page_points_at_the_offline_verifier():
+    assert "scripts/verify_receipt.py" in RECEIPT_HTML
