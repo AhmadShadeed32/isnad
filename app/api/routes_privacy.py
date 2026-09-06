@@ -107,6 +107,16 @@ async def posture(request: Request) -> dict:
                 ),
             },
             {
+                "name": "run_events",
+                "seconds": settings.run_event_retention_seconds,
+                "human": _human(settings.run_event_retention_seconds),
+                "why": (
+                    "A durable copy of one investigation's own trace events, kept only long enough to "
+                    "let a disconnected client recover what it missed. Independent of the signed chain "
+                    "itself, which is retained separately and indefinitely."
+                ),
+            },
+            {
                 "name": "outcome_events",
                 "seconds": settings.outcome_retention_seconds,
                 "human": _human(settings.outcome_retention_seconds),

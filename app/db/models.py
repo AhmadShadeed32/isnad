@@ -309,3 +309,26 @@ class ProofShareRow(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
     idempotency_key: Mapped[str] = mapped_column(String(128))
     request_fingerprint: Mapped[str] = mapped_column(String(64))
+
+
+class RunEventRow(Base):
+    """A durably persisted copy of one SSE event, keyed by (owner, run_id,
+    sequence), so a reconnecting client can recover what it missed without
+    rerunning the investigation (I14).
+
+    Persisted BEFORE fan-out from `app.events.emit()`, and only for events
+    that carry a `run_id` — most emissions in this app never do, and this
+    table exists to serve replay, not to become a second copy of every event
+    ever fired. `body` is allowlisted structured fields only (see
+    `app.db.run_events._ALLOWED_BODY_KEYS`); a raw phone number, prompt or
+    unrestricted provider string never reaches this table.
+    """
+
+    __tablename__ = "run_events"
+
+    owner_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    run_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    sequence: Mapped[int] = mapped_column(Integer, primary_key=True)
+    event_type: Mapped[str] = mapped_column(String(32))
+    body_json: Mapped[str] = mapped_column(Text)
+    server_time: Mapped[datetime] = mapped_column(UtcDateTime, index=True, default=lambda: datetime.now(UTC))

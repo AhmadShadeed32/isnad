@@ -221,6 +221,15 @@ class Settings(BaseSettings):
     proof_share_default_ttl_seconds: int = Field(259200, gt=0)  # 3 days
     proof_share_max_ttl_seconds: int = Field(2592000, gt=0)  # 30 days
 
+    # --- Durable run-event replay (I14) ---
+    # How long a persisted run event stays available for replay after a
+    # disconnect. Independent of the signed chain itself, which is retained
+    # indefinitely; this only bounds the *replay journal*.
+    run_event_retention_seconds: int = Field(3600, gt=0)
+    # A replay page is bounded so a client asking for "everything" cannot
+    # force one unbounded query.
+    run_replay_page_size: int = Field(500, gt=0)
+
     # --- Cache / idempotency ---
     cache_backend: str = "memory"  # memory | redis
     redis_url: str | None = None

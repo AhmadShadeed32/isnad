@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import AsyncIterator
 from contextlib import suppress
 from contextvars import ContextVar
+
+log = logging.getLogger("isnad")
 
 # Minimal in-process event bus for the live agent console.
 # In production this is Redis pub/sub -> WebSocket/SSE; the interface is the same.
@@ -46,9 +49,26 @@ def _redact(event: dict) -> dict:
 
 
 async def emit(event: dict) -> None:
-    """Deliver an event to the subscribers belonging to the current owner."""
+    """Deliver an event to the subscribers belonging to the current owner.
+
+    Persisted before fan-out (I14) when the event carries a `run_id` — most
+    emissions never do, and only a `run_id`'d run is ever replayable. A
+    persistence failure is logged and swallowed rather than raised: it must
+    never abort the live investigation the event belongs to, and the
+    resulting gap is a fact the replay reader can detect for itself (see
+    `app.db.run_events.has_gap`), not one this call pretends did not happen.
+    """
     event = _redact(event)
     owner = current_owner.get()
+    run_id = event.get("run_id")
+    if run_id:
+        try:
+            from app.db import run_events
+            from app.ownership import ANONYMOUS
+
+            await asyncio.to_thread(run_events.persist_event, owner or ANONYMOUS, run_id, event)
+        except Exception:
+            log.exception("run event persistence failed for run_id=%s", run_id)
     for q, subscriber_owner in list(_subscribers.items()):
         if subscriber_owner != owner:
             continue

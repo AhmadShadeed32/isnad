@@ -211,6 +211,33 @@ async def console_stream(
     )
 
 
+@router.get("/console/runs/{run_id}/events")
+async def replay_run_events(
+    run_id: str,
+    after: int = Query(default=0, ge=0),
+    _key: str = Depends(require_api_key),
+) -> dict:
+    """I14 — durable recovery after a disconnect: what happened on `run_id`
+    since sequence `after`, persisted before the live event ever reached the
+    SSE bus. A run-ID filter alone is not access control (P4a's own S2/S3
+    lesson): this is authorized the same way every other console route is,
+    through `require_api_key`, before any row is read — never derived from
+    the run_id itself, which a client could simply guess or copy from
+    another tenant.
+
+    `gap: true` means the caller's own cursor cannot be trusted (the run
+    never persisted that many events, or its retention window has already
+    passed) — the caller must fetch the current persisted result directly
+    rather than assume a smooth continuation from `after`.
+    """
+    from app.db import run_events
+
+    owner = owner_for(_key)
+    events = await asyncio.to_thread(run_events.events_after, owner, run_id, after=after)
+    gap = await asyncio.to_thread(run_events.has_gap, owner, run_id, after=after)
+    return {"run_id": run_id, "events": events, "gap": gap}
+
+
 # Reverse Isnad demo (Act IV): a spoofed "bank officer" caller.
 SPOOFED_CALLER = "+96279999999"
 
