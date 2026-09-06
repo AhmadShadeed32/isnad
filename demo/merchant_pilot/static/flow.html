@@ -100,6 +100,12 @@ function renderChallengePanel(challenge, decision) {
     return;
   }
   if (challenge.status === "PENDING") {
+    // I5: the merchant and the subscriber are two different audiences with
+    // two different questions. This is a storyboard of what the subscriber's
+    // own side of the same hold looks like -- there is no separate customer
+    // app here, so it is described rather than rendered live.
+    const expiresAt = new Date(challenge.expires_at);
+    const expired = Number.isFinite(expiresAt.getTime()) && expiresAt.getTime() < Date.now();
     panel.innerHTML = `
       <div class="challenge">
         <h3>Continue merchant verification</h3>
@@ -110,6 +116,17 @@ function renderChallengePanel(challenge, decision) {
         <button class="fail" data-result="FAILED">Failed</button>
         <button class="abandon" data-result="ABANDONED">Abandoned</button>
         <p class="err" id="challenge-err"></p>
+        <details style="margin-top:.6rem">
+          <summary>What the subscriber's side of this hold looks like (storyboard)</summary>
+          <p class="note" style="margin:.4rem 0 0">
+            <strong>Why held:</strong> the network could not fully confirm this checkout on its own.
+            <strong>Required action:</strong> none from the subscriber yet — this merchant is
+            reviewing manually (a callback or a check), not waiting on an OTP.
+            <strong>Expiry:</strong> this followup ${expired ? "has expired" : "expires at " + challenge.expires_at}.
+            <strong>Return path:</strong> the subscriber returns to the merchant's own order
+            status page, which is separate from this operator console.
+          </p>
+        </details>
       </div>`;
     for (const button of panel.querySelectorAll("button[data-result]")) {
       button.addEventListener("click", async () => {
