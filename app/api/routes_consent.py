@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from app.agent.investigator import build_engine_for_pricing, build_investigator
 from app.api.deps import get_live_provider, require_api_key
-from app.api.rate_limit import limit_per_key
+from app.api.rate_limit import limit_per_ip, limit_per_key
 from app.chain.models import Verdict
 from app.chain.vault import vault
 from app.config import settings
@@ -20,6 +23,71 @@ from app.policy import counterfactual
 from app.presentation import present
 
 router = APIRouter(prefix="/v1", tags=["consent"], dependencies=[Depends(limit_per_key)])
+# No /v1 prefix: this is a browser-facing landing page, not the JSON API —
+# same split as routes_judge.page_router / routes_console.page_router.
+page_router = APIRouter(tags=["consent"], dependencies=[Depends(limit_per_ip)])
+
+_CONSENT_COMPLETE_HTML = Path(__file__).parent.parent / "static" / "consent_complete.html"
+
+
+def _accept_quality(accept: str, media_type: str) -> float:
+    """The q-value Accept assigns to an exact media type (no wildcard credit).
+
+    A `*/*` or `text/*` entry does not count toward a specific type's score
+    here — "prefers html" must mean an explicit `text/html`, not a browser's
+    catch-all fallback, or "wildcard-only... keep JSON" would break.
+    """
+    best = 0.0
+    for part in accept.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        type_part, *params = part.split(";")
+        if type_part.strip() != media_type:
+            continue
+        quality = 1.0
+        for param in params:
+            param = param.strip()
+            if param.startswith("q="):
+                try:
+                    quality = float(param[2:])
+                except ValueError:
+                    quality = 1.0
+        best = max(best, quality)
+    return best
+
+
+def _prefers_html(accept: str | None) -> bool:
+    """Whether a browser's Accept header prefers text/html over JSON.
+
+    Absent, wildcard-only, or tied preferences all keep JSON — this only
+    fires for an explicit, strictly higher preference for text/html, which is
+    what an ordinary browser navigation (not a fetch()/curl/script client)
+    sends.
+    """
+    if not accept:
+        return False
+    return _accept_quality(accept, "text/html") > _accept_quality(accept, "application/json")
+
+
+def _redirect_to_completion_page() -> RedirectResponse:
+    return RedirectResponse(
+        url="/consent/complete",
+        status_code=status.HTTP_303_SEE_OTHER,
+        headers={"Vary": "Accept", "Cache-Control": "no-store"},
+    )
+
+
+@page_router.get("/consent/complete", response_class=HTMLResponse, include_in_schema=False)
+async def consent_complete_page() -> HTMLResponse:
+    """Generic same-origin landing page for a subscriber's phone browser.
+
+    Carries no code, state, phone number, consent ID or provider error text —
+    everything the callback learned about this specific attempt stays
+    server-side (see number_verification_callback's HTML branch below).
+    """
+    html = _CONSENT_COMPLETE_HTML.read_text(encoding="utf-8")
+    return HTMLResponse(content=html, headers={"Cache-Control": "no-store"})
 
 
 def _consent_response(record: ConsentRecord) -> NumberVerificationConsentResponse:
@@ -105,16 +173,33 @@ async def start_number_verification_consent(
 
 @router.get(
     "/consents/number-verification/callback",
-    response_model=NumberVerificationConsentResponse,
+    response_model=None,
 )
 async def number_verification_callback(
     state: str = Query(..., min_length=1, max_length=256),
     code: str | None = Query(default=None, min_length=1, max_length=2048),
     error: str | None = Query(default=None, min_length=1, max_length=128),
-) -> NumberVerificationConsentResponse:
-    """Receive the provider redirect; the authorization code is never exposed."""
+    accept: str | None = Header(default=None),
+) -> NumberVerificationConsentResponse | RedirectResponse:
+    """Receive the provider redirect; the authorization code is never exposed.
+
+    A browser navigating here directly (Accept prefers text/html) is bounced
+    to the generic /consent/complete page instead of seeing raw JSON or an
+    error naming the provider/consent state — for every outcome, not only
+    success (P4a step 8). All the same state transitions below run first;
+    only the *response representation* differs.
+    """
+    prefer_html = _prefers_html(accept)
+
+    def respond(record_for_json: ConsentRecord) -> NumberVerificationConsentResponse | RedirectResponse:
+        if prefer_html:
+            return _redirect_to_completion_page()
+        return _consent_response(record_for_json)
+
     record = consents.by_state(state)
     if record is None:
+        if prefer_html:
+            return _redirect_to_completion_page()
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"code": "consent_not_found", "message": "Unknown or expired consent state"},
@@ -122,17 +207,21 @@ async def number_verification_callback(
 
     if error:
         consents.deny(record)
-        return _consent_response(record)
+        return respond(record)
 
     callback_status = consents.begin_callback(record)
     if callback_status in {"AUTHORIZED", "COMPLETED"}:
-        return _consent_response(record)
+        return respond(record)
     if callback_status == "EXPIRED":
+        if prefer_html:
+            return _redirect_to_completion_page()
         raise HTTPException(
             status_code=status.HTTP_410_GONE,
             detail={"code": "consent_expired", "message": "Consent request expired"},
         )
     if callback_status == consents.REPLAYED:
+        if prefer_html:
+            return _redirect_to_completion_page()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={
@@ -141,6 +230,8 @@ async def number_verification_callback(
             },
         )
     if callback_status != "EXCHANGING" or not code:
+        if prefer_html:
+            return _redirect_to_completion_page()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={
@@ -153,6 +244,8 @@ async def number_verification_callback(
     exchange = getattr(provider, "exchange_number_verification_code", None)
     if not callable(exchange):
         consents.fail(record, "provider does not support Number Verification token exchange")
+        if prefer_html:
+            return _redirect_to_completion_page()
         raise _consent_unavailable("provider does not support Number Verification token exchange")
 
     try:
@@ -161,12 +254,14 @@ async def number_verification_callback(
         )
     except Exception as exc:
         consents.fail(record, "provider token exchange failed")
+        if prefer_html:
+            return _redirect_to_completion_page()
         if isinstance(exc, RuntimeError):
             raise _consent_unavailable(str(exc)) from exc
         raise _consent_unavailable("provider token exchange failed") from exc
 
     consents.authorize(record, access_token)
-    return _consent_response(record)
+    return respond(record)
 
 
 @router.get(

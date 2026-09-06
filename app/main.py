@@ -85,6 +85,7 @@ def create_app() -> FastAPI:
     app.add_middleware(SecurityHeadersMiddleware)
     app.include_router(routes_verify.router)
     app.include_router(routes_consent.router)
+    app.include_router(routes_consent.page_router)
     app.include_router(routes_reverse.router)
     app.include_router(routes_session.router)
     app.include_router(routes_console.router)
