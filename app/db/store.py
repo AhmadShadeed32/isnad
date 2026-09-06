@@ -4,6 +4,8 @@ import asyncio
 import secrets
 from dataclasses import dataclass
 
+from sqlalchemy.exc import IntegrityError
+
 from app.chain.models import Verdict
 from app.chain.subject import owner_binding, subject_hash
 from app.chain.vault import vault
@@ -11,6 +13,18 @@ from app.db.database import SessionLocal
 from app.db.models import ChainRow
 from app.events import current_owner
 from app.ownership import ANONYMOUS
+
+
+class ChainAlreadyExists(RuntimeError):
+    """A second `save()` tried to reuse a chain_id that already has a signed
+    record (P3).
+
+    chain_id carries 80 bits of randomness, so a legitimate caller never
+    collides with an existing one — this is either a bug or an attempt to
+    rewrite a previously issued verdict, and both must fail loud rather than
+    silently replace the decision, payload or signature a receipt was signed
+    over.
+    """
 
 
 @dataclass
@@ -56,17 +70,29 @@ def save(
     signed_at = verdict.signed_at
     public_key = vault.public_key_hex()
     with SessionLocal() as s:
-        row = s.get(ChainRow, verdict.chain_id) or ChainRow(chain_id=verdict.chain_id)
-        row.owner_hash = owner
-        row.decision = verdict.decision.value
-        row.confidence = verdict.confidence
-        row.hypothesis = verdict.hypothesis
-        row.verdict_json = verdict_json
-        row.signature = signature
-        row.signed_at = signed_at
-        row.public_key = public_key
-        s.add(row)
-        s.commit()
+        # Insert-only (P3): a plain `s.get(...) or ChainRow(...)` upsert let a
+        # colliding chain_id silently rewrite a signed decision. The unique
+        # primary key is the enforcement; IntegrityError is how a race (two
+        # concurrent saves of the same id) resolves rather than one winning
+        # silently.
+        s.add(
+            ChainRow(
+                chain_id=verdict.chain_id,
+                owner_hash=owner,
+                decision=verdict.decision.value,
+                confidence=verdict.confidence,
+                hypothesis=verdict.hypothesis,
+                verdict_json=verdict_json,
+                signature=signature,
+                signed_at=signed_at,
+                public_key=public_key,
+            )
+        )
+        try:
+            s.commit()
+        except IntegrityError as exc:
+            s.rollback()
+            raise ChainAlreadyExists(verdict.chain_id) from exc
     return ChainRecord(verdict, verdict_json, signature, signed_at, public_key, owner)
 
 
