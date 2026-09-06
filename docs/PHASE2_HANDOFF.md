@@ -1,4 +1,363 @@
-# Isnad — compact handoff
+# Isnad — implementation handoff
+
+## Current code review — 7 September 2026
+
+**This checkpoint supersedes current-state claims in the historical sections below.**
+The user requested a codebase review, proposed fixes in the handoff, and a README
+rewrite. This pass changes documentation and adds an offline reproduction script;
+the application defects below are **open**, not implemented fixes. Existing local
+lab, browser-test and screenshot changes were present before this review.
+
+### Validation of this checkout
+
+| Check | Observed result |
+| --- | --- |
+| Full `pytest -q` inside the sandbox | **1,105 passed**, 61 browser setup errors, 3 warnings. All browser errors were local socket permission failures, not assertion failures. |
+| Browser suite rerun with local server/browser permission | **60 passed, 1 xfailed** in 87.69 seconds. The expected failure is English `/lab` at 375 px. |
+| `ruff check app tests scripts demo` | Passed. The old unused-noqa warning is no longer current. |
+| `scripts/verify_runtime_lock.py` | Passed: 38 exact pins cover direct runtime dependencies. This is not an advisory audit or a clean installation test. |
+| Offline evidence pack | Five scenarios completed; all five stored receipt signatures valid and trusted. |
+| Fixed independent synthetic evaluation | 13/13 completed, zero errors; **34/78 evidence calls**, **6/13 CHALLENGE**, **4 authored-expectation disagreements**. |
+| Review probes | Reproduced cross-device queries, unthrottled repeats, callback-ID omission, mock provenance error, uncertain/empty-ID creates, concurrent quota bypass, contradictory hybrid guards and expired-session behavior. |
+
+Together the separate test runs cover **1,165 passes and one expected failure**;
+a single unsandboxed full-suite run was not performed. No Nokia/Gemini calls,
+physical handset trial, fresh dependency advisory audit, Docker build or Postgres
+integration run was performed in this pass. Those are not implied by passing tests.
+This was a broad source review with focused reproductions, not proof that every
+possible defect has been found.
+
+Fresh offline scenario outputs (default repository policy, mock/greedy):
+
+| Case | Decision / grade | Evidence links | Cost units | Uncalibrated score |
+| --- | --- | ---: | ---: | ---: |
+| Clean signup | ALLOW / ATTESTED_FULL | 2 | 3 | 0.041 |
+| Account takeover | DECLINE / REFUTED | 4 | 10 | 0.981 |
+| Clean checkout | ALLOW / ATTESTED_FULL | 2 | 4 | 0.096 |
+| Evidence unavailable | CHALLENGE / UNRESOLVED | 3 | 7 | 0.280 |
+| SIM replacement | CHALLENGE / DEGRADED | **5** | **12** | **0.322** |
+
+The old six-link / 0.242 replacement and 38/78 evaluation claims are stale.
+Swap-date enrichment consumes separate budget without adding an evidence link;
+link counts are not total provider-operation counts. The evidence-pack table's
+per-link costs also omit those extra operations, although its total includes them.
+Do not advertise the evaluator's 34/78 link count as total paid API-call savings.
+
+### Open findings and concrete fixes
+
+Priorities: **P1** before relying on paid calls, trust expiry or callbacks;
+**P2** before a release claiming complete functionality. Each item includes its
+own completion test; preserve issuing policy and exact historical receipt bytes.
+
+#### R01 · P1 — Subscription queries are not bound to the subscribed device
+
+**Source:** `app/network_conditions.py::query`, `app/db/models.py::NetworkConditionSubscriptionRow`.
+Creation stores `device_hash`, but query checks only owner and active status before
+sending the request body's phone to the provider. The probe subscribes phone A,
+queries phone B twice, and records two calls for B. Owner isolation works; the
+same owner's device/subscription prerequisite does not.
+
+**Fix:** compare the request phone's keyed hash with the stored device binding
+before any provider call. Also bind subscriptions to the provider that created
+them so configuration changes cannot reinterpret an old provider ID.
+**Acceptance:** same-owner wrong-device and wrong-provider queries make zero
+provider calls; matching-device queries work; foreign owners still receive 404.
+
+#### R02 · P1 — Registered callback URLs cannot identify a newly created subscription
+
+**Source:** `app/network_conditions.py::create`,
+`app/api/routes_network_conditions.py::receive_event`,
+`app/providers/nac.py::create_congestion_subscription`.
+The receiver is `/v1/network-conditions/callbacks/{subscription_id}`, but create
+passes the fixed configured URL unchanged. The generated local ID is never added
+to it or sent separately. A static URL cannot name each newly generated row.
+Tests call `accept_event` with a known local ID and therefore miss this wiring gap.
+
+**Fix:** define configuration as a validated callback base and append the local ID,
+or implement one receiver that resolves a provider ID/token to the local row.
+Validate the actual provider payload against an explicit adapter; the current
+custom `event_id/level/occurred_at` schema alone is not wire-contract proof.
+**Acceptance:** a fake provider POSTs to the exact URL it receives at creation,
+with the exact documented fixture payload and token; the event reaches the right
+row. Multiple subscriptions, wrong tokens and duplicate events are covered.
+
+#### R03 · P1 — Subscription quotas and query pacing do not bound concurrent spend
+
+**Source:** `app/network_conditions.py::_active_counts/create/query`,
+`app/config.py::network_conditions_min_query_interval_seconds`.
+Counts are read before a separate insert, with no serialized reservation. Routes
+run this in worker threads, so one worker does not prevent the race. A barrier
+probe creates **two active subscriptions for one device** despite the limit of
+one. Query never reads the configured five-second interval; immediate repeats
+both reach the provider. The general 60/minute route limit is a separate guard.
+
+**Fix:** reserve owner/device capacity atomically using database locking or a
+transactional quota record; for the supported single process, a lock can be an
+interim guard. Atomically reserve per-subscription query times and in-flight
+slots before SDK calls. Validate positive limits/TTLs at startup.
+**Acceptance:** concurrent same-device creates produce one provider create;
+owner limits hold across different devices; simultaneous/repeated queries yield
+one call plus a stable retry response until the configured interval elapses.
+
+#### R04 · P1 — Uncertain creates lose recovery and empty provider IDs become active
+
+**Source:** `app/network_conditions.py::create/delete`,
+`app/providers/nac.py::create_congestion_subscription`.
+Every exception marks the reservation `failed`, which is terminal and excluded
+from quotas. A timeout after remote success can therefore be followed by another
+create; no listing/reconciliation path recovers the first remote ID. The probe
+produces two failed rows with no provider IDs. An empty response ID is accepted
+as `active`; delete then skips the provider and reports local deletion.
+
+**Fix:** distinguish definite rejection from uncertain completion. Keep an
+`unknown/pending_reconciliation` state that consumes capacity, expose a durable
+operation handle, and reconcile through the supported provider listing/get
+contract before retrying. Add owner-scoped creation idempotency. Require a
+nonempty valid remote ID before activation; never confirm remote deletion when
+remote state is unknown.
+**Acceptance:** timeout-after-success plus retry creates at most one remote
+subscription; empty IDs never become active; response loss and failed cleanup
+remain recoverable across restart.
+
+#### R05 · P1 — Trust sessions stay active and perform checks after their TTL
+
+**Source:** `app/session/manager.py::get/_monitor`, `app/api/routes_session.py`.
+Expiry is checked before sleeping, but not on reads or immediately after sleep.
+The probe uses a shortened TTL/poll interval: a read after TTL still returns
+`ACTIVE`, then both SIM/device calls run after expiry. Normal operation has the
+same window, enlarged by the live provider's 30-second polling floor.
+
+**Fix:** derive effective expiry on every read/use, bound sleep to remaining TTL,
+and recheck expiry before each provider call. Make the terminal transition/event
+idempotent. Consumers must compare expiry even when the monitor is delayed.
+**Acceptance:** a fake-clock test reads after TTL while the monitor sleeps and
+gets EXPIRED; no new provider call starts after TTL, including between SIM and
+device checks and under a delayed event loop.
+
+#### R06 · P2 — Mock congestion data is falsely labeled hosted-simulator data
+
+**Source:** `app/network_conditions.py::_scope/query`,
+`app/domain/schemas.py::NetworkConditionSubscription/NetworkConditionQueryResponse`.
+`_scope()` returns `hosted_simulator` for every current configuration, including
+`MockProvider`. The probe confirms this label on a wholly local mock query.
+That confuses authored fixtures with an actual hosted Nokia simulator response.
+
+**Fix:** record explicit provider provenance at creation (`mock`, `nac_fake`,
+`hosted_simulator`, and separately verified live scope), and project that stable
+value through queries and both locale dictionaries. Do not infer live access
+from a successful call or retrofit claims into signed historical receipts.
+**Acceptance:** mock/fake data never carries a hosted/live label; simulator data
+is labeled as such; language switching preserves provenance meaning.
+
+#### R07 · P2 — Network-condition records have no terminal retention
+
+**Source:** `app/network_conditions.py`, `app/retention.py::purge_once`.
+Expired/deleted/failed subscription rows are never purged; their event rows are
+only capped per subscription. Repeated create/delete cycles grow both tables
+over time, and `_active_counts` scans all rows for an owner. Expiry changes the
+reported status but does not reclaim anything.
+
+**Fix:** define a terminal retention window, sweep child events and terminal
+subscriptions in bounded batches, and keep unresolved remote-cleanup records
+until reconciliation. Query active rows using an indexed status/expiry predicate.
+**Acceptance:** an idle fake-clock sweep reclaims eligible rows and events, keeps
+active/unreconciled records, and remains bounded with many historical rows.
+
+#### R08 · P2 — Network-condition input/output validation is incomplete
+
+**Source:** `app/domain/schemas.py::NetworkConditionSubscribeRequest/NetworkConditionQueryRequest`,
+`app/network_conditions.py::validate_period/query`.
+The phone fields only check length: `notaphone` passes. Any two ordered bounds
+within the maximum span are called `history`, even if both are in the future.
+Provider intervals have no count limit or local chronology/timezone checks;
+missing keys/null dates escape normalization and can become 500 responses.
+
+**Fix:** reuse the application's E.164 validation, define permitted temporal
+ranges explicitly, bound result counts, and validate each provider interval
+before response construction. Map malformed provider data to a stable sanitized
+unavailable/502 result instead of an uncaught validation exception.
+**Acceptance:** invalid phones/periods cause zero calls; null/missing/reversed
+intervals and oversized arrays produce bounded, controlled responses. Empty data
+remains unknown, never Low.
+
+#### R09 · P2 — Ended trust sessions keep raw phone numbers until another create
+
+**Source:** `app/session/manager.py::_prune/end/_monitor`, `app/retention.py`.
+`_prune()` is called only by `create()`. After the last session expires, is ended,
+or is revoked, its record still holds the raw phone for the life of an idle
+process. The merchant harness's five-minute cleanup does not purge this API store.
+
+**Fix:** define a bounded terminal session retention period, clear raw phones
+once monitoring ends (retain only a masked display value if required), and run
+cleanup independently of new-session traffic. Preserve a brief terminal-status
+window so clients can observe expiry/revocation.
+**Acceptance:** after all terminal transitions, idle cleanup removes PII within
+the documented window; one merchant's polling cannot prolong another's retention.
+
+#### R10 · P2 — The Docker image cannot serve the lab
+
+**Source:** `Dockerfile` runtime COPY instructions,
+`app/api/routes_lab.py::_BUNDLE/_live_identity`.
+The runtime copies `app/` and `pyproject.toml` but no `demo/` package or recorded
+bundle. `/lab` unconditionally imports `demo.lab.runner`, so this path fails in
+the image even though `/readyz` can succeed. Wheel packaging already includes
+`demo`; a wheel smoke test does not verify the Docker file layout.
+
+**Fix:** ship the lab runtime and bundle in the image, preferably move required
+runtime resources under `app/`, or explicitly disable lab routes/links in that
+artifact. Keep fake-operator development dependencies out of runtime imports.
+**Acceptance:** start the built image in isolated mock/demo mode with the registry
+public-key pin; request `/lab`, `/lab/bundle.json`, `/judge`, `/receipt/...`, and
+`/readyz`. Verify readable bundle/identity output even without `.git` or git.
+
+#### R11 · P2 — CI installs Playwright but never installs its Chromium build
+
+**Source:** `.github/workflows/ci.yml`, `requirements-dev.txt`,
+`tests/browser/conftest.py::browser`.
+The suite now unconditionally imports Playwright and launches its bundled
+Chromium. CI installs the Python package and runs all tests without
+`python -m playwright install --with-deps chromium`. A fresh runner with no
+matching Playwright browser cache cannot run these tests. The old README also
+omitted this setup step; that omission is corrected by this rewrite.
+
+**Fix:** install Chromium and its Linux dependencies before pytest; optionally
+split browser checks into a dedicated required CI job. Keep dev extras in
+`pyproject.toml` aligned too: `pip install '.[dev]'` currently omits Playwright.
+**Acceptance:** a clean Linux job with an empty browser cache executes browser
+and async tests, with only the explicitly tracked mobile-lab xfail remaining.
+
+#### R12 · P2 — No configuration can run the advertised selective-live hybrid mode
+
+**Source:** `app/config.py::check_startup_posture/makes_billable_calls`,
+`app/providers/__init__.py::get_provider`.
+With nonempty action/number allowlists, demo=false is rejected because hybrid is
+demo-only, while demo=true is rejected because public demo credentials would
+permit billable calls. Both rejections were reproduced. The protections are
+sensible individually, but the documented selective-live feature is unreachable.
+
+**Fix:** either formally retire selective-live hybrid and remove its setup claims,
+or add an authenticated private rehearsal mode that never mints public demo
+tokens and still enforces explicit action/subscriber allowlists and spend limits.
+Do not simply remove the billable-demo guard.
+**Acceptance:** an explicit configuration matrix permits only the intended
+private rehearsal path, or consistently rejects a documented unsupported mode;
+public demo tokens can never authorize paid calls.
+
+#### R13 · P1 — Verification idempotency is not durable with its signed result
+
+**Source:** `app/api/routes_verify.py::verify`, `app/cache.py`, `app/db/store.py`.
+The chain commits before the `done` cache entry. A crash, cancellation, or cache
+write failure in that interval leaves a signed chain without a durable mapping
+from the idempotency key. The default memory cache also loses completed entries
+on restart. A retry can issue a second investigation and paid calls. This is a
+source-confirmed crash window; this review did not execute a paid crash test.
+
+**Fix:** persist owner/key/request commitment and operation state in the database;
+commit the response-to-chain mapping atomically with the signed chain. Treat
+uncertain upstream work as reconciliation-required, not safe to repeat. Redis
+can accelerate replay but must not be the only mapping to the committed result.
+**Acceptance:** inject failure after chain commit but before response/cache write,
+restart, and retry the same key: return/reconcile the original operation with no
+second provider work. Preserve 409 for changed bodies and concurrent requests.
+
+#### R14 · P2 — Requested Redis caching silently falls back and blocks async routes
+
+**Source:** `app/cache.py::get_cache/RedisCache`, `app/api/routes_verify.py::verify`.
+A Redis selection with no URL or missing optional package silently becomes
+memory caching. The configured durability behavior therefore changes without a
+startup failure. With Redis installed, synchronous network operations execute
+directly inside the async verification handler with no explicit socket timeout.
+A stalled cache can block the event loop and unrelated requests.
+
+**Fix:** validate cache backend/URL/package at startup and fail when the requested
+backend cannot be constructed. Use an async client or bounded worker-thread
+calls with explicit connection/read timeouts and sanitized availability errors.
+Redis alone does not remove the one-worker/one-replica restriction.
+**Acceptance:** invalid Redis config refuses startup; an unavailable/hung Redis
+returns bounded errors while liveness and unrelated requests remain responsive.
+
+#### R15 · P2 — Mobile lab overflow is an acknowledged failing browser check
+
+**Source:** `tests/browser/test_surfaces.py::LAB_MOBILE_OVERFLOW`,
+`app/static/lab.html`.
+English `/lab` at 375 px still has a strict xfail for root horizontal movement
+(the marker records 422 px). This browser run reproduced the expected failure;
+it is not evidence that all responsive layouts pass.
+
+**Fix:** inspect the actual root overflow in Chromium, including grid/flex minimum
+sizes and positioned elements; contain wide tables locally without hiding page
+content or keyboard focus. Remove the xfail only after the defect is fixed.
+**Acceptance:** the existing check passes normally at 375 px in both languages,
+with all controls reachable and wide tables scrolling inside their own container.
+
+#### R16 · P2 — Current documentation and evaluation totals mix different budgets
+
+**Source:** historical README/handoff, `scripts/evidence_pack.py::_step_summary`,
+`scripts/independent_evaluation.py`, `app/agent/investigator.py::_enrich_timing`.
+The old docs promise six links/0.242 and three evaluation disagreements. Fresh
+runs produce five links/0.322 and four disagreements. Date enrichment is a
+separate charged operation, but the evidence-pack per-link breakdown omits it
+and the evaluation's "calls" count counts evidence links. This makes a claimed
+paid-call saving or a manual cost reconciliation misleading.
+
+**Fix:** README and this checkpoint now report fresh outputs. Next update the
+presenter script, CURRENT_STATE and recorded lab artifacts from the same build;
+report evidence calls, date-enrichment operations and total cost separately in
+both evaluators. Review the four expectation disagreements without silently
+retuning fixture labels or calling a synthetic score measured fraud accuracy.
+**Acceptance:** a recording provider's operation count equals report totals;
+per-operation cost sums match `evidence_cost`; all current-facing docs agree on
+one artifact's policy/code identity, with older numbers explicitly historical.
+
+### Recommended implementation order
+
+1. R01–R04: repair network subscription binding, callback delivery, atomic limits
+   and recovery as one coherent lifecycle; add migration(s) only after checking
+   the current Alembic head (`0006_network_conditions`).
+2. R05 and R13: enforce trust expiry and durable verification replay before any
+   paid deployment or merchant order-release reliance.
+3. R06–R09 and R14: finish provenance, data validation, retention and cache failure
+   behavior. Keep provider payloads/secrets out of error messages and artifacts.
+4. R10–R12 and R15: verify the actual deployment artifact, clean CI and mobile UI;
+   make the hybrid feature's supported status explicit.
+5. R16: regenerate evaluation/lab artifacts and synchronize remaining presenter
+   docs. Rerun affected regressions, the full suite, browser checks and image
+   smoke; report unresolved xfails and external validation separately.
+
+Existing operational limits remain: one worker/replica; process-local consent,
+sessions and demo tokens; API-key-derived ownership means key rotation needs an
+explicit tenant migration strategy; public full receipts are bearer-capability
+URLs and persist independently of expiring shared summaries. Physical handset
+proof, current advisory auditing and real fraud calibration remain separate work.
+
+### Reproduce the review locally
+
+From the repository root:
+
+```bash
+.venv311/bin/python docs/reviews/codebase_review_2026_09_07.py
+.venv311/bin/python -m pytest -q --ignore=tests/browser
+.venv311/bin/python -m pytest tests/browser -q
+.venv311/bin/python -m ruff check app tests scripts demo
+.venv311/bin/python scripts/verify_runtime_lock.py
+.venv311/bin/python scripts/evidence_pack.py --output-dir /tmp/isnad-review-evidence
+.venv311/bin/python scripts/independent_evaluation.py
+```
+
+The review probe forces mock/greedy, uses a temporary SQLite database and signing
+key, and makes no external calls. It **prints current defects**, not passing
+acceptance assertions; convert each relevant probe into a focused failing
+regression before fixing the corresponding code. The browser suite requires
+installed Chromium and permission to bind loopback ports and launch it.
+
+---
+
+## Historical handoff — checkpoints through 6 September 2026
+
+The remaining text preserves prior decisions and work history. Its test totals,
+"current" status, completion claims and execution ordering are historical; use
+the checkpoint above for this review's findings and observed validation.
+
 
 Updated 6 September 2026. **Read this file first.**
 
@@ -2441,3 +2800,167 @@ Before the latest Arabic edits, full regression suite passed 901 tests. The
 latest locale/pilot focused run passed 39 tests; browser coverage is unfinished
 and Ruff reported an unused noqa in the pilot locale import. These are checkpoint
 results, not final validation of the full requested release.
+
+
+---
+
+# Session record — 6–7 September 2026 (runbook gates 0 to 9)
+
+Written for someone who has to pick this up cold. It says what was built, what
+was actually run, what came back, and what is still broken. Nothing here is
+inferred from a configured key, a mock response or an older test result.
+
+Baseline at the start: commit `ac8740a`, 901 tests, one Ruff error.
+Head at the time of writing: `af6936b`, **1,187 passed + 1 xfailed**, Ruff clean.
+
+## Commits, in order
+
+| Commit | What it did |
+| --- | --- |
+| `0127024` | Gemini made primary; Nokia SDK wire contract pinned (gates 4 and 2) |
+| `e41419a` | Bounded simulator probe; 11 real hosted observations (gate 3) |
+| `0bc026a` | SDK hidden-retry fix; two probe record corrections |
+| `2e173cc` | Swap dates as separately priced evidence metadata (gate 5) |
+| `4b7aee4` | Congestion Insights as network conditions (gate 6) |
+| `8b08411` | Number Recycling (gate 7a) + recorded deferrals for 7b–7d |
+| `45fc292` | Bilingual UI fixed and proven in a browser (gate 8) |
+| `f2a6e37` | Browser surface matrix and screenshots (gate 9) |
+| `af6936b` | P1 fixes for defects this repo's own review found in gate 6 |
+
+## What actually ran against Nokia
+
+**Fifteen authenticated calls to the hosted simulator**, one attempt each
+(`timeout_in_seconds=10, max_retries=0`), all on the catalog host
+`https://network-as-code.p-eu.apihub.nokia.io`. Sanitized records:
+`docs/nac/observations/2026-09-06-hosted-simulator.jsonl`.
+
+| Operation | Device | Result |
+| --- | --- | --- |
+| `sim_swap_check` | `…1000` / `…1001` | `true` / `false` |
+| `device_swap_check` | `…1000` / `…1001` | `true` / `false` |
+| `sim_swap_date` | `…1000` | `2026-09-06T19:53:10Z` |
+| `device_swap_date` | `…1000` | `2026-08-18T13:26:31Z`, `monitoredPeriod` **absent** |
+| `congestion_list` | — | 200, empty collection |
+| `forwarding_unconditional` | `…1000` / `…1001` / `…0422` / `…0503` | `true` / `false` / **422** / **503** |
+| `number_recycling` | `…1000` ref 2026-01-15 | `true` |
+| `number_recycling` | `…1001` ref 2026-01-15 | `false` |
+| `number_recycling` | `…1000` ref **2030**-01-15 | **400** |
+
+### Three findings that changed the implementation
+
+1. **The catalog host answers.** That was an open unknown. The SDK default host
+   is still untested, so the application default is unchanged.
+2. **`…1000`'s device boolean contradicts its device date.** `swapped: true`
+   for a 24-hour window beside a date nineteen days old. The simulator's
+   boolean is not computed from its date, so Isnad shows both with separate
+   provenance, never derives one from the other, and carries an explicit
+   `disagrees_with_window` flag. Reproduced offline as a *visibly authored*
+   fixture — never presented as an observation.
+3. **A future reference date is a 400, not a `false`.** Number Recycling
+   therefore refuses an out-of-range date locally instead of paying to be told.
+
+**No Gemini call was made in this session.** No live-network call, no physical
+handset, no congestion subscription created, no callback ever delivered.
+
+## What was built
+
+- **Gate 4 — Gemini primary.** `GeminiNoResponse` separates an absent answer
+  from a returned one. Missing key, transport failure or an empty candidate
+  permits greedy with a bounded reason label; invalid output, an explicit
+  rejection, a 4xx/5xx and the call ceiling stop selection instead. Exception
+  routing verified by test, not by reading.
+- **Gate 2 — contract matrix.** `docs/NAC_CONTRACT_MATRIX.md`, made executable
+  by `tests/test_nac_wire_contract.py`, which drives the real SDK through
+  `httpx.MockTransport`.
+- **Gate 3 — bounded probe.** `scripts/nac_demo_probe.py`: plan by default,
+  one operation per `--execute`, `+9999` only, two named hosts, no free
+  endpoint override, allowlisted record fields, credentials never in argv.
+- **Gate 5 — swap dates.** Optional nested `EvidenceLink.timing`
+  (`swap_timing/1`), priced separately in `policy.yaml`, never touching
+  `result`, `signal` or `delta_logodds`. Old receipts stay byte-identical.
+- **Gate 6 — network conditions.** Owner-scoped `/v1/network-conditions` plus a
+  separately authenticated callback. Empty is never Low; missing confidence is
+  never 0 or 100; a successful create is never a delivered notification.
+- **Gate 7a — Number Recycling.** Merchant-supplied `last_verified_at`,
+  choreographed rather than planner-selected, `NUMBER_CONTINUOUS` weighted at
+  exactly zero, `NUMBER_RECYCLED` blocking an ALLOW outright.
+- **Gates 8–9 — bilingual UI and browser proof.** `tests/browser/`, 61 tests,
+  Chromium 151.0.7922.34, 35 screenshots under `docs/ui/release/`.
+
+## What failed, and what came of it
+
+### Defects found in this session's own code
+
+| Found by | Defect | Status |
+| --- | --- | --- |
+| Asserting SDK behaviour instead of assuming it | network-as-code retries 408/429/500/502/503 **twice** by default. Every provider hiccup was three billed calls while the signed chain claimed one. | **Fixed** — `_bounded()` on every call site |
+| Reviewing the probe after the batch | `request_correlator` was generated locally and never sent | **Fixed**; the 2026-09-06 file is annotated, not edited |
+| Same | `congestion_list` recorded a device it never used | **Fixed** with a `needs_device` flag |
+| Writing browser tests | `window.Isnad` was never defined, so every `window.Isnad ? … : fallback` had silently taken the fallback | **Fixed** |
+| Same | Dynamic rows never re-translated: strings resolved once into `textContent` | **Fixed** with `data-i18n` on every generated node |
+| A release screenshot | The network-conditions panel was authored against a light ground on a dark page and was close to illegible | **Fixed** |
+| The parallel codebase review | Query was not bound to the subscribed device | **Fixed** (R01) |
+| Same | A static callback URL could not identify a subscription | **Fixed** (R02) |
+| Same | Quota race and no query pacing | **Fixed** (R03) |
+| Same | Uncertain creates went terminal and leaked remote state; empty ids became active | **Fixed** (R04) |
+| Same | Mock data labelled `hosted_simulator` | **Fixed** (R06) |
+| Same | Phone/period/interval validation gaps | **Fixed** (R08) |
+| Same | CI installed Playwright but never its Chromium | **Fixed** (R11) |
+
+### Still open
+
+- **`/lab` drags sideways 422px at 375px.** A strict `xfail` in
+  `tests/browser/test_surfaces.py`, not a deleted test. Ruled out by
+  measurement: the audit table's wrapper is 299px with `overflow-x: auto` and
+  `min-width: 0` and scrolls correctly on its own, and a sweep for any element
+  wider than the viewport whose ancestors are all `overflow-x: visible` comes
+  back empty. Something else contributes to the root's scrollable area.
+- **R05, R09, R13** (trust-session TTL, terminal session PII retention,
+  durable verification idempotency) are pre-existing and **not fixed here**.
+- **R07, R10, R12** (network-condition retention, Docker lab layout,
+  unreachable hybrid mode) are **not fixed here**.
+- The deterministic explanation paragraph is composed server-side from each
+  chain's own numbers and is marked `lang="en"` rather than translated.
+- Arabic is a **draft**. `review_status` still says so on the page. No
+  automated test may be read as native review.
+
+### Dead ends worth not repeating
+
+- **`pytest-playwright` breaks this suite.** Its `pytest_runtest_call` wrapper
+  runs ahead of pytest-asyncio and left 213 coroutine tests unawaited. The
+  fixtures are built on the sync API instead.
+- **A session-scoped Playwright context also breaks it.** Held open, it leaves a
+  running event loop in the thread and every later async test dies with
+  "Runner.run() cannot be called from a running event loop". Function-scoped.
+- **Browser journeys need their own server.** This build keeps at most 32 live
+  demo credentials and a bounded subscriber set; a matrix that renders dozens of
+  pages exhausts both, and the next file's journey then fails for reasons that
+  have nothing to do with it. The `server` fixture is module-scoped.
+
+## Documented consequences a future run will see
+
+- Pricing the swap date as a second call changed evaluation numbers. The
+  takeover fixture now spends **7 on three links** where it spent 8 on four:
+  the same decision on less corroboration. That is a real trade, not a saving,
+  and both numbers are pinned in `tests/test_swap_timestamps.py`.
+- `ISNAD_NAC_CONGESTION_CALLBACK_URL` was renamed
+  **`ISNAD_NAC_CONGESTION_CALLBACK_BASE_URL`** and its meaning changed: it is a
+  base, and the subscription id is appended.
+- `EvidenceLink` gained `timing`; `Verdict` serialization therefore contains
+  `"timing": null` on links without it. Historical `verdict_json` bytes are
+  untouched and still verify.
+
+## Exact commands
+
+```sh
+export ISNAD_PROVIDER=mock ISNAD_PLANNER=greedy ISNAD_GEMINI_API_KEY=
+.venv311/bin/python -m pytest -q                 # 1187 passed, 1 xfailed
+.venv311/bin/python -m ruff check app tests scripts demo
+.venv311/bin/python scripts/verify_runtime_lock.py
+.venv311/bin/python -m playwright install chromium   # once, for tests/browser
+.venv311/bin/python scripts/nac_demo_probe.py        # plan only, zero requests
+```
+
+`make lint` is still **not run**: it invokes the dependency audit, and the
+earlier rejection of sending the dependency inventory to PyPI stands. Report it
+as unperformed.

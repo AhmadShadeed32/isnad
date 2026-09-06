@@ -23,8 +23,8 @@ a mock response or a dated test count.
 | 7c Consent Info | **DEFERRED, recorded** | none | n/a | Contract pinned in `tests/test_nac_wire_contract.py` (v0.1 path, scopes/purpose/requestCaptureUrl); **never called** | Deferred because it reports status and may hand back an operator capture URL — a redirect-ownership surface that needs its own state/replay protection, and no product path needs it before the required gates |
 | 7d Forwarding and tenure | **DEFERRED, recorded** | none | Call forwarding was **observed** (gate 3: active/inactive plus documented 422 and 503) | Contract and hosted behaviour known | No demonstrated product path. Forwarding is voice-only and not fraud by itself; tenure is not merchant history. Implementing either without a path would be an untested array of checks |
 | 8 Arabic + English | PASSED, with two recorded limits | `app/static/i18n.js`, `app/static/i18n/{en,ar}.json`, `app/static/judge.html`, `tests/browser/` (new), `tests/test_i18n.py`, `requirements-dev.txt` | `pytest -q` → **1118 passed, 39.2 s** (2026-09-07), browser tests included in that single command, **0 skipped**; ruff clean | Chromium 151.0.7922.34 driving a real uvicorn instance: rapid switching, dynamic results, aborted dictionary, stored preference, input/focus preservation, byte-identical signed payload, zero `/v1/` calls on a switch, no console errors | The deterministic explanation paragraph is composed server-side from this chain's numbers and is **marked English, not translated**. CAMARA API names stay English by choice. Arabic remains **draft, human review pending** |
-| 9 UI verification | NOT STARTED | | | | |
-| 10 Core re-audit | NOT STARTED | | | | |
+| 9 UI verification | PASSED for the automated matrix; remainder recorded as not visited | `tests/browser/test_surfaces.py`, `tests/browser/test_journeys.py`, `docs/ui/release/` (35 screenshots), `app/static/lab.html` | `pytest -q` → **1187 passed, 1 xfailed** (2026-09-07) | Chromium 151.0.7922.34. Judge/console/lab/privacy/consent-landing at 375 and 1440 in EN and AR; three judge cases; receipt valid and unavailable; network-conditions subscribe→read→delete; console run. Contrast measured against each element's own backdrop; accessible names and focus ring asserted per surface | **Open defect:** `/lab` drags sideways 422px at 375px — strict xfail, cause not found. **Not visited:** 320px and tablet, 200% zoom, keyboard-only critical paths, the merchant/fake-operator three-service journey, shared proof page states |
+| 10 Core re-audit | PARTIAL | `app/network_conditions.py`, `app/db/models.py`, `app/domain/schemas.py`, `migrations/0006`, `.github/workflows/ci.yml`, `pyproject.toml` | `pytest -q` → **1187 passed, 1 xfailed**; ruff clean | Seven defects this session introduced were found and fixed (SDK hidden retries, probe record honesty ×2, `window.Isnad`, dynamic re-translation, panel contrast) plus six from the parallel review (R01–R04, R06, R08, R11) | **Not fixed:** R05 session TTL, R07 network-condition retention, R09 terminal session PII, R10 Docker lab layout, R12 unreachable hybrid mode, R13 durable verify idempotency. All pre-existing; each has a written fix and acceptance test in the handoff |
 | 11 Demo rehearsal | NOT STARTED | | | | |
 | 12 Testing guide + README | NOT STARTED | `docs/TESTING_GUIDE.md` does not exist | | | |
 | 13 Final offline release gate | NOT STARTED | | | | |
@@ -196,3 +196,26 @@ Two limits, recorded rather than papered over:
 Next action: gate 9 — extend the browser matrix past `/judge` (console, receipt,
 proof, privacy, merchant journey), and record honestly which states were visited
 by automation, which by hand and which not at all.
+
+### 2026-09-07 — gates 9 and 10, and a review of this session's own work
+
+A parallel codebase review landed in `docs/PHASE2_HANDOFF.md` and found five P1
+defects in the network-conditions feature added earlier the same day. They were
+real, and they are fixed here with tests that assert the **provider was not
+called** — "it now returns an error" is not the same as "it no longer spends
+money". See the commit `af6936b` message and the handoff's R01–R13 list.
+
+The full session record — every commit, all fifteen hosted calls and what came
+back, every defect found and by what, the dead ends, and what is still open —
+is appended to `docs/PHASE2_HANDOFF.md` under "Session record — 6–7 September
+2026".
+
+Mocked only: every provider and model exchange in the test suite.
+
+Actually called: nothing external since the fifteen hosted simulator calls
+recorded in `docs/nac/observations/`. Still no Gemini call, no live network, no
+congestion subscription, no callback delivery.
+
+Next action: gate 12 — write `docs/TESTING_GUIDE.md` with one row per feature
+(status, setup, user action, expected result, test command, actual evidence,
+known limits), then gate 13's release checks, then the private push.
