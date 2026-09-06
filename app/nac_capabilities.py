@@ -1,6 +1,6 @@
 """I10 — provider capability and consent readiness.
 
-Reads the authored `docs/nac_capabilities.json` manifest (built from H2's own
+Reads the authored `app/nac_capabilities.json` manifest (built from H2's own
 recorded evidence captures, never generated at request time) and answers
 "is this ready" purely from local state: the manifest's own recorded status
 plus whatever the caller's own request already contains. `preflight()` never
@@ -16,7 +16,7 @@ from pathlib import Path
 
 from app.domain.schemas import VerificationRequest
 
-CAPABILITIES_PATH = Path(__file__).parent.parent / "docs" / "nac_capabilities.json"
+CAPABILITIES_PATH = Path(__file__).with_suffix(".json")
 
 
 def load_capabilities() -> dict:

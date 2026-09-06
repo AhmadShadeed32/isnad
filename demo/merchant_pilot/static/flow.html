@@ -357,8 +357,12 @@ async function poll() {
   try {
     const response = await fetch("/api/flows/" + flowId);
     if (!response.ok) {
-      document.getElementById("status").textContent = "Error checking status.";
-      return;
+      if ([401, 403, 404, 410].includes(response.status)) {
+        document.getElementById("status").textContent =
+          "This flow or login session is no longer available. Return to checkout to start again.";
+        return;
+      }
+      throw new Error("Status temporarily unavailable; retrying automatically.");
     }
     const data = await response.json();
     // F1: COMPLETED is set from the upstream consent before the signed result
@@ -388,6 +392,11 @@ async function poll() {
     if (data.qr_svg && !document.getElementById("qr").innerHTML) {
       document.getElementById("qr").innerHTML = data.qr_svg;
       document.getElementById("open-link").href = data.authorization_url;
+    }
+    if (!data.authorization_url) {
+      document.getElementById("qr").replaceChildren();
+      document.getElementById("open-link").removeAttribute("href");
+      document.getElementById("open-link").hidden = true;
     }
     if (data.result) {
       renderOutcome(data.result);

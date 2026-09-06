@@ -131,7 +131,14 @@ def test_a_verdict_is_issued_on_the_evidence_gathered_when_the_model_stops(monke
     )
     assert response.status_code == 200
     body = response.json()
-    assert body["evidence_steps"] == 1  # stopped after the first link
+    # Two, not one. The planner did stop after the first link — and the ALLOW
+    # gate then choreographed one more, because the first was NUMBER_MATCH and
+    # this signup is investigated as a bot farm, which a number match cannot
+    # speak to. That override is the point of the gate and predates it in
+    # shape: `policy: an allow must rest on a network fact` already worked this
+    # way for local-only chains. What matters here is unchanged — the loop
+    # ended and a signed verdict came out.
+    assert body["evidence_steps"] == 2
     assert body["decision"] in {"ALLOW", "CHALLENGE", "DECLINE"}
 
 

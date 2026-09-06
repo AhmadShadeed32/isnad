@@ -53,3 +53,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["app*", "demo*"]
+
+[tool.setuptools.package-data]
+app = ["static/*.html", "static/*.js", "static/i18n/*.json", "policy/*.yaml", "registry/*.yaml", "registry/*.sig", "nac_capabilities.json"]
+demo = ["merchant_pilot/static/*.html", "fake_operator/static/*.html", "lab/artifacts/*.json"]

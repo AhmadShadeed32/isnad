@@ -114,10 +114,28 @@ actions:
   # itself the instruction to step the customer up; the merchant runs it.
   step_up_otp:         { cost: 6, gain: 2.5, friction: 5 }
 
+# What each hypothesis may buy. This is not a list of good checks: it is the
+# list of checks that can move THIS hypothesis, in either direction. The
+# planner selects from it, the ALLOW gate requires a supporting fact from it,
+# and the verdict sentence is written from what was gathered — so a check that
+# cannot speak to the hypothesis produces a receipt answering a question
+# nobody asked.
 hypotheses:
   account_takeover: { relevant: [sim_swap, location_verify, device_swap] }
   mule:             { relevant: [device_swap, reachability, device_intelligence] }
-  bot_farm:         { relevant: [reachability, device_intelligence, number_verify] }
+  # number_verify was here and should not have been. It establishes that the
+  # handset presenting this number holds that SIM — and a bot farm runs real
+  # SIMs in real handsets at scale, so a match says nothing about whether this
+  # is one. Being the cheapest check priced, greedy bought it first, it
+  # satisfied the ALLOW gate on its own, and a day-zero signup was signed
+  # "Cleared by: network number matches the provided number" against a
+  # bot_farm hypothesis. The arithmetic was right the whole way through; the
+  # explanation was not.
+  #
+  # reachability stays because both of its outcomes bear on the question:
+  # REACHABLE_BOTPATTERN exists for this hypothesis, and REACHABLE_NORMAL is
+  # its exoneration.
+  bot_farm:         { relevant: [reachability, device_intelligence] }
   legit:            { relevant: [] }
   legit_thin_file:  { relevant: [] }
   impersonation:    { relevant: [number_verify, sim_swap, reachability, roaming] }

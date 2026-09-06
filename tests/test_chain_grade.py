@@ -209,11 +209,22 @@ async def test_clean_signup_is_attested_and_allowed():
     )
     verdict = await _investigator().investigate(req)
     assert verdict.decision == Decision.ALLOW
-    assert verdict.chain_grade == ChainGrade.ATTESTED_PARTIAL
-    # Which is the honest grade for this chain, and here is why: it cleared on
-    # ONE link, and full attestation asks for `min_links` corroborating facts.
-    assert len(verdict.chain) < _engine().min_links_for(verdict.hypothesis)
+    # ATTESTED_FULL, and here is why it changed. This signup is investigated as
+    # a bot farm, and the ALLOW gate now requires a supporting fact the
+    # hypothesis itself lists. It used to clear on NUMBER_MATCH alone — one
+    # link, so ATTESTED_PARTIAL — but a number match cannot distinguish a bot
+    # farm, which runs real SIMs in real handsets. The chain now also carries
+    # Reachability, which can, so it clears on two corroborating facts and the
+    # grade says so. Act IX is the one-link ALLOW now: an established customer
+    # with no risk signal at all, where no hypothesis is formed and nothing
+    # needs corroborating.
+    assert verdict.chain_grade == ChainGrade.ATTESTED_FULL
+    assert len(verdict.chain) >= _engine().min_links_for(verdict.hypothesis)
     assert all(link.delta_logodds < _engine().adverse_delta() for link in verdict.chain)
+    relevant = _engine().relevant_actions(verdict.hypothesis)
+    assert any(
+        link.action.value in relevant and link.delta_logodds < 0 for link in verdict.chain
+    ), "the ALLOW rests on no check that can move the hypothesis it was investigating"
 
 
 @pytest.mark.asyncio

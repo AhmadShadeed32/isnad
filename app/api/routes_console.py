@@ -76,6 +76,26 @@ DEMO_ACTS: dict[str, VerificationRequest] = {
             amount=Money(value=900),
         ),
     ),
+    # Act IX — the established customer. No risk signal in the context at all,
+    # so no hypothesis is formed (`legit`), nothing is prioritised, and the one
+    # cheap association check settles it. This is where "a clean chain costs
+    # one call, not six" actually lives, and the grade says what that is worth:
+    # ATTESTED_PARTIAL, because one link is one link however clean it looks.
+    #
+    # It exists as a separate act because the ALLOW gate now requires a
+    # supporting fact the hypothesis itself lists. Where there IS a hypothesis
+    # — Act I's bot farm, Act III's takeover — a single orthogonal check no
+    # longer clears it, and both correctly cost two. Neither of those is the
+    # low-risk case, and the demo had stopped being able to show one.
+    "act9": VerificationRequest(
+        phone_number="+99999991001",
+        context=RequestContext(
+            event="checkout",
+            payment_method="card",
+            account_age_days=400,
+            amount=Money(value=300),
+        ),
+    ),
     # Act VI — the lost phone: a genuine SIM replacement three days ago.
     # A rules engine declines on SIM_SWAPPED alone; the agent keeps going and
     # steps up instead -> CHALLENGE / DEGRADED.

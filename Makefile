@@ -12,7 +12,7 @@ help:  ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
 		| awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}'
 
-setup:  ## Create .venv and install dependencies
+setup:  ## Create .venv311 and install dependencies
 	./setup.sh
 
 demo:  ## Run the three demo acts through the real engine

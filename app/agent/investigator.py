@@ -200,7 +200,7 @@ class Investigator:
                     # planner does. It would then survive the suite (which runs
                     # greedy, which never stops) and fail in the console (which
                     # runs llm) — the exact shape of the Act VI regression.
-                    if not self._needs_a_network_fact(belief, chain):
+                    if not self._needs_a_network_fact(belief, chain, hypothesis):
                         break
                     action = self._choreography.next_best(hypothesis, used, budget_left)
                     if action is None:
@@ -284,7 +284,7 @@ class Investigator:
                 used.add(action)
                 await self._emit_link(link, belief, run_id)
         decision = self.engine.decide(belief.p_fraud)
-        missing_support = self._needs_a_network_fact(belief, chain)
+        missing_support = self._needs_a_network_fact(belief, chain, hypothesis)
         evidence_unresolved = bool(unresolved_signals) or missing_support
         if decision == Decision.ALLOW and evidence_unresolved:
             decision = Decision.CHALLENGE
@@ -416,7 +416,9 @@ class Investigator:
             await self._emit_link(link, belief, run_id)
         return budget_left, evidence_cost
 
-    def _needs_a_network_fact(self, belief: Belief, chain: Chain) -> bool:
+    def _needs_a_network_fact(
+        self, belief: Belief, chain: Chain, hypothesis: Hypothesis | None = None
+    ) -> bool:
         """Is this a clean verdict resting on local evidence alone — or on local
         evidence plus a network fact that contradicts it?
 
@@ -446,8 +448,29 @@ class Investigator:
         # weaker: announcement (-2.5) plus one zero-information network call,
         # gate satisfied, ALLOW. Supporting means it moved belief TOWARD the
         # customer.
+        #
+        # And the supporting fact has to bear on what was suspected. A day-zero
+        # signup is investigated as a bot farm; Number Verification is the
+        # cheapest check priced, so it went first, came back NUMBER_MATCH, and
+        # satisfied this gate on its own. But a match establishes that the
+        # handset presenting the number holds that SIM, and a bot farm runs
+        # real SIMs in real handsets — so the chain cleared on a check that
+        # could not distinguish the thing it was looking for. The same hole
+        # sits under account_takeover: a swapped SIM still number-matches.
+        # Every number in those chains was right; the sentence a merchant
+        # reads was not, and the sentence is the product.
+        #
+        # Only applied where the hypothesis names its checks. `legit` and
+        # `legit_thin_file` list none, and an empty list is an answer — no
+        # hypothesis-driven check — not a wildcard; filtering on their behalf
+        # would make the gate unsatisfiable and loop until the budget ran out.
+        relevant = self.engine.relevant_actions(hypothesis) if hypothesis else set()
         supporting = sum(
-            1 for link in chain.links if link.source != "local" and link.delta_logodds < 0
+            1
+            for link in chain.links
+            if link.source != "local"
+            and link.delta_logodds < 0
+            and (not relevant or link.action.value in relevant)
         )
         return supporting < self.engine.min_network_links_for_allow()
 

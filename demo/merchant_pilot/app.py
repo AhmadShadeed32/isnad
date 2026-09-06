@@ -20,12 +20,14 @@ http://127.0.0.1:8000), PILOT_SESSION_TTL_SECONDS (default 1800).
 
 from __future__ import annotations
 
+import asyncio
 import ipaddress
 import os
 import re
 import secrets
 import threading
 import time
+from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -47,6 +49,13 @@ OPERATOR_USERNAME = os.environ.get("PILOT_OPERATOR_USERNAME", "")
 OPERATOR_PASSWORD = os.environ.get("PILOT_OPERATOR_PASSWORD", "")
 SESSION_TTL_SECONDS = int(os.environ.get("PILOT_SESSION_TTL_SECONDS", "1800"))
 FLOW_RETENTION_SECONDS = int(os.environ.get("PILOT_FLOW_RETENTION_SECONDS", "3600"))
+CLEANUP_INTERVAL_SECONDS = int(os.environ.get("PILOT_CLEANUP_INTERVAL_SECONDS", "30"))
+if not 1 <= CLEANUP_INTERVAL_SECONDS <= 60:
+    raise ValueError("PILOT_CLEANUP_INTERVAL_SECONDS must be between 1 and 60")
+# A completed order may opt into I8 for five minutes; otherwise discard its
+# number. Existing sessions retain their own subject in Isnad, not here.
+PHONE_RETENTION_SECONDS = 300
+TERMINAL_STATES = {"COMPLETED", "DENIED", "FAILED", "EXPIRED", "UNAVAILABLE"}
 SESSION_COOKIE = "pilot_session"
 
 if not ISNAD_MERCHANT_API_KEY or not OPERATOR_USERNAME or not OPERATOR_PASSWORD:
@@ -75,6 +84,8 @@ class _Session:
 
 class SessionStore:
     def __init__(self, ttl_seconds: int) -> None:
+        if ttl_seconds <= 0:
+            raise ValueError("session TTL must be positive")
         self._sessions: dict[str, _Session] = {}
         self._lock = threading.Lock()
         self.ttl_seconds = ttl_seconds
@@ -115,6 +126,10 @@ class SessionStore:
         for sid, session in list(self._sessions.items()):
             if session.expires_at <= now:
                 del self._sessions[sid]
+
+    def purge(self) -> None:
+        with self._lock:
+            self._sweep()
 
 
 sessions = SessionStore(SESSION_TTL_SECONDS)
@@ -193,11 +208,27 @@ class FlowRecord:
     # the last check against Isnad — release-order re-checks it fresh rather
     # than trusting a stale copy.
     session: dict[str, Any] | None = None
+    session_creating: bool = False
+    phone_expires_at: datetime | None = None
     lock: threading.Lock = field(default_factory=threading.Lock)
+
+    def minimize(self) -> None:
+        with self.lock:
+            if self.status not in TERMINAL_STATES:
+                return
+            self.authorization_url = ""
+            self.qr_svg = ""
+            if self.phone_expires_at is None:
+                self.phone_expires_at = _now() + timedelta(seconds=PHONE_RETENTION_SECONDS)
+            if (self.status != "COMPLETED" or self.session is not None
+                    or self.phone_expires_at <= _now()):
+                self.phone_number = ""
 
 
 class FlowStore:
     def __init__(self, retention_seconds: int) -> None:
+        if retention_seconds <= 0:
+            raise ValueError("flow retention must be positive")
         self._flows: dict[str, FlowRecord] = {}
         self._lock = threading.Lock()
         self.retention_seconds = retention_seconds
@@ -229,8 +260,13 @@ class FlowStore:
     def _sweep(self) -> None:
         cutoff = _now() - timedelta(seconds=self.retention_seconds)
         for flow_id, flow in list(self._flows.items()):
+            flow.minimize()
             if flow.created_at <= cutoff:
                 del self._flows[flow_id]
+
+    def purge(self) -> None:
+        with self._lock:
+            self._sweep()
 
 
 flows = FlowStore(FLOW_RETENTION_SECONDS)
@@ -278,7 +314,25 @@ class OutcomeReportBody(BaseModel):
 
 # --- app ---
 
-app = FastAPI(title="Isnad merchant pilot harness (P4a)")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async def cleanup():
+        while True:
+            flows.purge()
+            sessions.purge()
+            await asyncio.sleep(CLEANUP_INTERVAL_SECONDS)
+
+    task = asyncio.create_task(cleanup())
+    app.state.cleanup_task = task
+    try:
+        yield
+    finally:
+        task.cancel()
+        with suppress(asyncio.CancelledError):
+            await task
+
+
+app = FastAPI(title="Isnad merchant pilot harness (P4a)", lifespan=lifespan)
 
 
 def _client_is_private(request: Request) -> bool:
@@ -558,6 +612,8 @@ async def _poll_and_maybe_complete(flow: FlowRecord) -> None:
                 flow.verifying = False
     except httpx.HTTPError:
         return
+    finally:
+        flow.minimize()
 
 
 @app.get("/api/flows/{flow_id}")
@@ -570,8 +626,9 @@ async def get_flow(
     if flow is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no such flow")
 
-    if flow.result is None and flow.status not in {"DENIED", "FAILED", "EXPIRED"}:
+    if flow.result is None and flow.status not in {"DENIED", "FAILED", "EXPIRED", "UNAVAILABLE"}:
         await _poll_and_maybe_complete(flow)
+    flow.minimize()
 
     return {
         "flow_id": flow.flow_id,
@@ -613,21 +670,36 @@ async def open_trust_session(
     if flow is None or flow.result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no such flow")
 
-    async with httpx.AsyncClient(base_url=ISNAD_BASE_URL, timeout=15.0) as client:
-        response = await client.post(
-            "/v1/sessions",
-            headers={"Authorization": f"Bearer {ISNAD_MERCHANT_API_KEY}"},
-            json={"phone_number": flow.phone_number},
-        )
-    if response.status_code != status.HTTP_200_OK:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Isnad rejected the session request")
-    data = response.json()
-    flow.session = {
-        "session_id": data["session_id"],
-        "status": data["status"],
-        "fulfillment_state": "HELD",
-    }
-    return flow.session
+    with flow.lock:
+        if flow.session is not None:
+            return flow.session
+        if flow.session_creating:
+            raise HTTPException(status_code=409, detail="Session creation is already in progress")
+        if not flow.phone_number:
+            raise HTTPException(status_code=410, detail="Phone retention expired; start a new verification")
+        flow.session_creating = True
+    try:
+        async with httpx.AsyncClient(base_url=ISNAD_BASE_URL, timeout=15.0) as client:
+            response = await client.post(
+                "/v1/sessions",
+                headers={"Authorization": f"Bearer {ISNAD_MERCHANT_API_KEY}"},
+                json={"phone_number": flow.phone_number},
+            )
+        if response.status_code != status.HTTP_200_OK:
+            raise HTTPException(status_code=502, detail="Isnad rejected the session request")
+        data = response.json()
+        flow.session = {
+            "session_id": data["session_id"],
+            "status": data["status"],
+            "fulfillment_state": "HELD",
+        }
+        return flow.session
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=503, detail="Isnad is temporarily unreachable") from exc
+    finally:
+        with flow.lock:
+            flow.session_creating = False
+        flow.minimize()
 
 
 @app.post("/api/flows/{flow_id}/simulate-swap")

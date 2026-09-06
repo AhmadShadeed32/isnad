@@ -90,15 +90,22 @@ async def _run_req(req, parallel: bool):
 async def test_parallel_costs_more_on_a_clean_chain():
     """The honest trade, pinned so nobody claims this is free.
 
-    A clean signup clears on the first cheap check, so sequential pays 1 and
+    A clean signup clears on two cheap checks, so sequential pays 3 and
     parallel pays 5 — it bought evidence that was never needed. This is exactly
     what weakens the T5 counterfactual, and it is the case to quote if a judge
     asks what parallel costs.
+
+    Sequential was 1 before the ALLOW gate started requiring a supporting fact
+    relevant to the hypothesis: this signup is investigated as a bot farm, and
+    the number match that used to close it cannot distinguish one. The point of
+    this test is the gap between the two modes, and the gap narrowed rather
+    than closed — parallel still buys a check sequential never needed.
     """
     sequential = await _run_req(_CLEAN, parallel=False)
     parallel = await _run_req(_CLEAN, parallel=True)
-    assert sequential.evidence_cost == 1.0 and len(sequential.chain) == 1
+    assert sequential.evidence_cost == 3.0 and len(sequential.chain) == 2
     assert parallel.evidence_cost == 5.0 and len(parallel.chain) == 3
+    assert parallel.evidence_cost > sequential.evidence_cost
 
 
 @pytest.mark.asyncio

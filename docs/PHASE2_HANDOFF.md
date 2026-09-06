@@ -1,6 +1,15 @@
 # Isnad — compact handoff
 
-Updated 6 September 2026. **Read this file first.** It replaces the long running
+Updated 6 September 2026. **Read this file first.**
+
+**Latest review:** [fixes, verification and hackathon priorities](REVIEW_2026-09-06.md).
+886 tests pass. F1/F3 were already implemented in this checkout; F2 is now closed
+with idle cleanup, terminal authorization clearing, and a bounded five-minute
+phone retention window for continuity-session opt-in. Packaging and polling fixes
+are also included. The latest 13-case result is 38/78 calls, five CHALLENGEs and
+three authored-expectation disagreements; historical results below remain dated
+records. The capability manifest now lives at `app/nac_capabilities.json`.
+ It replaces the long running
 log with current facts and an implementation plan. Read §6 for submission gates,
 §7 for the competition feature build order, and §3 for the underlying product
 contracts. Before further implementation, read §9 for seven confirmed code-review
@@ -1797,3 +1806,264 @@ All seven of the review's own probes now pass, integrated verbatim (with
 review's own instruction) as `tests/test_review_regressions.py`. Full suite
 751 → 759 passed, Ruff clean. The newer judge lab (§7, I1–I14) was not
 in scope for this review and is not re-reviewed here.
+
+## 10. Follow-up code review — 6 September 2026
+
+Reviewed through `e6c4e39`, including `9498cf9` review fixes and selected new
+judge-lab/share code. `app/static/receipt.html` had an ongoing uncommitted edit;
+this review did not modify it or approve its evolving UI. **771 tests passed
+(3 deprecation warnings); Ruff passed for app/tests/scripts/demo/lab and the
+merchant harness.** All seven original regression tests now pass. However,
+§9's broader acceptance criteria are not all satisfied: R2 and R3 remain partial.
+This supersedes the blanket “all fixed” interpretation of the implementation
+record, while preserving its historical test results. No app changes or push
+were made by this follow-up review.
+
+### F1 — Keep polling while a completed receipt is still missing (high; R2)
+
+`demo/merchant_pilot/app.py::_poll_and_maybe_complete` now correctly attempts
+cached recovery for COMPLETED. But it sets `flow.status` before that recovery;
+if the recovery POST also fails, the API returns COMPLETED with no result.
+`demo/merchant_pilot/static/flow.html::poll` then stops on every COMPLETED state,
+so the operator must reload manually to recover. The original Python regression
+calls the poller twice itself and therefore misses the browser stopping condition.
+
+1. Treat COMPLETED-without-result as still recovering in the browser (or expose
+   a separate recovery state); stop only once the receipt is present.
+2. Display a retryable recovery message. Explicitly handle a missing/expired
+   upstream consent instead of silently preserving an old state indefinitely.
+3. Add a browser test: verification commits, response is lost, the first cached
+   recovery also fails, the next succeeds. Assert automatic recovery, original
+   chain ID and exactly one investigation, without page reload.
+
+### F2 — Finish idle cleanup and terminal data minimization (medium; R3)
+
+`FlowStore.get_owned` now enforces read-time TTL, which fixes the original probe.
+However, the harness still creates `FastAPI` without a cleanup lifespan/task;
+`_sweep` only runs on add/owned lookup. Idle records remain indefinitely in memory.
+`FlowRecord` also retains raw phone, authorization URL and QR after terminal
+completion and returns authorization material on status reads.
+
+1. Add a lock-safe public purge method and a bounded lifespan cleanup task;
+   cancel and await it on shutdown. Validate the retention interval/settings.
+2. Clear authorization URL/QR at terminal transition and remove phone once no
+   longer needed. Check I8's trust-session dependencies before removing phone:
+   either bind necessary server-side data earlier or explicitly document and
+   enforce the smallest required retention window.
+3. Test expiry without any new request, terminal material removal, clean shutdown
+   and fresh-flow survival using a fake clock. Keep ownership regression coverage.
+
+### F3 — Pin the offline lab's default planner (high; I1/I2/I4/I9)
+
+`demo/lab/runner.py::run_scenario` passes `planner=None` to the investigator;
+`Investigator` then calls `get_planner`, which selects LLM whenever global settings
+say `llm`. `scripts/build_judge_lab.py` uses `os.environ.setdefault`, so an existing
+LLM environment overrides its documented offline/greedy guarantee. Tests pin
+settings to greedy, masking this. A no-network probe replacing the global planner
+factory with an exception confirmed the offline runner reaches that factory.
+With configured credentials this can call a model and invalidate deterministic
+comparisons; no real model call was made by this review.
+
+1. Construct a fresh `GreedyPlanner(engine)` inside the lab runner when its
+   explicit planner argument is None. Preserve intentional injected planners,
+   and label any explicitly supported model-backed mode separately.
+2. Do not mutate global settings to enforce isolation. Make the CLI's offline
+   guarantee hold even when the surrounding app uses LLM/live configuration.
+3. Test with global `settings.planner='llm'`, a fake configured credential and
+   model/network entry points replaced by failing spies. Default lab scenarios,
+   counterfactuals and fault cases must complete deterministically with zero
+   model/network calls. Explicit injection should still work and be labeled.
+
+**Next validation:** fix F1–F3, extend tests beyond the original seven probes,
+rerun the suite/Ruff and record evidence here. This was a focused review, not an
+exhaustive approval of every I1–I14 feature. Local main server was started in
+mock/greedy mode on port 8000; `/judge` returned HTTP 200. No hosted simulator or
+physical handset proof was performed.
+
+## 11. UI review and implementation plan — 6 September 2026
+
+**Review method:** opened the actual `/judge` UI, then used a local browser at
+1440×1000 and 375×812 to run the replacement scenario through CHALLENGE and open
+its signed receipt. Screenshots: [desktop idle](reviews/ui-2026-09-06/desktop-idle.png),
+[desktop result](reviews/ui-2026-09-06/desktop-result.png),
+[mobile result](reviews/ui-2026-09-06/mobile-result.png).
+Receipt UI had concurrent uncommitted changes; findings below describe what was
+rendered, not approval of that unfinished change. Merchant and shared-proof UI
+recommendations are source-reviewed follow-ups, not claimed browser passes.
+This pass changes documentation only. Keep the navy/gold palette and existing
+honest provider labels; improve hierarchy, readability and completion first.
+
+**Build order:** U1 → U2 → U3 → U4 → U5 → U6; then U7/U8. Complete §10's
+recovery fixes alongside U1/U5. Do not change policy, signed payloads or provider
+behavior to make the interface look better.
+
+### U1 — Make the first visit usable, including failure states (P0)
+
+Observed: the server originally ran with demo mode disabled. `/judge` returned
+200, showed SERVER MODE UNKNOWN, disabled all three actions and put “Bearer API
+key required” near the bottom. This review corrected its own local startup to
+mock + greedy + demo mode; that is not a production authentication change.
+
+1. In `app/static/judge.html`, model loading, ready, unavailable and expired-demo
+   states explicitly. Put the state beside the primary action with an actionable
+   message; reserve raw technical error details for an expandable section.
+2. Add a retry/reload action for transient failure or an expired short-lived
+   demo credential. Keep investigation actions disabled until readiness succeeds.
+3. Document a loopback-only demo startup command using `ISNAD_PROVIDER=mock`,
+   `ISNAD_PLANNER=greedy`, `ISNAD_DEMO_MODE=true`. Preserve production auth and
+   never make demo mode the global default or embed a merchant key in HTML.
+4. Acceptance: fresh demo visit works; demo-off, mode-fetch failure and token
+   expiry explain the next step at the button; no silent or unauthorized fallback.
+
+### U2 — Bring the action into the first mobile screen (P1)
+
+Observed: at 375×812, the main button's top was about **891 CSS pixels** from the
+page top. The hero, simulator paragraph and repeated customer story delay use.
+The desktop empty trace also occupies substantial space before any useful result.
+
+1. In `judge.html`, shorten the hero to “A new SIM. A fairer checkout decision.”
+   with one sentence explaining network evidence and a signed merchant decision.
+   Keep exact final wording editable, but avoid repeating the story in three places.
+2. Reduce mobile hero/card padding; make basket details compact. Put the primary
+   scenario action immediately after the short customer story, before optional
+   basket detail. Target the full primary button within the first 812px at 375px.
+3. Replace the two large secondary scenario buttons with a clearly labeled
+   scenario selector or compact secondary controls; preserve keyboard operability
+   and the current distinct replacement/clean/unresolved fixtures.
+4. Replace the long simulator paragraph with a visible “Simulated network
+   evidence” label and a disclosure explaining fixture parity and presentation
+   delay. Keep per-evidence provenance, and distinguish mock from hosted simulator.
+5. Acceptance: check 375/390/768/1440px, no page overflow, action discoverable
+   before scrolling on the target phone; desktop still communicates the problem.
+
+### U3 — Show the decision first, with concise supporting reasons (P1)
+
+Observed: the “plain-language” result is a long paragraph including thresholds,
+uncalibrated score, consent caveats and policy mechanics. The action paragraph
+adds another large block. The important merchant instruction gets buried.
+
+1. Update `app/presentation.py` and its consumers with a compact summary separate
+   from the existing detailed explanation. For this case: “A recent SIM change
+   needs a second check. The same handset and matching location support the
+   customer.” Action: “Complete merchant verification before proceeding.”
+2. Show decision, action and the strongest two supporting/adverse facts before
+   the scrolling trace. Preserve unresolved evidence as its own distinct category;
+   never imply missing evidence is a failed identity check or an OTP was sent.
+3. Put exact thresholds, numeric score and full explanation under “Why this
+   decision?” / technical details. Keep a short uncalibrated-score note beside any
+   score actually displayed. Do not alter existing signed fields.
+4. Use normal sans-serif for the customer-facing headline; reserve monospace for
+   identifiers and code. Prevent the left checkout card stretching into a tall
+   empty panel merely to match the result column.
+5. Acceptance: replacement, clean and unresolved cases each show a correct
+   one-sentence result and next action; a reader can identify both in five seconds.
+   Retain existing presenter tests and add assertions for the distinct summaries.
+
+### U4 — Repair mobile trace layout and make progress meaningful (P1)
+
+Observed: `.trace-row` uses `24px minmax(0,1fr) auto` while `.trace-meta` forbids
+wrapping. On mobile, metadata consumes the row and check names/details collapse
+into narrow columns. The page itself fits (375px scroll width), so an overflow
+check alone does not catch this. The four unlabeled progress bars also give no
+clear relationship to the six checks in this run.
+
+1. Below the mobile breakpoint, use icon + flexible content columns and place
+   metadata on a second row under the content. Allow wrapping; apply `min-width:0`.
+2. Combine each selection/result pair into one expandable check card, keyed by
+   stable event/step identity. Show check name, plain result and provenance first;
+   rationale, budget and score remain available in expanded details.
+3. Replace the fixed four bars with named lifecycle states (checking, deciding,
+   receipt ready) and an actual “N checks completed” count. Do not promise a
+   fixed number of calls when the planner can stop early.
+4. Auto-scroll only while the user is following the latest item. If they scroll
+   back, preserve their position and offer “Jump to latest”. Keep earlier adverse
+   evidence easy to find after completion.
+5. Acceptance: inspect real rendered rows at 375px, not just document width;
+   check names remain readable, all metadata is accessible, replay/reconnect
+   does not duplicate cards, and progress reflects the actual lifecycle.
+
+### U5 — Give CHALLENGE a visible continuation (P1)
+
+Observed: the lead story ends with instructions to do merchant verification,
+while the visible next interaction is opening a receipt. This makes the product
+feel unfinished even though the separate merchant harness implements followup.
+
+1. Add a primary “See merchant verification” continuation beside the result and
+   demote receipt/audit actions to secondary prominence. For the judge demo,
+   initially use a clearly labeled explanatory panel showing the next workflow.
+2. Show pending → merchant-reported passed/failed/abandoned states only when
+   backed by the existing challenge API. If integrating the actual harness,
+   implement authenticated server-side flow/session transfer first; do not send
+   API keys in URLs or assume a judge demo chain belongs to the harness merchant.
+3. Reuse P3 followup records without changing the original signed decision.
+   Label the outcome “Merchant-reported”; never claim Isnad sent a code.
+4. Preserve a safe “Try another scenario” action and receipt access. Resolve
+   pending/missing-result recovery per F1 before treating a flow as complete.
+5. Acceptance: the lead scenario has an obvious next step; explanatory mock
+   states are visibly labeled, and real transitions remain owner-scoped and
+   leave the original receipt bytes unchanged.
+
+### U6 — Make receipt verification understandable (P1)
+
+Observed on mobile: the receipt switches to a dense monospace visual style,
+leads with a tampering button, shows a long raw timestamp, and displays only the
+first columns of a horizontally scrollable table without an obvious scroll cue.
+The scoped table overflow fix works; do not undo it.
+
+1. In `app/static/receipt.html`, use the judge palette/typography for framing,
+   with a concise decision summary and a separate “Signature valid” result.
+   Keep the distinction between valid bytes, trusted signer and true evidence.
+2. Make download the primary utility. Move byte tampering into an explicitly
+   labeled “Try the integrity check” disclosure; provide a restore-original action.
+3. Format visible dates for humans with explicit timezone; keep exact signed
+   timestamps in audit details. Formatting must never modify verification bytes.
+4. Add a visible horizontal-scroll hint and accessible table-region name, or
+   render the same rows as labeled mobile cards. Keep every signal/result/delta
+   available. Preserve the arithmetic verifier, public key and signature details.
+5. Apply the same framing to `app/static/proof.html`, but label it “Shared
+   summary” and keep expiry/revocation separate from signature validity. Never
+   portray its separately signed attestation as the original full receipt.
+6. Acceptance: valid → tampered-invalid → restored-valid, download byte equality,
+   readable timestamps, all six evidence columns reachable by keyboard/touch,
+   and expired/missing shared links explain their unavailable state.
+
+### U7 — Make the new features discoverable without crowding checkout (P2)
+
+1. Add a compact “Explore Isnad” area after the result, with receipt verification,
+   trust continuity and advanced console links. Show only implemented destinations.
+2. Build a `/lab` presentation page only after F3 isolates the offline runner.
+   Start with versioned pre-generated artifacts and an authored-case selector;
+   show fixture/code/policy identity and simulated provenance. Do not add a
+   public arbitrary-provider-call endpoint just for interactive controls.
+3. Include comparison, missing-location and outage cases with their stated
+   limitations. Do not label authored fixtures as independent validation.
+4. Provide return navigation and consistent active-page labels across judge,
+   lab, receipt and separately served merchant app. Avoid dead localhost links
+   to a merchant server that has not been configured or started.
+5. Acceptance: every visible link resolves in the documented demo deployment;
+   a judge can discover a comparison without CLI instructions or API credentials.
+
+### U8 — Finish keyboard, motion and language behavior (P1 before submission)
+
+Source review found no live-region or reduced-motion handling in `judge.html`;
+this is a follow-up verification requirement, not a claimed screen-reader test.
+
+1. Add visible focus styles for all actions and a polite live region for concise
+   progress/result announcements. Do not announce every incoming trace token.
+2. Keep keyboard focus stable during updates; focus a summary only following an
+   intentional user action. Provide accessible names for scroll/disclosure areas.
+3. Respect `prefers-reduced-motion` for animation/scroll transitions while keeping
+   loading and completion visible. Use text/icons as well as result colors.
+4. Extend the existing locale dictionaries to judge and shared-summary UI only
+   with complete reviewed strings; mark incomplete Arabic clearly. Use `lang`,
+   `dir` and logical CSS, keeping hashes/IDs in LTR isolation. Translate display
+   labels without rewriting signed content or provider provenance.
+5. Acceptance: keyboard-only run and receipt visit; screen-reader announcement
+   check; 200% zoom; reduced-motion pass; Arabic RTL layout with English fallback
+   for missing entries. Target at least 44px primary touch controls and verify
+   actual text contrast rather than assuming the palette passes.
+
+**Delivery gate:** implement in small commits by U-item. Record screenshots at
+375×812 and 1440×1000 for idle/running/ALLOW/CHALLENGE/unresolved/error states,
+run the relevant existing tests and targeted interaction checks, then review the
+complete journey. Do not call this plan implemented until those results exist.

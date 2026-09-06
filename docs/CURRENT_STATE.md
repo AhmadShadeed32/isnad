@@ -12,12 +12,14 @@ Updated 6 September 2026.
   all fourteen (I1–I14) now have working, tested code — see §8's
   "I1–I14 implementation" entry for exactly what was built and what was
   deliberately left out of each one.
-- **Code review:** [seven confirmed fixes for Sonnet](PHASE2_HANDOFF.md#9-sonnet-code-review--6-september-2026),
-  all now fixed and verified (759 tests passing, plus a live two-session
-  browser check for the cross-session isolation finding). The reviewed
-  snapshot passed 661 existing tests but failed seven additional regression
-  probes before the fixes; the newer I1–I14 judge-lab work was outside that
-  review's own scope.
+- **Latest code review:** [fixes and hackathon suggestions](REVIEW_2026-09-06.md).
+  886 tests and Ruff pass. F1/F3 are already implemented; F2 idle cleanup and
+  terminal data minimization are now implemented. Packaging, transient browser
+  polling errors, session rebinding and setup-environment mismatch are fixed.
+  Fresh fixed evaluation: 38 vs 78 calls, five CHALLENGEs, three authored-expectation
+  disagreements. Dependency advisory audit remains approval-blocked.
+- **UI work next:** [review and ordered U1–U8 plan](PHASE2_HANDOFF.md#11-ui-review-and-implementation-plan--6-september-2026),
+  based on desktop/mobile browser checks and a completed synthetic checkout.
 - **Score interpretation:** [risk score](RISK_SCORE.md).
 - **Harder scenarios:** [fixed synthetic evaluation](INDEPENDENT_EVALUATION.md).
 - **Real operator consent:** [handset validation](HANDSET_VALIDATION.md).

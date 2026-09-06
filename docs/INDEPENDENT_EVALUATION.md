@@ -46,26 +46,29 @@ across 6 scenario categories.
 
 ## Measured result
 
-Measured 5 September 2026 with `.venv311`, the mock provider, greedy planner,
+Measured 6 September 2026 with `.venv311`, the mock provider, greedy planner,
 and the shipped policy:
 
 | Method | Completion coverage | Automatic decisions | CHALLENGE | Authored-expectation disagreements | Execution errors | Evidence calls |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Isnad, sequential greedy | 13/13 | 10/13 (76.9%) | 3/13 (23.1%) | 6 | 0 | 28 total (2.15/case) |
+| Isnad, sequential greedy | 13/13 | 8/13 (61.5%) | 5/13 (38.5%) | 3 | 0 | 38 total (2.92/case) |
 | Corroboration-aware rules | 13/13 | 5/13 (38.5%) | 8/13 (61.5%) | 0 | 0 | 78 total (6/case) |
 | Full-evidence same policy | 13/13 | 6/13 (46.2%) | 7/13 (53.8%) | 3 | 0 | 78 total (6/case) |
 
 Completion coverage means the method returned a result for every case.
 Automatic-decision coverage counts ALLOW plus DECLINE, so Isnad's 13/13
-completion and 10/13 automatic decisions describe different properties.
+completion and 8/13 automatic decisions describe different properties.
 
-The investigator disagreed with six conservative expectations, returning ALLOW:
-a later unavailable SIM check, a later unresolved location check, a number
-mismatch offset by supporting evidence, correlated SIM/device changes, a
-replacement plus location mismatch, and travel with a recent SIM change. These
-are synthetic expectation differences, not observed false negatives. A clean
-early answer can cross the allow threshold before later prescribed facts are
-bought; the 28-versus-78 call result is inseparable from those differences.
+The investigator disagreed with three conservative expectations, returning ALLOW:
+`location_could_not_resolve`, `single_number_mismatch`, and
+`travel_with_recent_sim_change`. These are synthetic expectation differences,
+not observed false negatives. Early stopping can still miss later evidence;
+the 38-versus-78 call result is inseparable from that tradeoff.
+
+The relevance-aware ALLOW gate now requires supporting evidence that bears on
+the active hypothesis. Compared with the prior 28-call/six-disagreement run,
+this buys ten more checks and resolves three authored-expectation differences.
+The fixture labels and policy weights were not tuned to recover old metrics.
 
 The first run exposed an empty-chain ALLOW path at a low prior. That violated
 the stated evidence minimum and was fixed without changing weights: all ALLOW

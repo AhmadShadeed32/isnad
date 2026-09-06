@@ -33,6 +33,10 @@ os.environ["ISNAD_DEMO_MODE"] = "true"
 # costs no coverage; it only removes the accidental live path.
 os.environ["ISNAD_PLANNER"] = "greedy"
 os.environ["ISNAD_GEMINI_API_KEY"] = ""
+# Harness tests must also be independent of collection order and local credentials.
+os.environ["ISNAD_MERCHANT_API_KEY"] = "test-merchant-key"
+os.environ["PILOT_OPERATOR_USERNAME"] = "operator"
+os.environ["PILOT_OPERATOR_PASSWORD"] = "correct-horse-battery-staple"
 # The shipped demo registry is signed by a deployment-independent public key.
 # CI creates a fresh vault key, so it must explicitly trust this pinned public
 # key in order to verify the committed signature. This is public material, not

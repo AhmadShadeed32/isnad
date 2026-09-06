@@ -124,10 +124,25 @@ async def test_report_accounts_for_every_case_call_and_disagreement():
     # either behaviour changed and expectations need review, or the baselines
     # accidentally collapsed into the implementation under test.
     assert report["pairwise_disagreements"]
-    assert any(
-        row["case_id"] == "correlated_sim_and_device_change"
-        for row in report["pairwise_disagreements"]
-    )
+    disagreeing = {row["case_id"] for row in report["pairwise_disagreements"]}
+    assert "number_and_location_mismatch" in disagreeing
+
+    # `correlated_sim_and_device_change` used to be pinned here and no longer
+    # disagrees, which is the ALLOW gate working rather than the comparison
+    # collapsing: greedy used to stop early on a check that could not speak to
+    # the hypothesis, and now buys one that can. It reaches the same answer as
+    # both baselines AND the authored expectation, on fewer calls — which is
+    # the claim this whole comparison exists to support, so it is asserted
+    # rather than quietly dropped.
+    converged = "correlated_sim_and_device_change"
+    assert converged not in disagreeing
+    rows = {
+        name: next(c for c in method["cases"] if c["case_id"] == converged)
+        for name, method in report["methods"].items()
+    }
+    assert len({row["decision"] for row in rows.values()}) == 1
+    assert rows["isnad-greedy"]["decision"] == rows["isnad-greedy"]["expected_safe_decision"]
+    assert rows["isnad-greedy"]["calls"] < rows["full-evidence-same-policy"]["calls"]
 
 
 def test_dataset_validation_rejects_an_implicit_safety_label(tmp_path):

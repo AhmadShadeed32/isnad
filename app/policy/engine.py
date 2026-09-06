@@ -161,6 +161,16 @@ class PolicyEngine:
         """Network facts required before a clean belief may stop the agent."""
         return int(self.cfg.get("grading", {}).get("min_network_links_for_allow", 0))
 
+    def relevant_actions(self, hypothesis: Hypothesis | str) -> set[str]:
+        """The checks that can move this hypothesis, in either direction.
+
+        Empty for `legit`/`legit_thin_file`, which is a real answer and not a
+        wildcard: those have no hypothesis-driven check, so nothing may be
+        filtered on their behalf.
+        """
+        key = hypothesis.value if isinstance(hypothesis, Hypothesis) else str(hypothesis)
+        return set(self.cfg.get("hypotheses", {}).get(key, {}).get("relevant", []))
+
     def min_links_for(self, hypothesis: Hypothesis | str) -> int:
         g = self.cfg.get("grading", {})
         key = hypothesis.value if isinstance(hypothesis, Hypothesis) else str(hypothesis)
