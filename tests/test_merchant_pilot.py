@@ -207,6 +207,45 @@ def test_an_invalid_phone_number_is_rejected(monkeypatch):
     assert response.status_code == 422
 
 
+def test_a_poll_survives_isnad_being_briefly_unreachable(monkeypatch):
+    """Found during P4a's browser verification: restarting the Isnad server
+    mid-poll produced an unhandled httpx.ConnectError, a 500 to the operator's
+    browser, and left `verifying` stuck True so the flow could never complete
+    even after Isnad came back."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/consents/number-verification":
+            return httpx.Response(
+                202,
+                json={
+                    "consent_id": "cns_flaky",
+                    "status": "PENDING",
+                    "authorization_url": "https://consent.test/authorize?state=s",
+                    "expires_at": "2026-01-01T00:05:00+00:00",
+                    "chain_id": None,
+                    "reason": None,
+                },
+            )
+        raise httpx.ConnectError("connection refused", request=request)
+
+    _patch_isnad(monkeypatch, handler)
+    client = _client()
+    csrf = _login(client)
+    created = client.post(
+        "/api/flows",
+        json={"phone_number": "+15551234567"},
+        headers={"X-CSRF-Token": csrf},
+    )
+    flow_id = created.json()["flow_id"]
+
+    polled = client.get(f"/api/flows/{flow_id}")
+
+    assert polled.status_code == 200
+    assert polled.json()["status"] == "PENDING"
+    flow = pilot_module.flows.get(flow_id)
+    assert flow.verifying is False
+
+
 def test_logout_clears_the_session():
     client = _client()
     _login(client)

@@ -410,33 +410,43 @@ async def create_flow(
 
 
 async def _poll_and_maybe_complete(flow: FlowRecord) -> None:
-    async with httpx.AsyncClient(base_url=ISNAD_BASE_URL, timeout=15.0) as client:
-        status_response = await client.get(
-            f"/v1/consents/{flow.consent_id}",
-            headers={"Authorization": f"Bearer {ISNAD_MERCHANT_API_KEY}"},
-        )
-        if status_response.status_code != 200:
-            return
-        consent_status = status_response.json().get("status")
-        flow.status = consent_status
-
-        if consent_status != "AUTHORIZED":
-            return
-        # Compare-and-swap-by-lock: a flow's own httpx round trip to Isnad's
-        # single-use /verify must happen at most once from this harness, even
-        # if two browser tabs poll the same flow concurrently.
-        with flow.lock:
-            if flow.verifying or flow.result is not None:
+    """Best-effort: Isnad being briefly unreachable must surface as "still
+    polling", not as a 500 to the operator's browser, and must never leave
+    `verifying` stuck True — that would permanently block this flow from ever
+    completing."""
+    try:
+        async with httpx.AsyncClient(base_url=ISNAD_BASE_URL, timeout=15.0) as client:
+            status_response = await client.get(
+                f"/v1/consents/{flow.consent_id}",
+                headers={"Authorization": f"Bearer {ISNAD_MERCHANT_API_KEY}"},
+            )
+            if status_response.status_code != 200:
                 return
-            flow.verifying = True
-        verify_response = await client.post(
-            f"/v1/consents/{flow.consent_id}/verify",
-            headers={"Authorization": f"Bearer {ISNAD_MERCHANT_API_KEY}"},
-        )
-        if verify_response.status_code == 200:
-            flow.result = verify_response.json()
-            flow.status = "COMPLETED"
-        flow.verifying = False
+            consent_status = status_response.json().get("status")
+            flow.status = consent_status
+
+            if consent_status != "AUTHORIZED":
+                return
+            # Compare-and-swap-by-lock: a flow's own httpx round trip to
+            # Isnad's single-use /verify must happen at most once from this
+            # harness, even if two browser tabs poll the same flow
+            # concurrently.
+            with flow.lock:
+                if flow.verifying or flow.result is not None:
+                    return
+                flow.verifying = True
+            try:
+                verify_response = await client.post(
+                    f"/v1/consents/{flow.consent_id}/verify",
+                    headers={"Authorization": f"Bearer {ISNAD_MERCHANT_API_KEY}"},
+                )
+                if verify_response.status_code == 200:
+                    flow.result = verify_response.json()
+                    flow.status = "COMPLETED"
+            finally:
+                flow.verifying = False
+    except httpx.HTTPError:
+        return
 
 
 @app.get("/api/flows/{flow_id}")
