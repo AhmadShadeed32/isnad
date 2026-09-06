@@ -138,6 +138,77 @@ class ScreenEventRow(Base):
     __table_args__ = (Index("ix_screen_events_owner_caller_at", "owner_hash", "caller_hash", "at"),)
 
 
+class ChallengeAttemptRow(Base):
+    """One CHALLENGE followup: a merchant re-verifying a customer out of band
+    after a signed CHALLENGE decision (P3).
+
+    Deliberately its own table, never a column on `chains`: `ChainRow` is the
+    thing the signature covers, and a followup happens strictly after that
+    signature is fixed. Nothing here is ever folded back into `verdict_json`.
+    """
+
+    __tablename__ = "challenge_attempts"
+
+    attempt_id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    chain_id: Mapped[str] = mapped_column(String(40), index=True)
+    owner_hash: Mapped[str] = mapped_column(String(64), index=True)
+    method: Mapped[str] = mapped_column(String(32))
+    status: Mapped[str] = mapped_column(String(16), default="PENDING")
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=lambda: datetime.now(UTC))
+    expires_at: Mapped[datetime] = mapped_column(UtcDateTime, index=True)
+    # Stamped the moment status leaves PENDING (PASSED/FAILED/ABANDONED/EXPIRED),
+    # by whichever transition wins the race. Retention is measured from this,
+    # not from created_at — mirrors the consent store's terminal_at (P4a),
+    # for the same reason: a still-open attempt must never be swept.
+    terminal_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+
+
+class ChallengeEventRow(Base):
+    """One merchant-reported result against a `ChallengeAttemptRow`.
+
+    Append-only. A conflicting second terminal result is rejected by the
+    attempt's own compare-and-swap (P3), never overwritten here — this table
+    only ever gains rows.
+    """
+
+    __tablename__ = "challenge_events"
+
+    event_id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    attempt_id: Mapped[str] = mapped_column(String(40), index=True)
+    result: Mapped[str] = mapped_column(String(16))
+    # Always "merchant_reported": the one other possible terminal cause,
+    # server-side expiry, is recorded on the attempt itself and mints no event
+    # row, since there is no merchant submission to attribute it to.
+    provenance: Mapped[str] = mapped_column(String(24), default="merchant_reported")
+    reported_at: Mapped[datetime] = mapped_column(UtcDateTime, default=lambda: datetime.now(UTC))
+
+
+class IdempotencyRecordRow(Base):
+    """A durable record of one merchant write, keyed by owner + operation +
+    the caller's `Idempotency-Key` (P3).
+
+    Unlike `/v1/verify`'s in-memory cache (app/cache.py), this must survive a
+    restart: a merchant reporting a challenge outcome may not poll again for
+    hours, and by then an in-memory reservation is long gone. The primary key
+    IS the race resolution — two concurrent writes for the same key both try
+    to insert this row, and the database's uniqueness constraint decides which
+    one commits.
+    """
+
+    __tablename__ = "idempotency_records"
+
+    owner_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    operation: Mapped[str] = mapped_column(String(64), primary_key=True)
+    idempotency_key: Mapped[str] = mapped_column(String(128), primary_key=True)
+    # A keyed commitment to the full target + body (app.chain.subject.
+    # idempotency_fingerprint) — never the raw request — so a key reused
+    # against a different chain, attempt or body is detectable as a conflict.
+    request_fingerprint: Mapped[str] = mapped_column(String(64))
+    response_json: Mapped[str] = mapped_column(Text)
+    status_code: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=lambda: datetime.now(UTC))
+
+
 class AnnouncementUseRow(Base):
     """One subscriber's single use of one announcement.
 

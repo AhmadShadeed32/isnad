@@ -359,3 +359,61 @@ class ScreenResponse(BaseModel):
     # caller cannot mistake it for a full chain.
     tier: int = 1
     elapsed_us: int = 0
+
+
+# --- CHALLENGE followups (P3) ---
+#
+# What a merchant did after a signed CHALLENGE decision. Deliberately separate
+# from VerificationResponse: these requests carry no free text, because a
+# merchant-supplied note here would be exactly the kind of unstructured input
+# T3 already keeps out of anything the agent or a receipt renders.
+
+ChallengeMethod = Literal["manual_review"]
+ChallengeResult = Literal["PASSED", "FAILED", "ABANDONED"]
+ChallengeStatus = Literal["PENDING", "PASSED", "FAILED", "ABANDONED", "EXPIRED"]
+
+
+class ChallengeCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    method: ChallengeMethod = "manual_review"
+
+
+class ChallengeCreateResponse(BaseModel):
+    attempt_id: str
+    chain_id: str
+    method: ChallengeMethod
+    status: ChallengeStatus
+    created_at: str
+    expires_at: str
+
+
+class ChallengeEventRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    result: ChallengeResult
+
+
+class ChallengeEventResponse(BaseModel):
+    attempt_id: str
+    status: ChallengeStatus
+    result: ChallengeResult
+    reported_at: str
+
+
+class ChallengeEventSummary(BaseModel):
+    result: ChallengeResult
+    provenance: str
+    reported_at: str
+
+
+class ChallengeAttemptSummary(BaseModel):
+    attempt_id: str
+    method: ChallengeMethod
+    status: ChallengeStatus
+    created_at: str
+    expires_at: str
+    events: list[ChallengeEventSummary]
+
+
+class ChallengeTimelineResponse(BaseModel):
+    chain_id: str
+    attempts: list[ChallengeAttemptSummary]

@@ -9,6 +9,7 @@ from fastapi.responses import RedirectResponse, Response
 
 from app import __version__, retention
 from app.api import (
+    routes_challenge,
     routes_consent,
     routes_console,
     routes_judge,
@@ -84,6 +85,7 @@ def create_app() -> FastAPI:
     app.add_middleware(RequestLimitsMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
     app.include_router(routes_verify.router)
+    app.include_router(routes_challenge.router)
     app.include_router(routes_consent.router)
     app.include_router(routes_consent.page_router)
     app.include_router(routes_reverse.router)

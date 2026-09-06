@@ -58,6 +58,22 @@ def request_commitment(request: Any) -> str:
     ).hexdigest()
 
 
+def idempotency_fingerprint(operation: str, *target: str, body: Any) -> str:
+    """A keyed, domain-separated commitment to a write's full target AND body.
+
+    `request_commitment` above binds a request's body but not what it is
+    against. An Idempotency-Key reused with the same body but a different
+    chain or attempt id must still be a conflict (P3) — folding the target
+    segments into the domain closes that gap rather than relying on callers
+    to remember to check it separately.
+    """
+    if not hasattr(body, "model_dump_json"):
+        raise TypeError("idempotency fingerprint requires a Pydantic model body")
+    domain = "isnad/idempotency/v1\0" + operation + "\0" + "\0".join(target) + "\0"
+    payload = domain.encode("utf-8") + body.model_dump_json().encode("utf-8")
+    return hmac.new(vault.subject_pepper(), payload, hashlib.sha256).hexdigest()
+
+
 def matches(verdict_subject_hash: str, e164: str) -> bool:
     """Whether a stored chain was really issued about this number."""
     if not verdict_subject_hash:

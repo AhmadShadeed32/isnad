@@ -87,6 +87,15 @@ async def posture(request: Request) -> dict:
                 "human": _human(settings.announce_max_ttl_seconds),
                 "why": "An institution saying who it is about to ring. Useless after the call.",
             },
+            {
+                "name": "challenge_followups",
+                "seconds": settings.challenge_followup_retention_seconds,
+                "human": _human(settings.challenge_followup_retention_seconds),
+                "why": (
+                    "What a merchant reported after a CHALLENGE decision. Kept for "
+                    "dispute resolution, not indefinitely."
+                ),
+            },
         ],
         "sweeper": {
             "enabled": settings.purge_interval_seconds > 0,

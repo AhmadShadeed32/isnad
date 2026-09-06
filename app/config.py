@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import urlparse
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -198,6 +199,14 @@ class Settings(BaseSettings):
     # and a caller-velocity burst (which is ordinary traffic for this endpoint)
     # exhausted it in seconds. Still bounded: each screen writes a row.
     rate_limit_per_key_screen: int = 600
+
+    # --- CHALLENGE followups (P3) ---
+    # How long a merchant has to report a followup before it expires unreported.
+    # The spec's own proposed default.
+    challenge_attempt_ttl_seconds: int = Field(900, gt=0)
+    # How long a resolved (PASSED/FAILED/ABANDONED/EXPIRED) attempt and its
+    # events stay queryable before the retention sweeper drops them. 30 days.
+    challenge_followup_retention_seconds: int = Field(2592000, gt=0)
 
     # --- Cache / idempotency ---
     cache_backend: str = "memory"  # memory | redis

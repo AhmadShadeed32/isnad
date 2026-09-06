@@ -67,7 +67,8 @@ def test_one_sweep_clears_both_tables():
         session.commit()
 
     deleted = retention.purge_once()
-    assert deleted == {"announcements": 1, "screen_events": 1}
+    assert deleted["announcements"] == 1
+    assert deleted["screen_events"] == 1
     assert _counts() == (0, 0, 0)
 
 
