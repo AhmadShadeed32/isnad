@@ -330,6 +330,30 @@ def check_startup_posture(cfg: Settings) -> None:
     misconfiguration is a stranger spending money on real CAMARA calls — and
     that is not hypothetical the moment the demo is exposed through a tunnel.
     """
+    # Selective-live hybrid is retired, and this is the single place that says
+    # so (R12). It used to be refused twice, by two guards that contradicted
+    # each other: demo_mode=false was rejected because hybrid is demo-only,
+    # and demo_mode=true was rejected because public demo tokens must never
+    # authorize billable calls. Both rejections are individually right, which
+    # is why no configuration could ever serve the documented feature — a
+    # reader following the setup instructions got a different refusal
+    # depending on which knob they turned last, and neither said the mode was
+    # unreachable.
+    #
+    # Retired rather than rebuilt: making it reachable means minting an
+    # authenticated path to billable calls, and the guard that stops public
+    # demo tokens authorizing spend is worth more than the feature. The
+    # provider class stays as a test seam with both lists empty, where it is a
+    # MockProvider with extra steps and cannot reach the network.
+    if cfg.provider == "hybrid" and (
+        cfg.live_evidence_actions.strip() or cfg.live_evidence_numbers.strip()
+    ):
+        raise InsecureConfiguration(
+            "Selective-live hybrid is retired: ISNAD_LIVE_EVIDENCE_ACTIONS and "
+            "ISNAD_LIVE_EVIDENCE_NUMBERS must be empty. Use ISNAD_PROVIDER=nac "
+            "with ISNAD_DEMO_MODE=false for live evidence."
+        )
+
     # Hybrid deliberately mixes live and fixture evidence.  That is useful for
     # an isolated stage rehearsal, but issuing a production verdict from a
     # fixture fallback is unsafe.  A deployment must choose mock (no live

@@ -162,7 +162,7 @@ Provider choices:
 | `mock` | Authored fixtures through the real investigator, policy and vault. Recommended for local exploration. |
 | `nac_fake` | Local fake operator for consent and integration testing. |
 | `nac` | Nokia Network-as-Code adapter requiring authorized credentials, supported operations and startup configuration. |
-| `hybrid` | Selective-live adapter exists, but contradictory startup guards currently prevent a billable hybrid configuration (R12). |
+| `hybrid` | Provider-level test seam only. Selective-live is **retired**: a non-empty `ISNAD_LIVE_EVIDENCE_*` allowlist is refused at startup, so this provider can never reach the network. Use `nac` for live evidence. |
 
 Judge Mode deliberately adds 650 ms per evidence check for readability. That
 pacing and mock link timings are not operator-performance measurements. Historical

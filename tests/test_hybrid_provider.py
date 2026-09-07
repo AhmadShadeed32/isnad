@@ -125,10 +125,14 @@ def test_hybrid_with_the_published_key_refuses_to_start():
     real, billable CAMARA calls and slipped straight past it — so a tunnelled
     demo with the published demo key let a stranger spend the operator budget.
     The guard has to key on whether calls can reach the network, not on one
-    provider name."""
+    provider name.
+
+    The refusal this now hits is the retirement (R12), which fires earlier and
+    covers strictly more configurations than the billable-demo guard did. The
+    property under test is unchanged: this configuration does not start."""
     from app.config import InsecureConfiguration, check_startup_posture
 
-    with pytest.raises(InsecureConfiguration, match="demo"):
+    with pytest.raises(InsecureConfiguration, match="retired"):
         check_startup_posture(_cfg())
 
 
