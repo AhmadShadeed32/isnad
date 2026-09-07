@@ -34,7 +34,7 @@ os.environ["ISNAD_DATABASE_URL"] = "sqlite://"
 # root, on sys.path. Make the documented command work without requiring install.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.agent.investigator import build_engine_for_pricing, build_investigator
+from app.agent.investigator import _SWAP_DATE, build_engine_for_pricing, build_investigator
 from app.api.routes_console import DEMO_ACTS
 from app.chain.vault import vault
 from app.db import store
@@ -88,7 +88,38 @@ CASES: tuple[EvidenceCase, ...] = (
 )
 
 
+# Kept identical to `scripts/independent_evaluation.py`: two evaluators
+# disagreeing about what counts as a charged operation is exactly the
+# reconciliation problem R16 is about.
+_UNCHARGED_TIMING = {"unsupported", "not_attempted"}
+
+
+def _enrichment_cost(link: Any, engine: Any) -> float:
+    """What the date enrichment on this link cost, if it was a real operation.
+
+    An enrichment that never left the process — `unsupported`, or one that was
+    not attempted — is not a charge, so it is not priced here.
+    """
+    timing = getattr(link, "timing", None)
+    if timing is None or timing.availability in _UNCHARGED_TIMING:
+        return 0.0
+    return engine.enrichment_cost(_SWAP_DATE)
+
+
 def _step_summary(link: Any, engine: Any) -> dict[str, Any]:
+    """One evidence link, priced in full.
+
+    `policy_cost_units` alone stopped being the whole cost of a step when the
+    swap date became a separately charged operation: the per-link numbers no
+    longer summed to `evidence_cost`, so anyone reconciling a paid-call saving
+    by hand got a figure that did not match the total on the same page (R16).
+    Both components are reported, and their sum, rather than folding them
+    together — a reader comparing against an operator invoice needs to see the
+    enrichments as their own line.
+    """
+    evidence = engine.action_cost(link.action)
+    enrichment = _enrichment_cost(link, engine)
+    timing = getattr(link, "timing", None)
     return {
         "step": link.step,
         "action": link.action.value,
@@ -99,7 +130,13 @@ def _step_summary(link: Any, engine: Any) -> dict[str, Any]:
         # MockProvider encodes this fixture timing in the link; it is useful for
         # explaining the scripted sequence, but it is not a network measurement.
         "scripted_provider_latency_ms": link.latency_ms,
-        "policy_cost_units": engine.action_cost(link.action),
+        "policy_cost_units": evidence,
+        "timing_enrichment": {
+            "availability": timing.availability if timing else "not_attempted",
+            "charged": enrichment > 0,
+            "cost_units": enrichment,
+        },
+        "step_cost_units": round(evidence + enrichment, 6),
     }
 
 
@@ -135,6 +172,18 @@ async def run_case(case: EvidenceCase) -> dict[str, Any]:
             "planner": verdict.planner,
             "provider_sources": verdict.provider_sources,
             "evidence_steps": len(verdict.chain),
+            # Reported separately, then totalled. An operation count that mixes
+            # evidence checks with date enrichments cannot be reconciled
+            # against an operator's own line items (R16).
+            "evidence_call_cost_units": round(
+                sum(engine.action_cost(link.action) for link in verdict.chain), 6
+            ),
+            "timing_enrichment_operations": sum(
+                1 for link in verdict.chain if _enrichment_cost(link, engine) > 0
+            ),
+            "timing_enrichment_cost_units": round(
+                sum(_enrichment_cost(link, engine) for link in verdict.chain), 6
+            ),
             "evidence_cost_units": verdict.evidence_cost,
             "wall_clock_latency_ms": verdict.latency_ms,
         },
