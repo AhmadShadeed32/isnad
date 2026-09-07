@@ -2829,7 +2829,7 @@ Head at the time of writing: `af6936b`, **1,187 passed + 1 xfailed**, Ruff clean
 
 ## What actually ran against Nokia
 
-**Fifteen authenticated calls to the hosted simulator**, one attempt each
+**Fourteen authenticated calls to the hosted simulator**, one attempt each
 (`timeout_in_seconds=10, max_retries=0`), all on the catalog host
 `https://network-as-code.p-eu.apihub.nokia.io`. Sanitized records:
 `docs/nac/observations/2026-09-06-hosted-simulator.jsonl`.
@@ -2859,8 +2859,15 @@ Head at the time of writing: `af6936b`, **1,187 passed + 1 xfailed**, Ruff clean
 3. **A future reference date is a 400, not a `false`.** Number Recycling
    therefore refuses an out-of-range date locally instead of paying to be told.
 
-**No Gemini call was made in this session.** No live-network call, no physical
-handset, no congestion subscription created, no callback ever delivered.
+**Gemini was called twice**, in a single bounded run over mock network data
+(gate 11.2): `gemini-3.6-flash`, both selections returned `planner="llm"` with
+the model's own rationales, no fallback label fired, 2 calls against a cap of 6,
+4.1 s wall clock, verdict DECLINE/REFUTED. Record:
+`docs/nac/observations/2026-09-07-gemini-rehearsal.json`. The provider was the
+mock, so **no operator was called** by that run.
+
+**No live-network call, no physical handset, no congestion subscription created,
+no callback ever delivered.**
 
 ## What was built
 
@@ -2932,12 +2939,23 @@ handset, no congestion subscription created, no callback ever delivered.
 - **A session-scoped Playwright context also breaks it.** Held open, it leaves a
   running event loop in the thread and every later async test dies with
   "Runner.run() cannot be called from a running event loop". Function-scoped.
-- **Browser journeys need their own server.** This build keeps at most 32 live
-  demo credentials and a bounded subscriber set; a matrix that renders dozens of
-  pages exhausts both, and the next file's journey then fails for reasons that
-  have nothing to do with it. The `server` fixture is module-scoped.
+- **Browser journeys need their own server.** After the surface matrix runs,
+  the journeys in the next file fail against the same process. A module-scoped
+  `server` fixture — a fresh process per test file — resolves it reliably. The
+  **cause was not isolated**: bounded per-process state is the obvious suspect
+  (this build keeps at most 32 live demo credentials and a bounded subscriber
+  set, and the matrix renders dozens of pages), but reloading to reset the token
+  budget alone did not fix it, so that explanation is unconfirmed. Recorded as a
+  working remedy, not a diagnosis.
 
 ## Documented consequences a future run will see
+
+- **`pytest -q` rewrites 35 tracked PNGs.** The browser surface matrix writes
+  its screenshots to `docs/ui/release/`, which is committed, so `git status` is
+  never clean after a full run even when no source changed. Check the diff
+  before assuming a run modified something: byte-different screenshots of an
+  unchanged page are the normal case. Review them when the UI changed, and
+  `git checkout -- docs/ui/release/` when it did not.
 
 - Pricing the swap date as a second call changed evaluation numbers. The
   takeover fixture now spends **7 on three links** where it spent 8 on four:

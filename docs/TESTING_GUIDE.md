@@ -49,7 +49,7 @@ strict xfail, so the day it is fixed the suite fails until the marker is removed
 | Judge: clean checkout | Works offline | `/judge` → **Try a clean checkout** | ALLOW resting on a supporting network fact | same | `judge-en-clean-1440.png` | — |
 | Judge: unresolved evidence | Works offline | `/judge` → **Show an unresolved-evidence case** | CHALLENGE with a hole in the chain, not a failed check | same | `judge-en-gap-1440.png` | This is "we could not check", never "the check failed" |
 | Console Acts I–IX | Works offline | `/console` → **Run the stage suite** | Rows per act with source labels and a risk meter | `pytest -q tests/test_console.py tests/scenarios/` | `console-en-connected-1440.png` | Demo mode only; the console mints its own short-TTL credential |
-| Gemini chooses the next check | **Built, never called** in this release | Set `ISNAD_GEMINI_API_KEY` and `ISNAD_PLANNER=llm` | Evidence rows labelled `llm` with the model's own one-sentence rationale | `pytest -q tests/test_gemini_primary.py tests/test_llm_planner.py` (88 tests) | Every exchange in those tests is stubbed. **No Gemini request was made in this release.** | Do not present a configured key as a working model integration |
+| Gemini chooses the next check | **Works, one observed run** | Set `ISNAD_GEMINI_API_KEY` and `ISNAD_PLANNER=llm` | Evidence rows labelled `llm` with the model's own one-sentence rationale | `pytest -q tests/test_gemini_primary.py tests/test_llm_planner.py` (88 tests) | Every exchange in those tests is stubbed. One real run was made against `gemini-3.6-flash` over **mock** network data: 2 selection calls, both labelled `llm`, no fallback — `docs/nac/observations/2026-09-07-gemini-rehearsal.json` | One request shape, one fixture. The degraded-model and fallback-label paths have only ever run against stubs |
 | Model STOP | Works offline | — | Selection ends; policy gates still apply | `pytest -q tests/test_gemini_primary.py -k stop` | — | Stopping is a decision, not a failure |
 | Greedy fallback, and only for no answer | Works offline | Unset the key, or interrupt the network | Source `greedy` with a bounded reason naming which no-answer condition allowed it | `pytest -q tests/test_gemini_primary.py` | — | Invalid output, an explicit refusal, a 4xx/5xx and the call ceiling **stop selection** instead of falling back |
 | Policy-choreographed checks | Works offline | Any case that reaches the ALLOW gate | Trace rows labelled `policy`, never `llm` | `pytest -q tests/test_allow_evidence_gate.py` | — | The signed `planner` field's vocabulary is llm/greedy; `policy` appears in the trace |
@@ -112,8 +112,11 @@ strict xfail, so the day it is fixed the suite fails until the marker is removed
 
 ## What this release does not do
 
-- **No Gemini request was made.** The planner is configured for it and tested
-  against stubs; that is not the same thing.
+- **Gemini was called exactly twice**, in one bounded run over mock network
+  data (`docs/nac/observations/2026-09-07-gemini-rehearsal.json`). That proves
+  the live request/response contract on one fixture. Everything else about the
+  planner — the fallback reason labels, degraded-model behaviour, the call
+  ceiling — is still stub-tested only.
 - **No live network, no physical handset, no congestion subscription, and no
   callback has ever been delivered.**
 - **`make lint` was not run.** It invokes a dependency audit that sends the
