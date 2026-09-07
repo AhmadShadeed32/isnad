@@ -1,13 +1,13 @@
 # Nokia Network as Code contract matrix
 
-Compiled 6 September 2026 for gate 2 of `docs/EXECUTION_RUNBOOK.md`. It reconciles
+Compiled 6 September 2026. It reconciles
 three sources and says which one each claim comes from:
 
 1. **Installed SDK** — `network-as-code==10.0.0`, exported without any network
-   request by `scripts/export_nac_contracts.py` into `docs/NAC_SDK_CONTRACTS.json`
+   request by `scripts/export_nac_contracts.py` (its output is regenerated on demand, not committed)
    (79 operations, `network_calls: 0`). Paths below are the SDK's own request AST.
 2. **Authenticated catalog** — the signed-in Nokia catalog inspection recorded in
-   `docs/NAC_DEMO_REVIEW_2026-09-06.md`.
+   the recorded probe run itself.
 3. **Observation** — a response this project actually received. Where the "Last
    observation" column says *none*, nothing has been received and no claim of
    working integration may be made from this row.

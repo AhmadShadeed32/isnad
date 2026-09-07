@@ -1,5 +1,5 @@
 """P2 — app/presentation.py: a deterministic, plain-language projection of an
-already-signed Verdict. See docs/PHASE2_HANDOFF.md, package P2.
+already-signed Verdict. Package P2.
 
 Real synthetic Verdicts come from running the actual investigator over the
 console's own DEMO_ACTS fixtures (mock provider, greedy planner — same as the

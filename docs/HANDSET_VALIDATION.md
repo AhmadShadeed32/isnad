@@ -69,8 +69,8 @@ phone number into this document, a ticket, a chat, or a screen recording.
 ## Live procedure
 
 Before a live run, complete the current OAuth contract checks in
-[P4a of the handoff](PHASE2_HANDOFF.md#p4a--build-the-live-consent-journey-locally).
-Start the controlled deployment using the [live deployment checklist](PHASE2_HANDOFF.md#4-path-to-a-live-product).
+the local consent journey against the bundled fake operator.
+Start the controlled deployment using the deployment boundaries in the [README](../README.md#deployment-boundaries).
 Confirm `/readyz` returns 200 and confirm the
 registered callback matches `ISNAD_NAC_REDIRECT_URI` byte for byte.
 

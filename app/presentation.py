@@ -1,6 +1,6 @@
 """A deterministic, plain-language projection of an already-signed Verdict.
 
-P2 (see docs/PHASE2_HANDOFF.md): a first-time merchant should be able to read
+P2: a first-time merchant should be able to read
 "Additional verification needed" and a short list of facts, without decoding
 CHALLENGE / DEGRADED / 0.242 first. This module never does that decoding for
 them by inventing anything: every sentence here is either

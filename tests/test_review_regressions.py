@@ -1,5 +1,5 @@
-"""Regression tests for the 6 September 2026 code review (docs/PHASE2_HANDOFF.md
-§9, findings R1-R7). Adapted from docs/reviews/sonnet_review_regressions.py:
+"""Regression tests for the 6 September 2026 code review (findings R1-R7).
+Adapted from the review's own reproduction script:
 `add_flow()` now takes an explicit `owner_session_id` (R1 added that field to
 `FlowRecord`), and assertions are otherwise unchanged from the review's own
 probes.

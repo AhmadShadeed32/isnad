@@ -106,7 +106,7 @@ async def complete_number_verification_exchange(
 
     Fails closed on a missing id_token: the documented contract returns one,
     and treating its absence as "compatible anyway" is exactly the assumption
-    the handoff calls out as unaddressed. See docs/PHASE2_HANDOFF.md §3 P4a.1.
+    the handoff calls out as unaddressed. See the local consent journey notes.
     """
     token_response = await exchange_code_for_tokens(
         http_client=http_client,

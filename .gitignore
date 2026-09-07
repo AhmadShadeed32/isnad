@@ -8,6 +8,7 @@ dist/
 
 # Virtual environments
 .venv/
+.venv311/
 venv/
 env/
 
@@ -15,56 +16,32 @@ env/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+.coverage
 
-# Environment / secrets
+# Environment / secrets. Never commit a real .env, signing key or database.
 .env
 .env.*
 !.env.example
 *.local
+*.pem
+*.key
 
-# Local database + vault key
+# Local database and vault state
 *.db
 *.db-wal
 *.db-shm
 *.db.*
-# The real path is .isnad/vault-key.pem; the old entry here never matched
-# it and it was only ignored because the whole .isnad/ directory is (S13).
-*.pem
-*.key
+.isnad/
 
 # OS / editor
 .DS_Store
 .idea/
 .vscode/
-.isnad/
-isnad.db
-.venv/
-.venv311/
-.pytest_cache/
-.ruff_cache/
-__pycache__/
-*.py[cod]
-.isnad/stage-key.txt
-.isnad/public-8020.log
-.coverage
 
-# Local development material
+# Working material kept on disk but out of the submission: agent instructions,
+# the local knowledge graph, and the internal engineering notes and review
+# records that predate the public README.
 .claude/
 CLAUDE.md
-docs/*.md
-docs/mentorship/
-docs/video/
 graphify-out/
-
-# Review deliverables linked from the public README.
-!docs/CURRENT_STATE.md
-!docs/RISK_SCORE.md
-!docs/INDEPENDENT_EVALUATION.md
-!docs/HANDSET_VALIDATION.md
-!docs/JUDGE_WALKTHROUGH.md
-!docs/REVIEW_2026-09-06.md
-!docs/EXECUTION_RUNBOOK.md
-!docs/NAC_DEMO_REVIEW_2026-09-06.md
-!docs/IMPLEMENTATION_PROGRESS.md
-!docs/TESTING_GUIDE.md
-!docs/NAC_CONTRACT_MATRIX.md
+docs/_internal/

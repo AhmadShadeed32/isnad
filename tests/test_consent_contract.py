@@ -1,7 +1,7 @@
 """P4a — consent-contract defects fixed before building the live-consent journey.
 
 Each test below was run against the pre-fix code first and observed failing for
-the stated reason; see docs/PHASE2_HANDOFF.md §7 for the record.
+the stated reason.
 """
 
 from __future__ import annotations

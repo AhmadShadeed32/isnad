@@ -17,7 +17,7 @@ result to read, not a thing to hammer. Run it again by hand if you want another.
     ISNAD_T1_ARM=i-understand-this-costs-money \
     ISNAD_T1_PHONE=+962... .venv311/bin/python scripts/t1_probe.py sim_swap
 
-The observation is written to docs/T1_OBSERVATIONS.md, appended, never
+The observation is written to docs/_internal/T1_OBSERVATIONS.md, appended, never
 overwritten — an earlier failed probe is evidence too. The phone number is
 never written to that file: only its last two digits, so successive probes can
 be told apart without committing a real identifier.
@@ -36,7 +36,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 ARM_VALUE = "i-understand-this-costs-money"
-OUT = Path(__file__).resolve().parent.parent / "docs" / "T1_OBSERVATIONS.md"
+OUT = Path(__file__).resolve().parent.parent / "docs" / "_internal" / "T1_OBSERVATIONS.md"
 
 # Kept deliberately small. Each entry is one billable call.
 PROBES = {

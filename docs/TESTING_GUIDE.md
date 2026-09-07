@@ -100,7 +100,7 @@ strict xfail, so the day it is fixed the suite fails until the marker is removed
 
 | Feature | Status | Do this | You should see | Automated | Evidence | Limits |
 | --- | --- | --- | --- | --- | --- | --- |
-| Consent allow / deny / expiry / recovery | Works offline | Use the fake operator from `docs/P4A_IMPLEMENTATION_RECORD.md` | Single-use callbacks, owner binding, cached completion | `pytest -q tests/test_consent.py tests/test_s9_consent_replay.py` | — | The fake operator is a local simulation and says so |
+| Consent allow / deny / expiry / recovery | Works offline | Use the bundled fake operator (`demo/fake_operator/`) | Single-use callbacks, owner binding, cached completion | `pytest -q tests/test_consent.py tests/test_s9_consent_replay.py` | — | The fake operator is a local simulation and says so |
 | Consent completion landing | Works offline | `/consent/complete` | A generic page carrying no code, state or phone number | `pytest -q tests/test_consent_html_redirect.py` | `consent-complete-en-initial-1440.png` | — |
 | Merchant login / checkout / flow | Works offline | Start `demo/merchant_pilot` per the P4A record | Login errors, validation, consent QR, terminal states, recovery | `pytest -q tests/test_merchant_pilot.py tests/test_pilot_polling.py tests/test_pilot_retention.py` | **Not visited in a browser this release** | The three-service journey was not driven end-to-end in a browser here |
 | Verified Caller announcements | Works offline | `/console` → reverse check | Pre-announcement rows, Tier 1 screen, velocity | `pytest -q tests/test_verified_caller.py tests/test_velocity.py` | — | An announcement cannot outvote a contradicting network fact |
@@ -128,5 +128,5 @@ strict xfail, so the day it is fixed the suite fails until the marker is removed
   critical paths, the merchant three-service journey, and the shared proof
   page's expired and revoked states.
 - **Open defects carried forward:** the `/lab` mobile overflow, and R05, R07,
-  R09, R10, R12 and R13 from the review in `docs/PHASE2_HANDOFF.md`. Each has a
+  R09, R10, R12 and R13 from the September 2026 code review. Each has a
   written fix and acceptance test there.

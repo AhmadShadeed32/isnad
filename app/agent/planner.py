@@ -153,7 +153,7 @@ class GreedyPlanner:
         There used to be an `Action.STEP_UP_OTP` fallback here when nothing
         low-friction remained, and it was a way to spend half a high-value
         budget on nothing. `STEP_UP_OTP` is not a provider call — see
-        `docs/IMPLEMENTATION_STATUS.md`, "not a network provider call by
+        the planner contract, "not a network provider call by
         design" — so the investigator handed it to the provider anyway, no
         scenario defined it, and the catch-all came back `LOCATION_UNKNOWN`,
         delta **0.0**, for a cost of 6 of a budget of 12. The signed chain then
