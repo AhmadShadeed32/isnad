@@ -90,6 +90,7 @@ def answer(verdict: Verdict, question: str, client=None) -> str:
         # and so the boundary is obvious to anyone reading the prompt on stage.
         "question_from_the_public": trimmed,
     }
+    _note_if_deployment_pays()
     text = client.generate_text(
         system=SYSTEM_PROMPT,
         prompt=json.dumps(payload, sort_keys=True),
@@ -108,3 +109,16 @@ def _maybe_client() -> object | None:
         model=settings.llm_model,
         timeout_seconds=settings.llm_timeout_seconds,
     )
+
+
+def _note_if_deployment_pays() -> None:
+    """Charge this call against the hourly ceiling when it spends OUR key.
+
+    A key supplied on the request belongs to the reviewer who sent it and is
+    deliberately not rationed.
+    """
+    from app.model_budget import note_model_call
+    from app.runtime_keys import uses_server_key
+
+    if uses_server_key():
+        note_model_call()

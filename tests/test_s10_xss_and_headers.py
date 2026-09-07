@@ -92,8 +92,22 @@ def test_the_csp_permits_no_external_origin():
 
 def test_the_console_still_loads_nothing_from_an_external_origin():
     """The invariant the runbook says to keep: a venue may be offline."""
-    external = re.findall(r'(?:src|href)\s*=\s*["\'](https?:)?//', CONSOLE_HTML)
-    assert external == []
+    # No external LOAD: no `src`, no stylesheet `<link href>`. The only outside
+    # addresses this page may name are an anchor to Google AI Studio, so a
+    # reviewer can get a key, and the SVG namespace, which is an identifier
+    # rather than a fetch. Both are navigations or names, not requests, so the
+    # page still works in a locked-down venue and the CSP is untouched.
+    #
+    # This rule used to forbid an external `href` outright, which the shared key
+    # panel — inlined here and into the judge and lab pages — made unsatisfiable
+    # against their own rules. Loads are the invariant; naming a destination is
+    # not.
+    assert re.findall(r'src\s*=\s*["\'](?:https?:)?//', CONSOLE_HTML) == []
+    assert re.findall(r'<link[^>]+href\s*=\s*["\'](?:https?:)?//', CONSOLE_HTML) == []
+    assert set(re.findall(r'https?://[^\s"\'`,)]+', CONSOLE_HTML)) <= {
+        "https://aistudio.google.com/apikey",
+        "http://www.w3.org/2000/svg",
+    }
 
 
 def test_headers_are_present_on_the_streaming_response(monkeypatch):

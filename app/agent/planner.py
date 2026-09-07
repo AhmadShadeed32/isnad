@@ -267,6 +267,7 @@ class LLMPlanner:
         observations: Sequence[Observation],
     ) -> Choice:
         self._calls += 1
+        _note_if_deployment_pays()
         prompt = self._render(hypothesis, affordable, budget_left, p_fraud, observations)
         try:
             response = self._client.generate_json(
@@ -418,3 +419,16 @@ def effective_planner() -> str:
     if asked_for_llm and LLMPlanner._maybe_client() is not None:
         return LLMPlanner.source
     return GreedyPlanner.source
+
+
+def _note_if_deployment_pays() -> None:
+    """Charge this call against the hourly ceiling when it spends OUR key.
+
+    A key supplied on the request belongs to the reviewer who sent it and is
+    deliberately not rationed.
+    """
+    from app.model_budget import note_model_call
+    from app.runtime_keys import uses_server_key
+
+    if uses_server_key():
+        note_model_call()

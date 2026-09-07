@@ -172,10 +172,23 @@ def test_the_lab_page_is_read_only_over_the_whole_app():
 
 
 def test_the_page_loads_no_external_assets_and_only_links_to_studio():
+    # No external LOAD: no `src`, no stylesheet `<link href>`. The only outside
+    # addresses this page may name are an anchor to Google AI Studio, so a
+    # reviewer can get a key, and the SVG namespace, which is an identifier
+    # rather than a fetch. Both are navigations or names, not requests, so the
+    # page still works in a locked-down venue and the CSP is untouched.
+    #
+    # Matched as URLs rather than as `href="…"` because the shared key panel is
+    # built from DOM nodes, not an assigned markup template — the S10 rule
+    # forbids assigning markup, so the address is a JS string. The rendered
+    # anchor, with its rel and target, is asserted by the browser test
+    # tests/browser/test_lab_replay_controls.py.
     assert re.findall(r'src\s*=\s*["\'](?:https?:)?//', LAB_HTML) == []
-    assert re.findall(r'href="(https?://[^" ]+)"', LAB_HTML) == [
-        "https://aistudio.google.com/apikey"
-    ]
+    assert re.findall(r'<link[^>]+href\s*=\s*["\'](?:https?:)?//', LAB_HTML) == []
+    assert set(re.findall(r'https?://[^\s"\'`,)]+', LAB_HTML)) <= {
+        "https://aistudio.google.com/apikey",
+        "http://www.w3.org/2000/svg",
+    }
 
 
 def test_the_page_renders_every_value_as_text_not_markup():

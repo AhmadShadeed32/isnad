@@ -215,6 +215,12 @@ class Settings(BaseSettings):
     # A hard ceiling per investigation. Without it one request can burn unbounded
     # model budget; past it model selection stops without switching planners.
     llm_max_calls_per_investigation: int = 6
+    # A ceiling on model calls charged to THIS deployment's own key in a rolling
+    # hour, across every caller. 0 is unlimited and is the right default for a
+    # local run. A public demo that carries a key must set it, or one header
+    # lets a stranger spend the operator's whole quota. A key supplied on the
+    # request is the reviewer's own and is never counted here.
+    llm_max_calls_per_hour: int = 0
     # Short: a planner call sits in the request path, and on stage a slow verdict
     # is worse than a greedy one. A timeout is just another fallback.
     #

@@ -9,30 +9,76 @@ window.IsnadKey = (() => {
   const choice = () => { try { return sessionStorage.getItem(plannerStore) === 'greedy' ? 'greedy' : (sessionStorage.getItem(plannerStore) === 'llm' && serverGemini || read() ? 'llm' : 'greedy'); } catch { return 'greedy'; } };
   const mount = document.getElementById('sharedGemini');
   const text = (key, fallback) => window.Isnad ? window.Isnad.t('ui.' + key, fallback) : fallback;
-  if (mount) mount.innerHTML = `
-    <div class="planner-bar">
-      <label for="plannerChoice" data-i18n="ui.planner_label">Planner</label>
-      <select id="plannerChoice" disabled>
-        <option value="greedy" data-i18n="ui.planner_greedy">Greedy · deterministic</option>
-        <option value="llm" data-i18n="ui.planner_llm">Gemini · LLM</option>
-      </select>
-      <span data-i18n="ui.planner_scope">Applies to your next investigation. Lab recordings stay unchanged.</span>
-    </div>
-    <details class="site-key" id="byok">
-      <summary><span data-i18n="ui.key_title">Gemini API key</span><span id="byokState" role="status"></span></summary>
-      <div class="site-key-body">
-        <p data-i18n="ui.key_scope">One key for Checkout, Console, and Lab model runs in this browser tab. Viewing recordings does not call Gemini.</p>
-        <form id="byokForm" class="site-key-actions">
-          <label for="byokKey" data-i18n="ui.key_label">Your Gemini key</label>
-          <input id="byokKey" type="password" autocomplete="off" spellcheck="false" placeholder="AIza…" aria-describedby="byokPromise" disabled>
-          <button id="byokUse" type="submit" disabled data-i18n="ui.key_save">Save key</button>
-          <button id="byokForget" type="button" data-i18n="ui.key_forget">Forget key</button>
-        </form>
-        <p id="byokPromise" data-i18n="ui.key_privacy">Stored in this tab’s session storage. Sent to this app’s server for model requests, then to Google. The app does not write it to its database, receipts, or logs. Calls use your saved key’s quota, or the site key when none is saved.</p>
-        <p><a id="googleStudioLink" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" data-i18n="ui.key_get">Get a key from Google AI Studio</a></p>
-        <p id="byokFeedback" role="status"></p>
-      </div>
-    </details>`;
+  // Built from DOM nodes, never by assigning markup (S10). This template is
+  // static and interpolates nothing, but the rule is a blanket one precisely so
+  // nobody has to audit each new template to decide whether it is the dangerous
+  // kind — and the guard test matches on the property name, so even naming it
+  // in a comment trips it. That strictness is the point.
+  //
+  // The one external reference is an anchor to Google AI Studio, so a reviewer
+  // can get a key. That is a navigation, not a load: the page still fetches
+  // nothing from outside, still works in a locked-down venue, and the CSP is
+  // untouched. Loads (`src`) remain forbidden.
+  const el = (tag, props = {}, kids = []) => {
+    const node = document.createElement(tag);
+    for (const [k, v] of Object.entries(props)) {
+      if (k === 'dataset') Object.assign(node.dataset, v);
+      else if (k in node) node[k] = v;
+      else node.setAttribute(k, v);
+    }
+    for (const kid of kids) node.append(kid);
+    return node;
+  };
+  const i18n = (key, fallback, tag = 'span', props = {}) =>
+    el(tag, {...props, textContent: fallback, dataset: {i18n: 'ui.' + key}});
+
+  if (mount) {
+    const plannerBar = el('div', {className: 'planner-bar'}, [
+      i18n('planner_label', 'Planner', 'label', {htmlFor: 'plannerChoice'}),
+      el('select', {id: 'plannerChoice', disabled: true}, [
+        i18n('planner_greedy', 'Greedy · deterministic', 'option', {value: 'greedy'}),
+        i18n('planner_llm', 'Gemini · LLM', 'option', {value: 'llm'}),
+      ]),
+      i18n('planner_scope',
+           'Applies to your next investigation. Lab recordings stay unchanged.'),
+    ]);
+
+    const body = el('div', {className: 'site-key-body'}, [
+      i18n('key_scope',
+           'One key for Checkout, Console, and Lab model runs in this browser '
+           + 'tab. Viewing recordings does not call Gemini.', 'p'),
+      el('form', {id: 'byokForm', className: 'site-key-actions'}, [
+        i18n('key_label', 'Your Gemini key', 'label', {htmlFor: 'byokKey'}),
+        el('input', {id: 'byokKey', type: 'password', autocomplete: 'off',
+                     spellcheck: false, placeholder: 'AIza…', disabled: true,
+                     'aria-describedby': 'byokPromise'}),
+        i18n('key_save', 'Save key', 'button', {id: 'byokUse', type: 'submit',
+                                                disabled: true}),
+        i18n('key_forget', 'Forget key', 'button', {id: 'byokForget',
+                                                    type: 'button'}),
+      ]),
+      i18n('key_privacy',
+           'Stored in this tab’s session storage. Sent to this app’s server for '
+           + 'model requests, then to Google. The app does not write it to its '
+           + 'database, receipts, or logs. Calls use your saved key’s quota, or '
+           + 'the site key when none is saved.', 'p', {id: 'byokPromise'}),
+      el('p', {}, [i18n('key_get', 'Get a key from Google AI Studio', 'a', {
+        id: 'googleStudioLink',
+        href: 'https://aistudio.google.com/apikey',
+        target: '_blank',
+        rel: 'noopener noreferrer',
+      })]),
+      el('p', {id: 'byokFeedback', role: 'status'}),
+    ]);
+
+    const details = el('details', {className: 'site-key', id: 'byok'}, [
+      el('summary', {}, [i18n('key_title', 'Gemini API key'),
+                         el('span', {id: 'byokState', role: 'status'})]),
+      body,
+    ]);
+
+    mount.replaceChildren(plannerBar, details);
+  }
   function render() {
     if (!mount) return;
     const saved = !!read();

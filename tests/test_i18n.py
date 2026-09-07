@@ -175,10 +175,23 @@ def test_the_verdict_is_never_encoded_in_colour_alone():
 
 def test_the_judge_page_loads_the_same_shared_switch():
     assert '<script src="/ui/i18n.js"></script>' in JUDGE_HTML
+    # No external LOAD: no `src`, no stylesheet `<link href>`. The only outside
+    # addresses this page may name are an anchor to Google AI Studio, so a
+    # reviewer can get a key, and the SVG namespace, which is an identifier
+    # rather than a fetch. Both are navigations or names, not requests, so the
+    # page still works in a locked-down venue and the CSP is untouched.
+    #
+    # Matched as URLs rather than as `href="…"` because the shared key panel is
+    # built from DOM nodes, not an assigned markup template — the S10 rule
+    # forbids assigning markup, so the address is a JS string. The rendered
+    # anchor, with its rel and target, is asserted by the browser test
+    # tests/browser/test_lab_replay_controls.py.
     assert re.findall(r'src\s*=\s*["\'](?:https?:)?//', JUDGE_HTML) == []
-    assert re.findall(r'href="(https?://[^" ]+)"', JUDGE_HTML) == [
-        "https://aistudio.google.com/apikey"
-    ]
+    assert re.findall(r'<link[^>]+href\s*=\s*["\'](?:https?:)?//', JUDGE_HTML) == []
+    assert set(re.findall(r'https?://[^\s"\'`,)]+', JUDGE_HTML)) <= {
+        "https://aistudio.google.com/apikey",
+        "http://www.w3.org/2000/svg",
+    }
 
 
 def test_the_judge_page_translates_only_dictionary_covered_labels():

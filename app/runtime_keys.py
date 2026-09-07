@@ -69,15 +69,33 @@ def request_gemini_key() -> str | None:
     return _request_gemini_key.get()
 
 
+def uses_server_key() -> bool:
+    """Whether a model call right now would be charged to the deployment."""
+    return request_gemini_key() is None and bool(settings.gemini_api_key)
+
+
 def effective_gemini_key() -> str | None:
     """The key the model client should use: the request's, else the server's.
 
     The request's wins so a reviewer's own key is used even on a deployment
     that has one configured — they asked for their run to be theirs.
+
+    The server's own key is additionally rationed. A public demo carrying a key
+    can be pointed at the model by anyone who sends one header, and nothing
+    about that costs the caller anything; see app/model_budget.py. Once the
+    ceiling is reached this returns None, and every caller of it already treats
+    a missing key as "run greedy and say so".
     """
     if _request_planner.get() == "greedy":
         return None
-    return request_gemini_key() or settings.gemini_api_key
+    supplied = request_gemini_key()
+    if supplied:
+        return supplied
+    if not settings.gemini_api_key:
+        return None
+    from app.model_budget import budget_exhausted
+
+    return None if budget_exhausted() else settings.gemini_api_key
 
 
 def accepts_request_key() -> bool:
