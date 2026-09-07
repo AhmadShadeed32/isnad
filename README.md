@@ -14,7 +14,7 @@ performs that verification; Isnad does not send an OTP itself.
 
 [Quick start](#quick-start) · [API example](#api-example) ·
 [Testing](#testing-and-reproducible-evidence) ·
-[Open issues and handoff](docs/PHASE2_HANDOFF.md)
+[Release checks and handoff](docs/PHASE2_HANDOFF.md)
 
 ![Checkout investigation using simulated network evidence](docs/assets/judge-checkout.png)
 
@@ -105,10 +105,11 @@ handset. Without a claim, Location Verification returns unavailable. Costs are
 normalized policy units, not operator prices. Date-enrichment operations consume
 budget separately from the evidence-link count.
 
-Repeating an idempotency key with the same body replays a cached result; a changed
-body or in-progress request returns 409. **Replay is not crash-safe today**:
-the cache and signed chain are committed separately, and the default memory
-cache is lost on restart. See handoff R13 before relying on retry-safe paid work.
+Repeating an idempotency key with the same body replays the stored result; a
+changed body or in-progress request returns 409. The operation-to-chain mapping
+is now persisted in the same database transaction as the signed receipt. If a
+crash leaves upstream work uncertain, retries are refused rather than repeating
+potentially paid calls. The cache accelerates reads; it is not the durable record.
 Keep provider credentials and merchant integration keys on the backend.
 
 ## How the engine works
@@ -151,9 +152,9 @@ public bearer capabilities; expiring shared summaries have a separate lifecycle.
 | Consent | Server-side OAuth/OIDC exchange, ownership, replay controls and completion recovery | Local fake-operator coverage is separate from physical handset proof. |
 | Merchant pilot | Operator login, consent flow, merchant-reported challenges and outcomes | Separate local/private reference harness, not a production storefront. |
 | Caller protection | Registry checks, institution announcements and caller velocity | Depends on configured registry trust and institution/key bindings. |
-| Continuity sessions | Polling, revocation and TTL settings | Expiry enforcement and terminal phone retention have open defects (R05/R09). |
-| English/Arabic UI | Judge, console, lab, receipt and supporting surfaces | Mobile English lab overflow remains an expected browser failure. |
-| Network conditions | Subscription/query/callback code and judge controls | Device binding, callback wiring, quota races, uncertain creates, provenance and input validation repaired 7 Sep (R01–R04, R06, R08). Retention (R07) is still open. **Never exercised against an operator.** |
+| Continuity sessions | Polling, revocation and TTL settings | Expiry is enforced on reads and before checks; terminal phone data is cleared and records have bounded retention. |
+| English/Arabic UI | Judge, console, lab, receipt and supporting surfaces | The mobile lab overflow regression now passes; Arabic wording remains a draft pending native review. |
+| Network conditions | Subscription/query/callback code and judge controls | Device binding, callback wiring, quota races, uncertain creates, provenance and input validation repaired 7 Sep (R01–R04, R06, R08). Terminal retention is implemented too (R07). The hosted subscription/callback lifecycle remains unvalidated. |
 
 Provider choices:
 
@@ -189,30 +190,31 @@ loopback socket and Chromium-launch access and write screenshots under
 current test setup, and the package's `[dev]` extra now includes Playwright too.
 CI installs the Chromium build before running the suite.
 
-**Latest full run, 7 September 2026, after the R01–R04/R06/R08 fixes:**
-`pytest -q` → **1,187 passed and 1 xfailed** in 99.7 s, browser tests included in
-that single command. Ruff clean; the runtime lock check passed. The one expected
-failure is the `/lab` mobile-overflow defect, kept as a strict xfail so it cannot
-start passing unnoticed.
+**Release verification, 7 September 2026:** a single full `pytest -q` run passed
+**1,244 tests in 104.01 seconds**, including browser tests, with no failures,
+skips or expected failures. Three Starlette deprecation warnings remain. Ruff
+and the runtime lock check passed. SQLite migrations reached revision `0007`
+and Alembic detected no model/schema differences. A standalone wheel smoke
+passed page serving, verification, idempotent replay and trusted receipt signing.
+The Dockerfile also built and passed HTTP smoke
+checks with the cached Python 3.11.16 base; the default pinned 3.11.15 build
+could not fetch base metadata from Docker Hub and remains unverified.
 
-(An earlier sandboxed review run on the same day reported 1,105 non-browser
-passes with all 61 browser cases blocked by sandbox setup restrictions, then 60
-passes and the same xfail on a permitted rerun. That was the state before the
-fixes.) See the [handoff](docs/PHASE2_HANDOFF.md) for limits, reproductions and
-acceptance tests, and the [test guide](docs/TESTING_GUIDE.md) for what has and
-has not actually been validated, feature by feature. These results do not include a fresh
-advisory audit, Docker smoke or Postgres integration run.
+See the [latest handoff checkpoint](docs/PHASE2_HANDOFF.md#private-release-verification--7-september-2026)
+for deployment-image verification and remaining external validation limits, and
+the [test guide](docs/TESTING_GUIDE.md) for feature-level procedures. No fresh
+dependency advisory audit, physical handset trial or live Postgres test was run.
 
 ```bash
 .venv311/bin/python scripts/evidence_pack.py --output-dir /tmp/isnad-evidence
 .venv311/bin/python scripts/independent_evaluation.py
 .venv311/bin/python scripts/handset_validation.py contract --output /tmp/isnad-consent-contract.json
-.venv311/bin/python docs/reviews/codebase_review_2026_09_07.py
 ```
 
 The evidence pack runs five offline scenarios and verifies stored signatures.
 The consent `contract` command is local validation, not a handset trial. The
-review probe prints known defects using temporary storage and fake providers.
+original review probe is a historical defect reproduction, not a current smoke
+test; the fixed behavior is covered by the regression suite.
 
 Fresh mock/greedy evidence-pack results:
 
@@ -272,11 +274,12 @@ rotation. Demo mode must be off for billable calls. `/health` is liveness;
 `/readyz` checks database connectivity. Disable access logging of OAuth query
 parameters at both the app server and any reverse proxy.
 
-**This checkout has open release defects.** In particular, repair network-condition
-subscription controls, session expiry and durable verification replay before
-relying on them. The Docker image currently omits lab runtime files, and CI needs
-Chromium installation. All findings, suggested fixes and completion tests are in
-the [current handoff review](docs/PHASE2_HANDOFF.md#current-code-review--7-september-2026).
+The sixteen review findings have implementation fixes recorded in the handoff,
+including session expiry, durable verification replay, subscription controls,
+lab packaging and CI browser setup. Passing local checks does not establish
+operator availability, callback delivery or measured fraud accuracy. Use the
+[latest handoff checkpoint](docs/PHASE2_HANDOFF.md#private-release-verification--7-september-2026)
+for the exact checks performed and outstanding integration work.
 
 Further integration procedures:
 [handset validation](docs/HANDSET_VALIDATION.md) ·

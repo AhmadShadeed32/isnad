@@ -1,8 +1,57 @@
 # Isnad — implementation handoff
 
+## Private release verification — 7 September 2026
+
+**Read this checkpoint first.** The code fixes through `34fbe3a` were already
+committed and present on `private/main` when this verification began. R01–R16
+have implementation fixes recorded in the later defect-clearing session ledger;
+the original review below describes the pre-fix state. This release pass verifies
+the current code and corrects stale current-facing documentation. It does not
+claim that local tests prove live operator behavior.
+
+| Check | Fresh result |
+| --- | --- |
+| Full `.venv311/bin/python -m pytest -q` | **1,244 passed in 104.01 seconds**, browser suite included; no skips/xfails/failures. Three Starlette 422-constant deprecation warnings. |
+| Ruff: `app tests scripts demo` | Passed. |
+| Runtime lock | Passed: 38 exact pins cover direct runtime dependencies. |
+| SQLite migrations | Fresh temporary database upgraded through `0007_verification_operations`; `alembic check` reports no new upgrade operations. |
+| Wheel build | Built `isnad-0.1.0-py3-none-any.whl` with `--no-deps --no-build-isolation`. |
+| Standalone wheel smoke | Imported extracted wheel outside the source checkout; eight UI/health routes passed, verification and idempotent replay worked, receipt page served and signature was valid/trusted. Uses installed dependencies, not a clean dependency resolution. |
+| Offline consent contract | PASS: mock Number Verification / NUMBER_MATCH. |
+| Offline evidence pack | Five scenarios completed with valid, trusted signatures. |
+| Fixed synthetic evaluation | 13/13 complete, zero execution errors; **49 vs 78 provider operations** (34 evidence checks + 15 date enrichments), six CHALLENGEs, four authored-expectation disagreements. |
+| Alternate-base Docker build and HTTP smoke | Passed using cached `python:3.11-slim` (actual Python **3.11.16**), image `sha256:1bec8b8d376f301e3295feca2325f93972edd8a9486475ce365ab69d172d4cad`. Started with `--network none`; eight routes, lab JSON, verification, replay, receipt page and trusted signature passed. Temporary container stopped after validation. This does not verify the default 3.11.15 base. |
+| Pinned Docker build | Docker Desktop started successfully, but Docker Hub base metadata lookup for `python:3.11.15-slim` timed out (`DeadlineExceeded`) before build steps ran. The pinned deployment image remains unverified. |
+
+The full suite rewrites tracked screenshots. This release includes the fresh
+browser captures as validation artifacts; they use the suite's isolated mock
+server and synthetic inputs. README and CURRENT_STATE now point to this checkpoint
+instead of claiming repaired defects or the mobile-lab xfail are still open.
+The old review probe is preserved as historical evidence, not a current smoke
+command: fixed code is expected to reject the operations it previously reproduced.
+
+Remaining verification boundaries:
+
+- No fresh external dependency advisory audit was run. The prior approval
+  restriction recorded in the runbook remains separate from the passing local
+  lock-structure check. No bypass was attempted.
+- No physical handset proof or live hosted subscription/callback lifecycle was
+  attempted. The local consent contract is not operator validation.
+- No live Postgres/Redis integration test or native Arabic wording review was
+  performed. SQLite migration parity and stubbed cache tests are narrower checks.
+- Four synthetic expectation disagreements remain evaluation results to review,
+  not measured fraud accuracy. The three deprecation warnings are non-fatal.
+
+The push destination for this request is **`private` →
+`git@github.com:AhmadShadeed32/isnad-private.git`, branch `main`**. The public
+`origin` remote is not a push target. Existing remote history must be preserved;
+no force push is required.
+
+---
+
 ## Current code review — 7 September 2026
 
-**This checkpoint supersedes current-state claims in the historical sections below.**
+**Historical pre-fix review. The private-release checkpoint above supersedes its open-defect and validation status.**
 The user requested a codebase review, proposed fixes in the handoff, and a README
 rewrite. This pass changes documentation and adds an offline reproduction script;
 the application defects below are **open**, not implemented fixes. Existing local

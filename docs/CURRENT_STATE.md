@@ -1,6 +1,16 @@
 # Isnad — start here
 
-Updated 6 September 2026.
+Updated 7 September 2026.
+
+**Current release:** [private-release verification](PHASE2_HANDOFF.md#private-release-verification--7-september-2026)
+is the authoritative checkpoint. The full local suite passes **1,244 tests**,
+including browser coverage with no xfails; lint, runtime lock, SQLite migration
+parity and the standalone wheel smoke pass. All R01–R16 findings have recorded
+implementation fixes. Remaining external validation is listed at that checkpoint.
+
+**The text below is historical context from 6 September.** Its test totals,
+open-defect statements and proposed next steps do not supersede the release
+checkpoint above.
 
 **Active follow-up:** [handoff §12](PHASE2_HANDOFF.md#12-active-user-requests-and-implementation-plan--6-september-2026) records the user’s complete new scope and implementation order: Gemini-first, Arabic everywhere, NaC contract audit, actual swap timestamps, Congestion Insights, full testing guide, and final private-repository push. The plan distinguishes in-progress edits from unimplemented features.
 
