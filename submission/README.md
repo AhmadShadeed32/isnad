@@ -79,8 +79,12 @@ English and labelled as such. 39 tests became 1,329.
 | [`Isnad_Pitch_Phase2.pptx`](Isnad_Pitch_Phase2.pptx) | Phase 2 pitch deck, ten slides, with speaker notes |
 | [`Isnad_Idea_Capture_Phase1.pdf`](Isnad_Idea_Capture_Phase1.pdf) | The Idea Phase template, kept for continuity |
 
-**Deployed:** <https://huggingface.co/spaces/AhmadShadeed32/isnad-trust-engine> — a Docker Space running this repository's code on the
-mock provider, with no operator or model credential attached.
+**Deployed:** <https://ahmadshadeed32-isnad-trust-engine.hf.space/judge> — this repository's code running on the mock provider,
+with no operator or model credential attached. No sign-in, nothing to install.
+
+(The Hugging Face project page behind it is deliberately not public, so the
+deployment is not browsable or scrapeable. The application URL above is, and is
+the one to use.)
 
 ---
 
