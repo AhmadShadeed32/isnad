@@ -11,7 +11,6 @@ from the shared SSE bus via an injected per-run sink (see the Investigator
 from __future__ import annotations
 
 import hashlib
-import subprocess
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -50,28 +49,34 @@ def _policy_digest() -> str:
 
 
 def _code_revision() -> tuple[str, bool]:
-    """(revision, dirty). Best-effort: an offline generator without git access
-    (a tarball export, a container with no .git) must still produce an
-    artifact, just one that honestly cannot claim reproducibility."""
+    """Fingerprint the runtime sources, including uncommitted file contents.
+
+    Git HEAD does not identify a dirty checkout, and container images have no
+    Git metadata at all. Hash the same runtime files in both environments.
+    Generated recordings, bytecode and presentation assets are excluded: they
+    do not define the investigation, and hashing the output would be circular.
+    The legacy ``dirty`` field now signals an unavailable source identity.
+    """
     try:
-        rev = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=REPO_ROOT,
-            capture_output=True,
-            text=True,
-            timeout=5,
-            check=True,
-        ).stdout.strip()
-        status = subprocess.run(
-            ["git", "status", "--porcelain"],
-            cwd=REPO_ROOT,
-            capture_output=True,
-            text=True,
-            timeout=5,
-            check=True,
-        ).stdout.strip()
-        return rev, bool(status)
-    except Exception:  # noqa: BLE001 - any git failure means "cannot claim reproducibility"
+        roots = (REPO_ROOT / "app", REPO_ROOT / "demo" / "lab")
+        if any(not root.is_dir() for root in roots):
+            return "unknown", True
+        files = set()
+        for root in roots:
+            files.update(root.rglob("*.py"))
+        # Policy, registry and capability data also affect runtime behavior.
+        for folder in ("app/policy", "app/registry"):
+            files.update(path for path in (REPO_ROOT / folder).rglob("*")
+                         if path.is_file() and path.suffix in {".yaml", ".json", ".sig"})
+        files.add(REPO_ROOT / "app" / "nac_capabilities.json")
+        digest = hashlib.sha256(b"isnad-lab-runtime-v1\0")
+        for path in sorted(files):
+            name = path.relative_to(REPO_ROOT).as_posix().encode()
+            body = path.read_bytes()
+            digest.update(len(name).to_bytes(8, "big") + name)
+            digest.update(len(body).to_bytes(8, "big") + body)
+        return "sha256:" + digest.hexdigest(), False
+    except OSError:
         return "unknown", True
 
 

@@ -6,8 +6,8 @@
       "fault_profile": null,
       "removes_claimed_location": false,
       "run": {
-        "code_revision": "0f7fb95de8e0f3ae7bffa18bf8f5bc387678cc1b",
-        "dirty": true,
+        "code_revision": "sha256:fc814cd15786e089219f9fadf7bdba6f16b7de56e77de501e51a75dd3c091bf3",
+        "dirty": false,
         "events": [
           {
             "action": null,
@@ -22,7 +22,7 @@
             "phase": "start",
             "rationale": null,
             "result": null,
-            "run_id": "lab_ac45ffe572ff4b529101",
+            "run_id": "lab_4993839bd5cc4317bc81",
             "selection_source": null,
             "sequence": 1,
             "signal": null
@@ -40,7 +40,7 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_ac45ffe572ff4b529101",
+            "run_id": "lab_4993839bd5cc4317bc81",
             "selection_source": "greedy",
             "sequence": 2,
             "signal": null
@@ -58,7 +58,7 @@
             "phase": "evidence",
             "rationale": null,
             "result": "PASS",
-            "run_id": "lab_ac45ffe572ff4b529101",
+            "run_id": "lab_4993839bd5cc4317bc81",
             "selection_source": null,
             "sequence": 3,
             "signal": "NUMBER_MATCH"
@@ -76,7 +76,7 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_ac45ffe572ff4b529101",
+            "run_id": "lab_4993839bd5cc4317bc81",
             "selection_source": "greedy",
             "sequence": 4,
             "signal": null
@@ -94,7 +94,7 @@
             "phase": "enrichment",
             "rationale": null,
             "result": null,
-            "run_id": "lab_ac45ffe572ff4b529101",
+            "run_id": "lab_4993839bd5cc4317bc81",
             "selection_source": null,
             "sequence": 5,
             "signal": null
@@ -112,7 +112,7 @@
             "phase": "evidence",
             "rationale": null,
             "result": "FLAG",
-            "run_id": "lab_ac45ffe572ff4b529101",
+            "run_id": "lab_4993839bd5cc4317bc81",
             "selection_source": null,
             "sequence": 6,
             "signal": "SIM_SWAPPED"
@@ -130,7 +130,7 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_ac45ffe572ff4b529101",
+            "run_id": "lab_4993839bd5cc4317bc81",
             "selection_source": "greedy",
             "sequence": 7,
             "signal": null
@@ -148,7 +148,7 @@
             "phase": "enrichment",
             "rationale": null,
             "result": null,
-            "run_id": "lab_ac45ffe572ff4b529101",
+            "run_id": "lab_4993839bd5cc4317bc81",
             "selection_source": null,
             "sequence": 8,
             "signal": null
@@ -166,7 +166,7 @@
             "phase": "evidence",
             "rationale": null,
             "result": "PASS",
-            "run_id": "lab_ac45ffe572ff4b529101",
+            "run_id": "lab_4993839bd5cc4317bc81",
             "selection_source": null,
             "sequence": 9,
             "signal": "DEVICE_STABLE"
@@ -184,7 +184,7 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_ac45ffe572ff4b529101",
+            "run_id": "lab_4993839bd5cc4317bc81",
             "selection_source": "greedy",
             "sequence": 10,
             "signal": null
@@ -202,7 +202,7 @@
             "phase": "evidence",
             "rationale": null,
             "result": "PASS",
-            "run_id": "lab_ac45ffe572ff4b529101",
+            "run_id": "lab_4993839bd5cc4317bc81",
             "selection_source": null,
             "sequence": 11,
             "signal": "AT_CLAIMED_LOCATION"
@@ -220,7 +220,7 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_ac45ffe572ff4b529101",
+            "run_id": "lab_4993839bd5cc4317bc81",
             "selection_source": "greedy",
             "sequence": 12,
             "signal": null
@@ -238,7 +238,7 @@
             "phase": "evidence",
             "rationale": null,
             "result": "INFO",
-            "run_id": "lab_ac45ffe572ff4b529101",
+            "run_id": "lab_4993839bd5cc4317bc81",
             "selection_source": null,
             "sequence": 13,
             "signal": "ROAMING_NETWORK"
@@ -256,14 +256,14 @@
             "phase": "verdict",
             "rationale": null,
             "result": null,
-            "run_id": "lab_ac45ffe572ff4b529101",
+            "run_id": "lab_4993839bd5cc4317bc81",
             "selection_source": "greedy",
             "sequence": 14,
             "signal": null
           }
         ],
         "fixture_digest": "2ca345bf88319a3d",
-        "generated_at": "2026-09-07T00:01:37.382385+00:00",
+        "generated_at": "2026-09-07T17:47:18.486659+00:00",
         "outcome": {
           "chain_grade": "DEGRADED",
           "confidence": 0.322,
@@ -274,7 +274,7 @@
         "planner_source": "greedy",
         "policy_digest": "e0ef1a19fb408c7f",
         "receipt_ref": null,
-        "run_id": "lab_ac45ffe572ff4b529101",
+        "run_id": "lab_4993839bd5cc4317bc81",
         "scenario_id": "replacement",
         "schema_version": 2,
         "timing_basis": "stage_pacing"
@@ -287,8 +287,8 @@
       "fault_profile": null,
       "removes_claimed_location": false,
       "run": {
-        "code_revision": "0f7fb95de8e0f3ae7bffa18bf8f5bc387678cc1b",
-        "dirty": true,
+        "code_revision": "sha256:fc814cd15786e089219f9fadf7bdba6f16b7de56e77de501e51a75dd3c091bf3",
+        "dirty": false,
         "events": [
           {
             "action": null,
@@ -303,7 +303,7 @@
             "phase": "start",
             "rationale": null,
             "result": null,
-            "run_id": "lab_c5375c45ca094f0ab7b0",
+            "run_id": "lab_e1dbaae5f31d457d8b82",
             "selection_source": null,
             "sequence": 1,
             "signal": null
@@ -321,7 +321,7 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_c5375c45ca094f0ab7b0",
+            "run_id": "lab_e1dbaae5f31d457d8b82",
             "selection_source": "greedy",
             "sequence": 2,
             "signal": null
@@ -339,7 +339,7 @@
             "phase": "evidence",
             "rationale": null,
             "result": "PASS",
-            "run_id": "lab_c5375c45ca094f0ab7b0",
+            "run_id": "lab_e1dbaae5f31d457d8b82",
             "selection_source": null,
             "sequence": 3,
             "signal": "NUMBER_MATCH"
@@ -357,7 +357,7 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_c5375c45ca094f0ab7b0",
+            "run_id": "lab_e1dbaae5f31d457d8b82",
             "selection_source": "greedy",
             "sequence": 4,
             "signal": null
@@ -375,7 +375,7 @@
             "phase": "enrichment",
             "rationale": null,
             "result": null,
-            "run_id": "lab_c5375c45ca094f0ab7b0",
+            "run_id": "lab_e1dbaae5f31d457d8b82",
             "selection_source": null,
             "sequence": 5,
             "signal": null
@@ -393,7 +393,7 @@
             "phase": "evidence",
             "rationale": null,
             "result": "PASS",
-            "run_id": "lab_c5375c45ca094f0ab7b0",
+            "run_id": "lab_e1dbaae5f31d457d8b82",
             "selection_source": null,
             "sequence": 6,
             "signal": "SIM_STABLE"
@@ -411,14 +411,14 @@
             "phase": "verdict",
             "rationale": null,
             "result": null,
-            "run_id": "lab_c5375c45ca094f0ab7b0",
+            "run_id": "lab_e1dbaae5f31d457d8b82",
             "selection_source": "greedy",
             "sequence": 7,
             "signal": null
           }
         ],
         "fixture_digest": "00967283728e6034",
-        "generated_at": "2026-09-07T00:01:37.406792+00:00",
+        "generated_at": "2026-09-07T17:47:18.491151+00:00",
         "outcome": {
           "chain_grade": "ATTESTED_FULL",
           "confidence": 0.096,
@@ -429,7 +429,7 @@
         "planner_source": "greedy",
         "policy_digest": "e0ef1a19fb408c7f",
         "receipt_ref": null,
-        "run_id": "lab_c5375c45ca094f0ab7b0",
+        "run_id": "lab_e1dbaae5f31d457d8b82",
         "scenario_id": "clean",
         "schema_version": 2,
         "timing_basis": "stage_pacing"
@@ -442,8 +442,8 @@
       "fault_profile": null,
       "removes_claimed_location": false,
       "run": {
-        "code_revision": "0f7fb95de8e0f3ae7bffa18bf8f5bc387678cc1b",
-        "dirty": true,
+        "code_revision": "sha256:fc814cd15786e089219f9fadf7bdba6f16b7de56e77de501e51a75dd3c091bf3",
+        "dirty": false,
         "events": [
           {
             "action": null,
@@ -458,7 +458,7 @@
             "phase": "start",
             "rationale": null,
             "result": null,
-            "run_id": "lab_499c1f4a445a420484b4",
+            "run_id": "lab_0eae2956ef314b19bf87",
             "selection_source": null,
             "sequence": 1,
             "signal": null
@@ -476,7 +476,7 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_499c1f4a445a420484b4",
+            "run_id": "lab_0eae2956ef314b19bf87",
             "selection_source": "greedy",
             "sequence": 2,
             "signal": null
@@ -494,7 +494,7 @@
             "phase": "evidence",
             "rationale": null,
             "result": "PASS",
-            "run_id": "lab_499c1f4a445a420484b4",
+            "run_id": "lab_0eae2956ef314b19bf87",
             "selection_source": null,
             "sequence": 3,
             "signal": "NUMBER_MATCH"
@@ -512,7 +512,7 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_499c1f4a445a420484b4",
+            "run_id": "lab_0eae2956ef314b19bf87",
             "selection_source": "greedy",
             "sequence": 4,
             "signal": null
@@ -530,7 +530,7 @@
             "phase": "enrichment",
             "rationale": null,
             "result": null,
-            "run_id": "lab_499c1f4a445a420484b4",
+            "run_id": "lab_0eae2956ef314b19bf87",
             "selection_source": null,
             "sequence": 5,
             "signal": null
@@ -548,7 +548,7 @@
             "phase": "evidence",
             "rationale": null,
             "result": "FLAG",
-            "run_id": "lab_499c1f4a445a420484b4",
+            "run_id": "lab_0eae2956ef314b19bf87",
             "selection_source": null,
             "sequence": 6,
             "signal": "SIM_SWAPPED"
@@ -566,7 +566,7 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_499c1f4a445a420484b4",
+            "run_id": "lab_0eae2956ef314b19bf87",
             "selection_source": "greedy",
             "sequence": 7,
             "signal": null
@@ -584,7 +584,7 @@
             "phase": "enrichment",
             "rationale": null,
             "result": null,
-            "run_id": "lab_499c1f4a445a420484b4",
+            "run_id": "lab_0eae2956ef314b19bf87",
             "selection_source": null,
             "sequence": 8,
             "signal": null
@@ -602,7 +602,7 @@
             "phase": "evidence",
             "rationale": null,
             "result": "FLAG",
-            "run_id": "lab_499c1f4a445a420484b4",
+            "run_id": "lab_0eae2956ef314b19bf87",
             "selection_source": null,
             "sequence": 9,
             "signal": "DEVICE_SWAPPED"
@@ -620,7 +620,7 @@
             "phase": "corroboration",
             "rationale": "policy: corroborate before this signal alone can decline",
             "result": null,
-            "run_id": "lab_499c1f4a445a420484b4",
+            "run_id": "lab_0eae2956ef314b19bf87",
             "selection_source": "policy",
             "sequence": 10,
             "signal": null
@@ -638,7 +638,7 @@
             "phase": "evidence",
             "rationale": null,
             "result": "FLAG",
-            "run_id": "lab_499c1f4a445a420484b4",
+            "run_id": "lab_0eae2956ef314b19bf87",
             "selection_source": null,
             "sequence": 11,
             "signal": "NOT_AT_CLAIMED_LOCATION"
@@ -656,14 +656,14 @@
             "phase": "verdict",
             "rationale": null,
             "result": null,
-            "run_id": "lab_499c1f4a445a420484b4",
+            "run_id": "lab_0eae2956ef314b19bf87",
             "selection_source": "greedy",
             "sequence": 12,
             "signal": null
           }
         ],
         "fixture_digest": "a700e9ebf41c167e",
-        "generated_at": "2026-09-07T00:01:37.432452+00:00",
+        "generated_at": "2026-09-07T17:47:18.495735+00:00",
         "outcome": {
           "chain_grade": "REFUTED",
           "confidence": 0.981,
@@ -674,7 +674,7 @@
         "planner_source": "greedy",
         "policy_digest": "e0ef1a19fb408c7f",
         "receipt_ref": null,
-        "run_id": "lab_499c1f4a445a420484b4",
+        "run_id": "lab_0eae2956ef314b19bf87",
         "scenario_id": "ghost",
         "schema_version": 2,
         "timing_basis": "stage_pacing"
@@ -687,8 +687,8 @@
       "fault_profile": null,
       "removes_claimed_location": true,
       "run": {
-        "code_revision": "0f7fb95de8e0f3ae7bffa18bf8f5bc387678cc1b",
-        "dirty": true,
+        "code_revision": "sha256:fc814cd15786e089219f9fadf7bdba6f16b7de56e77de501e51a75dd3c091bf3",
+        "dirty": false,
         "events": [
           {
             "action": null,
@@ -703,7 +703,7 @@
             "phase": "start",
             "rationale": null,
             "result": null,
-            "run_id": "lab_1dd0b7d1261044929e07",
+            "run_id": "lab_bf01d09a9abb441aa45c",
             "selection_source": null,
             "sequence": 1,
             "signal": null
@@ -721,7 +721,7 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_1dd0b7d1261044929e07",
+            "run_id": "lab_bf01d09a9abb441aa45c",
             "selection_source": "greedy",
             "sequence": 2,
             "signal": null
@@ -739,7 +739,7 @@
             "phase": "evidence",
             "rationale": null,
             "result": "PASS",
-            "run_id": "lab_1dd0b7d1261044929e07",
+            "run_id": "lab_bf01d09a9abb441aa45c",
             "selection_source": null,
             "sequence": 3,
             "signal": "NUMBER_MATCH"
@@ -757,7 +757,7 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_1dd0b7d1261044929e07",
+            "run_id": "lab_bf01d09a9abb441aa45c",
             "selection_source": "greedy",
             "sequence": 4,
             "signal": null
@@ -775,7 +775,7 @@
             "phase": "enrichment",
             "rationale": null,
             "result": null,
-            "run_id": "lab_1dd0b7d1261044929e07",
+            "run_id": "lab_bf01d09a9abb441aa45c",
             "selection_source": null,
             "sequence": 5,
             "signal": null
@@ -793,7 +793,7 @@
             "phase": "evidence",
             "rationale": null,
             "result": "FLAG",
-            "run_id": "lab_1dd0b7d1261044929e07",
+            "run_id": "lab_bf01d09a9abb441aa45c",
             "selection_source": null,
             "sequence": 6,
             "signal": "SIM_SWAPPED"
@@ -811,7 +811,7 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_1dd0b7d1261044929e07",
+            "run_id": "lab_bf01d09a9abb441aa45c",
             "selection_source": "greedy",
             "sequence": 7,
             "signal": null
@@ -829,7 +829,7 @@
             "phase": "enrichment",
             "rationale": null,
             "result": null,
-            "run_id": "lab_1dd0b7d1261044929e07",
+            "run_id": "lab_bf01d09a9abb441aa45c",
             "selection_source": null,
             "sequence": 8,
             "signal": null
@@ -847,7 +847,7 @@
             "phase": "evidence",
             "rationale": null,
             "result": "PASS",
-            "run_id": "lab_1dd0b7d1261044929e07",
+            "run_id": "lab_bf01d09a9abb441aa45c",
             "selection_source": null,
             "sequence": 9,
             "signal": "DEVICE_STABLE"
@@ -865,7 +865,7 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_1dd0b7d1261044929e07",
+            "run_id": "lab_bf01d09a9abb441aa45c",
             "selection_source": "greedy",
             "sequence": 10,
             "signal": null
@@ -883,7 +883,7 @@
             "phase": "evidence",
             "rationale": null,
             "result": "INFO",
-            "run_id": "lab_1dd0b7d1261044929e07",
+            "run_id": "lab_bf01d09a9abb441aa45c",
             "selection_source": null,
             "sequence": 11,
             "signal": "EVIDENCE_UNAVAILABLE"
@@ -901,7 +901,7 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_1dd0b7d1261044929e07",
+            "run_id": "lab_bf01d09a9abb441aa45c",
             "selection_source": "greedy",
             "sequence": 12,
             "signal": null
@@ -919,7 +919,7 @@
             "phase": "evidence",
             "rationale": null,
             "result": "INFO",
-            "run_id": "lab_1dd0b7d1261044929e07",
+            "run_id": "lab_bf01d09a9abb441aa45c",
             "selection_source": null,
             "sequence": 13,
             "signal": "ROAMING_NETWORK"
@@ -937,14 +937,14 @@
             "phase": "verdict",
             "rationale": null,
             "result": null,
-            "run_id": "lab_1dd0b7d1261044929e07",
+            "run_id": "lab_bf01d09a9abb441aa45c",
             "selection_source": "greedy",
             "sequence": 14,
             "signal": null
           }
         ],
         "fixture_digest": "82c5c67d2347fe45",
-        "generated_at": "2026-09-07T00:01:37.456623+00:00",
+        "generated_at": "2026-09-07T17:47:18.500557+00:00",
         "outcome": {
           "chain_grade": "UNRESOLVED",
           "confidence": 0.612,
@@ -955,7 +955,7 @@
         "planner_source": "greedy",
         "policy_digest": "e0ef1a19fb408c7f",
         "receipt_ref": null,
-        "run_id": "lab_1dd0b7d1261044929e07",
+        "run_id": "lab_bf01d09a9abb441aa45c",
         "scenario_id": "replacement",
         "schema_version": 2,
         "timing_basis": "stage_pacing"
@@ -968,8 +968,8 @@
       "fault_profile": "unavailable",
       "removes_claimed_location": false,
       "run": {
-        "code_revision": "0f7fb95de8e0f3ae7bffa18bf8f5bc387678cc1b",
-        "dirty": true,
+        "code_revision": "sha256:fc814cd15786e089219f9fadf7bdba6f16b7de56e77de501e51a75dd3c091bf3",
+        "dirty": false,
         "events": [
           {
             "action": null,
@@ -984,7 +984,7 @@
             "phase": "start",
             "rationale": null,
             "result": null,
-            "run_id": "lab_4a76194397f245f3a3f7",
+            "run_id": "lab_8c9c4e4dd394432cb573",
             "selection_source": null,
             "sequence": 1,
             "signal": null
@@ -1002,7 +1002,7 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_4a76194397f245f3a3f7",
+            "run_id": "lab_8c9c4e4dd394432cb573",
             "selection_source": "greedy",
             "sequence": 2,
             "signal": null
@@ -1020,7 +1020,7 @@
             "phase": "evidence",
             "rationale": null,
             "result": "INFO",
-            "run_id": "lab_4a76194397f245f3a3f7",
+            "run_id": "lab_8c9c4e4dd394432cb573",
             "selection_source": null,
             "sequence": 3,
             "signal": "EVIDENCE_UNAVAILABLE"
@@ -1038,7 +1038,7 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_4a76194397f245f3a3f7",
+            "run_id": "lab_8c9c4e4dd394432cb573",
             "selection_source": "greedy",
             "sequence": 4,
             "signal": null
@@ -1056,7 +1056,7 @@
             "phase": "enrichment",
             "rationale": null,
             "result": null,
-            "run_id": "lab_4a76194397f245f3a3f7",
+            "run_id": "lab_8c9c4e4dd394432cb573",
             "selection_source": null,
             "sequence": 5,
             "signal": null
@@ -1074,7 +1074,7 @@
             "phase": "evidence",
             "rationale": null,
             "result": "INFO",
-            "run_id": "lab_4a76194397f245f3a3f7",
+            "run_id": "lab_8c9c4e4dd394432cb573",
             "selection_source": null,
             "sequence": 6,
             "signal": "EVIDENCE_UNAVAILABLE"
@@ -1092,7 +1092,7 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_4a76194397f245f3a3f7",
+            "run_id": "lab_8c9c4e4dd394432cb573",
             "selection_source": "greedy",
             "sequence": 7,
             "signal": null
@@ -1110,7 +1110,7 @@
             "phase": "enrichment",
             "rationale": null,
             "result": null,
-            "run_id": "lab_4a76194397f245f3a3f7",
+            "run_id": "lab_8c9c4e4dd394432cb573",
             "selection_source": null,
             "sequence": 8,
             "signal": null
@@ -1128,7 +1128,7 @@
             "phase": "evidence",
             "rationale": null,
             "result": "INFO",
-            "run_id": "lab_4a76194397f245f3a3f7",
+            "run_id": "lab_8c9c4e4dd394432cb573",
             "selection_source": null,
             "sequence": 9,
             "signal": "EVIDENCE_UNAVAILABLE"
@@ -1146,7 +1146,7 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_4a76194397f245f3a3f7",
+            "run_id": "lab_8c9c4e4dd394432cb573",
             "selection_source": "greedy",
             "sequence": 10,
             "signal": null
@@ -1164,7 +1164,7 @@
             "phase": "evidence",
             "rationale": null,
             "result": "INFO",
-            "run_id": "lab_4a76194397f245f3a3f7",
+            "run_id": "lab_8c9c4e4dd394432cb573",
             "selection_source": null,
             "sequence": 11,
             "signal": "EVIDENCE_UNAVAILABLE"
@@ -1182,7 +1182,7 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_4a76194397f245f3a3f7",
+            "run_id": "lab_8c9c4e4dd394432cb573",
             "selection_source": "greedy",
             "sequence": 12,
             "signal": null
@@ -1200,7 +1200,7 @@
             "phase": "evidence",
             "rationale": null,
             "result": "INFO",
-            "run_id": "lab_4a76194397f245f3a3f7",
+            "run_id": "lab_8c9c4e4dd394432cb573",
             "selection_source": null,
             "sequence": 13,
             "signal": "EVIDENCE_UNAVAILABLE"
@@ -1218,7 +1218,7 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_4a76194397f245f3a3f7",
+            "run_id": "lab_8c9c4e4dd394432cb573",
             "selection_source": "greedy",
             "sequence": 14,
             "signal": null
@@ -1236,7 +1236,7 @@
             "phase": "evidence",
             "rationale": null,
             "result": "INFO",
-            "run_id": "lab_4a76194397f245f3a3f7",
+            "run_id": "lab_8c9c4e4dd394432cb573",
             "selection_source": null,
             "sequence": 15,
             "signal": "EVIDENCE_UNAVAILABLE"
@@ -1254,14 +1254,14 @@
             "phase": "verdict",
             "rationale": null,
             "result": null,
-            "run_id": "lab_4a76194397f245f3a3f7",
+            "run_id": "lab_8c9c4e4dd394432cb573",
             "selection_source": "greedy",
             "sequence": 16,
             "signal": null
           }
         ],
         "fixture_digest": "2ca345bf88319a3d",
-        "generated_at": "2026-09-07T00:01:37.480698+00:00",
+        "generated_at": "2026-09-07T17:47:18.505793+00:00",
         "outcome": {
           "chain_grade": "UNRESOLVED",
           "confidence": 0.44,
@@ -1272,7 +1272,7 @@
         "planner_source": "greedy",
         "policy_digest": "e0ef1a19fb408c7f",
         "receipt_ref": null,
-        "run_id": "lab_4a76194397f245f3a3f7",
+        "run_id": "lab_8c9c4e4dd394432cb573",
         "scenario_id": "replacement",
         "schema_version": 2,
         "timing_basis": "stage_pacing"
@@ -1280,7 +1280,7 @@
       "scenario_id": "replacement"
     }
   ],
-  "code_revision": "0f7fb95de8e0f3ae7bffa18bf8f5bc387678cc1b",
+  "code_revision": "sha256:fc814cd15786e089219f9fadf7bdba6f16b7de56e77de501e51a75dd3c091bf3",
   "comparison": {
     "after_value": null,
     "base_outcome": {
@@ -1290,7 +1290,7 @@
       "evidence_cost": 12.0,
       "evidence_steps": 5
     },
-    "base_run_id": "lab_6364bdb9d5d94994afc9",
+    "base_run_id": "lab_8b105001cf70434caf45",
     "before_value": "present",
     "changed_field": "context.claimed_location",
     "effect": "changed",
@@ -1302,11 +1302,11 @@
       "evidence_cost": 12.0,
       "evidence_steps": 5
     },
-    "variant_run_id": "lab_8a9c26d4a8de4fe49787"
+    "variant_run_id": "lab_c50f4d4208e043c78bd0"
   },
-  "dirty": true,
+  "dirty": false,
   "evidence_report": {
-    "code_revision": "0f7fb95de8e0f3ae7bffa18bf8f5bc387678cc1b",
+    "code_revision": "bc48818d0f048688b223ed81e1ed25695769c5db",
     "false_decline_baseline": {
       "case_count": 17,
       "false_declines": {
@@ -1322,7 +1322,7 @@
         "single-signal": 0
       }
     },
-    "generated_at": "2026-09-07T00:01:37.567658+00:00",
+    "generated_at": "2026-09-07T17:47:18.560046+00:00",
     "independent_evaluation": {
       "case_count": 13,
       "dataset_digest": "ead266305ec0a8f5",
@@ -2011,7 +2011,7 @@
     ],
     "policy_digest": "e0ef1a19fb408c7f"
   },
-  "generated_at": "2026-09-07T00:01:37.348060+00:00",
+  "generated_at": "2026-09-07T17:47:18.472806+00:00",
   "limits": [
     "Every case here is an authored synthetic fixture. Authored data is not independent ground truth, and a case that did not appear in the lead recording is still not a statistically held-out test.",
     "These are recordings, not live runs. Selecting a case replays what this generator captured; nothing on the page calls a provider or a model.",

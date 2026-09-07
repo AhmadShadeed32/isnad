@@ -24,3 +24,5 @@ ASSETS = {
     if extension == "css" or page != "consent_complete"
 }
 ASSETS["shared.css"] = STATIC_ROOT / "shared.css"
+
+ASSETS["shared.js"] = STATIC_ROOT / "shared.js"

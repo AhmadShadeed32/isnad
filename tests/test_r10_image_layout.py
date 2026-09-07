@@ -99,15 +99,9 @@ def test_the_lab_runtime_imports_nothing_outside_what_the_image_carries():
 
 
 def test_the_image_documents_the_registry_signing_posture():
-    """Signing the registry has two halves and doing one is a startup failure.
-
-    The image keeps the developer's `.sig` out of the build context on purpose,
-    so an operator who enables signature enforcement must both sign with this
-    deployment's key and pin that key as trusted. Doing only the first starts a
-    container that verifies and then refuses. The wheel hits the same wall from
-    the other side — it ships the dev `.sig` — which is what the release smoke
-    found, so the image says it too.
-    """
+    """The shipped signature needs an explicit trust pin and enforcement guidance."""
+    assert not _ignored("app/registry/registry.yaml.sig")
+    assert _ignored("app/registry/local.yaml.sig")
     assert "ISNAD_VAULT_TRUSTED_PUBLIC_KEYS" in DOCKERFILE, (
         "the Dockerfile must name the trusted-key pin the registry check requires"
     )

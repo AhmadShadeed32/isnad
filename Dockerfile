@@ -87,21 +87,12 @@ COPY --chown=isnad:isnad pyproject.toml ./
 COPY --chown=isnad:isnad demo/__init__.py ./demo/
 COPY --chown=isnad:isnad demo/lab ./demo/lab
 
-# Signing the shipped registry is a DEPLOY-time step, not a build-time one, and
-# it has two halves that must be done together:
-#
-#   1. sign `app/registry/*.yaml` with this deployment's vault key — the dev
-#      `.sig` is deliberately kept out of the build context (see
-#      .dockerignore), because a signature made with the developer's key is
-#      not one a fresh volume's key can verify;
-#   2. set ISNAD_VAULT_TRUSTED_PUBLIC_KEYS to the public key that signed it.
-#
-# Doing only the first with ISNAD_REGISTRY_SIGNATURE_REQUIRED=true is how a
-# container starts, verifies, and refuses: the signature is present and is
-# rejected as untrusted. Leaving both undone starts unsigned, which is the
-# default posture and is reported as such rather than claimed as verified.
-# A wheel install hits the same wall for the opposite reason — it DOES ship the
-# dev .sig — and that is why this is written down here as well.
+# The bundled demo registry ships with its signature and public verification
+# key. A fresh container can verify it independently of its own receipt key.
+# Deployments replacing the registry must also supply its signature and override
+# ISNAD_VAULT_TRUSTED_PUBLIC_KEYS with the signer they trust.
+# Set ISNAD_REGISTRY_SIGNATURE_REQUIRED=true to reject a missing signature;
+# the Render blueprint requires it for the reviewer demo.
 
 # The persistent volume. Both paths below MUST be absolute and MUST live on it:
 # a relative vault path plus a restart means a new signing key and every stored
@@ -114,6 +105,7 @@ VOLUME ["/srv/isnad"]
 
 ENV ISNAD_VAULT_KEY_PATH=/srv/isnad/.isnad/vault-key.pem \
     ISNAD_DATABASE_URL=sqlite:////srv/isnad/isnad.db \
+    ISNAD_VAULT_TRUSTED_PUBLIC_KEYS=4034e169495122a893d8fe6738c2b0f54655fdfb6ec3c6d0eeb938d1330e7f9f \
     ISNAD_DEMO_MODE=false \
     ISNAD_PROVIDER=mock
 # Deliberately NOT set here, because they are secrets and must come from the

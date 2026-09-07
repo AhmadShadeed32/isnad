@@ -5,14 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Isnad — Verified Checkout</title>
 <meta name="isnad-demo-token" content="__ISNAD_JUDGE_TOKEN__">
-<link rel="stylesheet" href="/ui/shared.css">
 <link rel="stylesheet" href="/ui/pages/judge.css">
+<link rel="stylesheet" href="/ui/shared.css">
 </head>
-<body>
-<main class="shell">
-  <header>
-    <div class="brand"><span class="arabic">إسناد</span><span>Isnad<small>Network-verified trust</small></span></div>
-    <div class="header-controls">
+<body class="site-page">
+<main class="shell site-shell">
+  <header class="site-header">
+    <a class="site-brand" href="/judge" aria-label="Isnad home"><span lang="ar">إسناد</span><span>Isnad<small data-i18n="ui.site_tagline">Network-verified trust</small></span></a>
+        <div class="header-controls">
       <label for="locale" class="visually-hidden">Language / اللغة</label>
       <select id="locale">
         <option value="en">English</option>
@@ -21,6 +21,13 @@
       <span id="mode" class="mode">checking environment…</span>
     </div>
   </header>
+  <nav class="site-nav" aria-label="Main navigation">
+    <a href="/judge" data-i18n="ui.nav_demo" aria-current="page">Checkout demo</a>
+    <a href="/console" data-i18n="ui.nav_console">Console</a>
+    <a href="/lab" data-i18n="ui.nav_lab">Lab</a>
+    <a href="/privacy" data-i18n="ui.nav_privacy">Privacy</a>
+  </nav>
+  <div id="sharedGemini"></div>
   <p id="localeNote" class="locale-note" hidden></p>
 
   <section class="lead">
@@ -66,32 +73,7 @@
     </article>
   </section>
 
-  <section class="byok" id="byok" aria-labelledby="byokTitle" hidden>
-    <h2 id="byokTitle">Run the agent with your own Gemini key</h2>
-    <p class="byok-scope">
-      The demo above uses the deterministic <code>greedy</code> planner, so your
-      result matches the written guide exactly. Paste a free
-      Google AI Studio key
-      to watch the model choose the evidence instead — and watch policy overrule it.
-      We ship no key of our own here on purpose.
-    </p>
-    <p class="byok-scope">Get a free key at <code>aistudio.google.com/apikey</code>.</p>
-    <div class="byok-actions">
-      <label class="visually-hidden" for="byokKey">Gemini API key</label>
-      <input id="byokKey" type="password" autocomplete="off" spellcheck="false"
-             placeholder="AIza…" aria-describedby="byokPromise">
-      <button id="byokUse" type="button">Use my key</button>
-      <button id="byokForget" type="button" disabled>Forget it</button>
-    </div>
-    <p id="byokPromise" class="byok-promise">
-      Your key stays in this browser tab and is sent only to this demo, as one
-      header, on the runs you start. It is never written to our database, never
-      enters a signed receipt, never reaches a log, and is discarded the moment
-      each request finishes. Close the tab and it is gone. It spends your quota,
-      not ours.
-    </p>
-    <div id="byokState" class="byok-state">No key set — running the deterministic planner.</div>
-  </section>
+
 
   <section class="network-conditions" aria-labelledby="ncTitle">
     <h2 id="ncTitle" data-i18n="ui.network_conditions_title">Network conditions</h2>
@@ -117,6 +99,7 @@
 </main>
 <!-- Same origin, no CDN: the shared locale switch (I6). -->
 
+<script src="/ui/shared.js"></script>
 <script src="/ui/i18n.js"></script>
 <script src="/ui/pages/judge.js"></script>
 </body>

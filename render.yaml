@@ -32,6 +32,8 @@ services:
       # key on boot, still trust that committed file.
       - key: ISNAD_VAULT_TRUSTED_PUBLIC_KEYS
         value: 4034e169495122a893d8fe6738c2b0f54655fdfb6ec3c6d0eeb938d1330e7f9f
+      - key: ISNAD_REGISTRY_SIGNATURE_REQUIRED
+        value: "true"
       # The free plan has an ephemeral filesystem, so a receipt lives as long
       # as the instance does. That is the right lifetime for a demo, and the
       # page says so rather than implying a receipt link is permanent.

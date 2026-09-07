@@ -143,6 +143,7 @@ function requireApiKey(){
 }
 async function apiJson(path, options = {}){
   const headers = {
+    ...window.IsnadKey.headers(path),
     ...(options.auth === false ? {} : {'Authorization':'Bearer ' + requireApiKey()}),
     ...(options.body ? {'Content-Type':'application/json'} : {}),
     ...(options.headers || {})

@@ -99,3 +99,13 @@ def test_a_page_name_outside_the_registry_is_refused():
     assert page_path("judge") == STATIC_ROOT / "judge.html"
     with pytest.raises(ValueError):
         page_path("../config")
+
+
+def test_public_ui_settings_expose_only_key_support(monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "demo_mode", True)
+    monkeypatch.setattr(settings, "provider", "mock")
+    assert client.get('/ui/settings.json').json() == {"accepts_request_key": True, "server_gemini_available": False}
+    monkeypatch.setattr(settings, "demo_mode", False)
+    assert client.get('/ui/settings.json').json() == {"accepts_request_key": False, "server_gemini_available": False}

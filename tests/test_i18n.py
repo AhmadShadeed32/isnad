@@ -175,7 +175,10 @@ def test_the_verdict_is_never_encoded_in_colour_alone():
 
 def test_the_judge_page_loads_the_same_shared_switch():
     assert '<script src="/ui/i18n.js"></script>' in JUDGE_HTML
-    assert re.findall(r'(?:src|href)\s*=\s*["\'](?:https?:)?//', JUDGE_HTML) == []
+    assert re.findall(r'src\s*=\s*["\'](?:https?:)?//', JUDGE_HTML) == []
+    assert re.findall(r'href="(https?://[^" ]+)"', JUDGE_HTML) == [
+        "https://aistudio.google.com/apikey"
+    ]
 
 
 def test_the_judge_page_translates_only_dictionary_covered_labels():

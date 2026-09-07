@@ -1,18 +1,8 @@
-"""The judge lab page (I1/I2/I3/I4/I9) — a reader for recorded runs.
+"""Recorded Lab exploration plus an explicit, authenticated Gemini simulation.
 
-There is deliberately no execution endpoint behind this page. Every case a
-judge can select was run offline by `scripts/build_lab_artifacts.py` against a
-fixed authored fixture, and what the page does is replay the recording. That
-is what makes I1's "replay controls scrub the recorded timeline without
-resending requests" and "a replay cannot incur additional model spend" true by
-construction instead of by promise, and it is why I9's input surface is
-bounded: the only thing a selection can do is pick a recording that already
-exists.
-
-The bundle is committed, so it goes stale the moment the policy file or the
-code moves. Rather than hide that, the page is handed the *live* policy digest
-and code revision alongside the recorded ones and says plainly when they
-differ.
+Reading and replaying the bundle is free of model and operator calls. Only
+POST /v1/lab/run/{case_id} executes a model, against a fixed mock case.
+The generated run is returned to the requester and never replaces the bundle.
 """
 
 from __future__ import annotations
@@ -21,13 +11,18 @@ import asyncio
 import json
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, JSONResponse
 
+from app.api import demo_token
+from app.api.deps import require_api_key
 from app.api.rate_limit import limit_per_ip
+from app.config import settings
+from app.runtime_keys import accepts_request_key, effective_gemini_key
 from app.ui import page_path
 
 router = APIRouter(tags=["lab"])
+_model_slots = asyncio.Semaphore(2)
 
 _LAB_HTML = page_path("lab")
 _BUNDLE = Path(__file__).resolve().parents[2] / "demo" / "lab" / "artifacts" / "bundle.json"
@@ -75,7 +70,30 @@ async def lab_page(request: Request) -> HTMLResponse:
     identity = json.dumps(await asyncio.to_thread(_live_identity), sort_keys=True)
     html = html.replace('"__BUNDLE__"', _embed(bundle), 1)
     html = html.replace('"__LIVE_IDENTITY__"', _embed(identity), 1)
+    html = html.replace('__ISNAD_LAB_TOKEN__', demo_token.mint() if settings.demo_mode else '')
     return HTMLResponse(content=html, headers={"Cache-Control": "no-store"})
+
+
+@router.post("/v1/lab/run/{case_id}")
+async def lab_model_run(case_id: str, request: Request, _key: str = Depends(require_api_key)):
+    """Explicit, model-backed simulation; fixed fixtures and mock network only."""
+    from app.agent.planner import LLMPlanner
+    from app.policy.engine import get_engine
+    from demo.lab.challenge import CASES, run_case
+
+    await limit_per_ip(request)
+    if not accepts_request_key():
+        raise HTTPException(403, detail="Lab model runs are available only in a non-billable demo")
+    if case_id not in CASES:
+        raise HTTPException(404, detail="Unknown Lab case")
+    if not effective_gemini_key():
+        raise HTTPException(400, detail="Select Gemini and configure a server or personal key first")
+    if _model_slots.locked():
+        raise HTTPException(429, detail="Lab model runs are busy; try again shortly")
+    async with _model_slots:
+        planner = LLMPlanner(get_engine(str(settings.policy_path)))
+        run = await run_case(case_id, planner=planner)
+    return {"run": run.to_dict(), "provider": "mock", "requested_planner": "llm"}
 
 
 @router.get("/lab/bundle.json", include_in_schema=False)

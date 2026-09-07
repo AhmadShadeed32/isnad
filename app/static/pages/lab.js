@@ -55,7 +55,7 @@ function renderProvenance(){
   if (live.policy_digest && live.policy_digest !== bundle.policy_digest){
     drift.push('the policy file has changed since these runs were recorded');
   }
-  if (live.code_revision && bundle.code_revision !== 'unknown'
+  if (live.code_revision && live.code_revision !== 'unknown' && bundle.code_revision !== 'unknown'
       && live.code_revision !== bundle.code_revision){
     drift.push('the code has moved to a different revision');
   }
@@ -67,7 +67,9 @@ function renderProvenance(){
   }
   if (bundle.dirty || live.dirty){
     $('dirtyBanner').hidden = false;
-    $('dirtyBanner').textContent = bundle.dirty
+    $('dirtyBanner').textContent = live.code_revision === 'unknown' || bundle.code_revision === 'unknown'
+      ? 'The runtime source identity could not be verified. These recordings cannot be confirmed against the running code.'
+      : bundle.dirty
       ? 'Recorded from a working tree with uncommitted changes, so the recorded code revision does not fully identify what ran. It is reproducible only against that same tree.'
       : 'The running tree has uncommitted changes, so its revision does not fully identify what is running now.';
   }
@@ -91,9 +93,16 @@ function renderProvenance(){
 
 let order = [];
 let selected = null;
+const modelRuns = new Map();
+const modelViews = new Set();
+let modelBusy = false;
+let playTimer = null;
 let shown = 0;      // how many recorded events are revealed
 
-const caseById = (id) => (bundle.cases || []).find(c => c.case_id === id);
+const caseById = (id) => {
+  const entry = (bundle.cases || []).find(c => c.case_id === id);
+  return entry && modelViews.has(id) && modelRuns.has(id) ? {...entry, run:modelRuns.get(id)} : entry;
+};
 
 function renderCaseButtons(){
   const holder = $('cases');
@@ -104,7 +113,15 @@ function renderCaseButtons(){
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'case-btn';
-    button.textContent = entry.case_id.replace(/_/g, ' ');
+    const name = document.createElement('strong');
+    name.textContent = caseName(entry);
+    const description = document.createElement('span');
+    description.className = 'case-description';
+    description.textContent = entry.description;
+    const outcome = document.createElement('span');
+    outcome.className = 'case-outcome ' + entry.run.outcome.decision;
+    outcome.textContent = entry.run.outcome.decision + ' · ' + entry.run.outcome.evidence_steps + ' checks';
+    button.append(name, description, outcome);
     button.setAttribute('aria-pressed', String(id === selected));
     button.addEventListener('click', () => selectCase(id));
     holder.appendChild(button);
@@ -128,9 +145,12 @@ function assumptionsFor(entry){
 }
 
 function selectCase(id){
+  pauseReplay();
   const entry = caseById(id);
   if (!entry) return;
   selected = id;
+  text('caseTitle', caseName(entry));
+  updateModelStatus();
   renderCaseButtons();
   $('caseDetail').hidden = false;
 
@@ -274,7 +294,12 @@ function renderEvents(){
     }
     list.appendChild(li);
   });
-  $('scrubCount').textContent = shown + ' of ' + events.length + ' recorded steps';
+  $('scrubCount').textContent = shown + ' / ' + events.length;
+  $('stepBackBtn').disabled = shown <= 0;
+  $('stepFwdBtn').disabled = shown >= events.length;
+  renderRisk(events);
+  const active = list.children[Math.max(shown - 1, 0)];
+  if (active && playTimer) list.scrollTop = Math.max(0, active.offsetTop - list.offsetTop - list.clientHeight / 2);
 }
 
 function setShown(value){
@@ -282,14 +307,15 @@ function setShown(value){
   if (!entry) return;
   const total = (entry.run.events || []).length;
   shown = Math.min(Math.max(value, 0), total);
-  $('scrub').value = String(Math.max(shown, 1));
+  $('scrub').value = String(shown);
   renderEvents();
 }
 
-$('scrub').addEventListener('input', (e) => setShown(Number(e.target.value)));
-$('stepFwdBtn').addEventListener('click', () => setShown(shown + 1));
-$('stepBackBtn').addEventListener('click', () => setShown(shown - 1));
+$('scrub').addEventListener('input', (e) => { pauseReplay(); setShown(Number(e.target.value)); });
+$('stepFwdBtn').addEventListener('click', () => { pauseReplay(); setShown(shown + 1); });
+$('stepBackBtn').addEventListener('click', () => { pauseReplay(); setShown(shown - 1); });
 $('allBtn').addEventListener('click', () => {
+  pauseReplay();
   const entry = caseById(selected);
   setShown(entry ? (entry.run.events || []).length : 0);
 });
@@ -303,6 +329,7 @@ $('shuffleBtn').addEventListener('click', () => {
 });
 
 $('resetBtn').addEventListener('click', () => {
+  pauseReplay();
   order = (bundle.cases || []).map(c => c.case_id);
   selected = null;
   shown = 0;
@@ -446,6 +473,111 @@ function renderEvidence(){
   });
 }
 
+// Model runs are explicit and never overwrite the recorded bundle.
+function updateModelStatus(message){
+  text('outcomeBasis', modelViews.has(selected) ? 'Fresh simulated outcome' : 'Recorded outcome');
+  $('runLabLlm').disabled = modelBusy || !selected;
+  $('showRecorded').disabled = !modelViews.has(selected);
+  $('labModelStatus').textContent = message || (modelViews.has(selected)
+    ? 'Fresh Gemini-requested simulation · actual selections are labeled in the trace. Unsigned; network evidence is simulated.'
+    : 'Recorded Greedy run. Running Gemini uses the configured key’s quota with simulated network evidence.');
+}
+$('runLabLlm').addEventListener('click', async () => {
+  if (!selected || modelBusy) return;
+  await window.IsnadKey.ready;
+  const path = '/v1/lab/run/' + encodeURIComponent(selected);
+  const headers = window.IsnadKey.headers(path);
+  if (headers['X-Isnad-Planner'] !== 'llm') {
+    updateModelStatus('Choose Gemini in the Planner selector above, then run this case. A site or personal key is required.'); return;
+  }
+  const caseId = selected;
+  modelBusy = true; pauseReplay();
+  updateModelStatus('Gemini is investigating this synthetic case… This spends model quota.');
+  try {
+    const token = document.querySelector('meta[name="isnad-demo-token"]').content;
+    const response = await fetch(path, {method:'POST',headers:{...headers,Authorization:'Bearer '+token}});
+    const data = await response.json();
+    if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Model run failed. Try again.');
+    modelRuns.set(caseId, data.run); modelViews.add(caseId);
+    if (selected === caseId) selectCase(caseId);
+  } catch (error) { updateModelStatus(error.message || 'Model run failed. Try again.'); }
+  finally { modelBusy = false; $('runLabLlm').disabled = !selected; }
+});
+$('showRecorded').addEventListener('click', () => {
+  modelViews.delete(selected); selectCase(selected);
+});
+
+// --- visual replay -----------------------------------------------------------
+const CASE_NAMES = {
+  legitimate_sim_replacement: ['lab_case_sim', 'A new SIM. The same customer.'],
+  clean_checkout: ['lab_case_clean', 'The clean checkout'],
+  two_adverse_signals: ['lab_case_adverse', 'When two signals agree'],
+  absent_location_claim: ['lab_case_location', 'The missing location claim'],
+  provider_outage: ['lab_case_outage', 'When the network goes quiet']
+};
+function copy(key, fallback){ return window.Isnad ? window.Isnad.t('ui.' + key, fallback) : fallback; }
+function caseName(entry){ const pair = CASE_NAMES[entry.case_id]; return pair ? copy(...pair) : entry.case_id.replace(/_/g, ' '); }
+function pauseReplay(){
+  if (playTimer) clearInterval(playTimer);
+  playTimer = null;
+  $('playBtn').textContent = copy('lab_play', 'Play recording');
+  $('playBtn').setAttribute('aria-pressed', 'false');
+}
+function playReplay(){
+  const entry = caseById(selected);
+  if (!entry) return;
+  if (playTimer) { pauseReplay(); return; }
+  const total = entry.run.events.length;
+  if (shown >= total) setShown(0);
+  $('playBtn').textContent = copy('lab_pause', 'Pause recording');
+  $('playBtn').setAttribute('aria-pressed', 'true');
+  playTimer = setInterval(() => {
+    setShown(shown + 1);
+    if (shown >= total) pauseReplay();
+  }, Number($('playSpeed').value));
+}
+$('playBtn').removeAttribute('data-i18n');
+$('playBtn').addEventListener('click', playReplay);
+$('playSpeed').addEventListener('change', () => { if (playTimer) { pauseReplay(); playReplay(); } });
+window.addEventListener('pagehide', pauseReplay);
+document.addEventListener('visibilitychange', () => { if (document.hidden) pauseReplay(); });
+function renderRisk(events){
+  const svg = $('riskChart');
+  svg.replaceChildren();
+  const add = (tag, attrs, label) => {
+    const node = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    Object.entries(attrs).forEach(([k,v]) => node.setAttribute(k, String(v)));
+    if (label) node.textContent = label;
+    svg.appendChild(node); return node;
+  };
+  const points = events.filter(e => typeof e.belief_after === 'number' && Number.isFinite(e.belief_after));
+  const x = e => 32 + (e.sequence - 1) / Math.max(events.length - 1, 1) * 582;
+  const y = e => 124 - Math.max(0, Math.min(1, e.belief_after)) * 100;
+  for (const [value, height] of [['1.0',24], ['0.5',74], ['0.0',124]]) {
+    add('line', {x1:32,x2:614,y1:height,y2:height,stroke:'#2d3b70','stroke-dasharray':'3 5'});
+    add('text', {x:0,y:height+4,fill:'#aab5d4','font-size':11}, value);
+  }
+  if (points.length) {
+    add('polyline', {points:points.map(e => x(e)+','+y(e)).join(' '),fill:'none',stroke:'#526695','stroke-width':2});
+    const revealed = points.filter(e => e.sequence <= shown);
+    add('polyline', {points:revealed.map(e => x(e)+','+y(e)).join(' '),fill:'none',stroke:'#f0cf78','stroke-width':3});
+    points.forEach(e => {
+      const dot = add('circle', {cx:x(e),cy:y(e),r:4,fill:e.sequence<=shown?'#f0cf78':'#526695'});
+      const title = document.createElementNS('http://www.w3.org/2000/svg','title');
+      title.textContent = 'Recorded step '+e.sequence+': '+e.belief_after;
+      dot.appendChild(title);
+    });
+    text('currentRisk', revealed.length ? revealed[revealed.length-1].belief_after.toFixed(3) : '—');
+  } else text('currentRisk', '—');
+}
+document.addEventListener('DOMContentLoaded', () => {
+  if (window.Isnad) window.Isnad.onChange(() => {
+    renderCaseButtons();
+    if (selected) text('caseTitle',caseName(caseById(selected)));
+    $('playBtn').textContent = playTimer ? copy('lab_pause','Pause recording') : copy('lab_play','Play recording');
+  });
+});
+
 // --- start -------------------------------------------------------------------
 
 if (renderProvenance()){
@@ -453,4 +585,5 @@ if (renderProvenance()){
   renderCaseButtons();
   renderComparison();
   renderEvidence();
+  if (order.length) selectCase(order[0]);
 }

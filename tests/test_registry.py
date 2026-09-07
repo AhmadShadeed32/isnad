@@ -571,15 +571,26 @@ def test_the_registry_signature_is_domain_separated():
     assert not vault.verify(body, record.signature)
 
 
-def test_the_signature_is_not_shipped_into_the_image():
-    """A fresh container generates its OWN vault key.
+def test_render_requires_the_bundled_registry_signature(monkeypatch, tmp_path):
+    """The blueprint's trust pin verifies the shipped file and fails closed."""
+    import shutil
 
-    The developer's .sig verifies against a key that deployment does not have,
-    so shipping it turns `_check_registry_signature()` into a server that
-    refuses to start. Sign at deploy time with the deployment key.
-    """
-    ignored = Path(".dockerignore").read_text(encoding="utf-8")
-    assert "app/registry/*.sig" in ignored
+    blueprint = yaml.safe_load(Path("render.yaml").read_text())
+    env = {item["key"]: item["value"] for item in blueprint["services"][0]["envVars"]}
+    assert env["ISNAD_REGISTRY_SIGNATURE_REQUIRED"] == "true"
+    monkeypatch.setattr(settings, "vault_trusted_public_keys",
+                        env["ISNAD_VAULT_TRUSTED_PUBLIC_KEYS"])
+    registry = tmp_path / "registry.yaml"
+    shutil.copyfile("app/registry/registry.yaml", registry)
+    signature = signing.signature_path(registry)
+    shutil.copyfile("app/registry/registry.yaml.sig", signature)
+    assert signing.verify(registry, required=True) is None
+    registry.write_text(registry.read_text() + "\n# altered\n")
+    with pytest.raises(signing.RegistryTampered, match="does not match"):
+        signing.verify(registry, required=True)
+    signature.unlink()
+    with pytest.raises(signing.RegistryTampered, match="missing"):
+        signing.verify(registry, required=True)
 
 
 def test_startup_survives_a_deployment_that_has_no_signature(monkeypatch, tmp_path):

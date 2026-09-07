@@ -27,11 +27,10 @@ demo/
 !demo/lab/**
 demo/lab/**/__pycache__/
 
-# The registry signature is made with the DEPLOYMENT vault key, not the
-# developer's. Shipping the dev .sig into an image makes a fresh volume — which
-# generates its own key — refuse to start: the signature verifies against a key
-# the new deployment does not trust. Sign at deploy time instead.
+# Exclude local signatures, but ship the bundled demo registry's signature.
+# Its public verification key is pinned in the image and Render blueprint.
 app/registry/*.sig
+!app/registry/registry.yaml.sig
 
 # Submission and review material: judge guide, decks, Phase 1 template. None of
 # it is read at runtime.

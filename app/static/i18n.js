@@ -213,7 +213,9 @@ const Isnad = (() => {
       select.addEventListener('change', () => setLocale(select.value));
       const note = document.createElement('small'); note.setAttribute('data-no-translate','');
       onChange(() => { note.textContent = reviewStatus() || ''; });
-      bar.append(label,select,note); document.body.prepend(bar);
+      bar.append(label,select,note);
+      const slot = document.querySelector(".site-language-slot");
+      if (slot) slot.append(bar); else document.body.prepend(bar);
       setLocale(preferred());
     }
     // Coalesced to one pass per frame. The observer fires per mutation and

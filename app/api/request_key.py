@@ -15,9 +15,12 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.runtime_keys import (
     GEMINI_KEY_HEADER,
+    PLANNER_HEADER,
     accepts_request_key,
     reset_request_gemini_key,
+    reset_request_planner,
     set_request_gemini_key,
+    set_request_planner,
 )
 
 
@@ -31,20 +34,24 @@ class RequestKeyMiddleware:
             return
 
         supplied = None
+        planner = None
         for name, value in scope.get("headers", ()):
+            if name.lower() == PLANNER_HEADER.encode("latin-1"):
+                planner = value.decode("latin-1").strip().lower()
             if name.lower() == GEMINI_KEY_HEADER.encode("latin-1"):
                 try:
                     supplied = value.decode("latin-1")
                 except UnicodeDecodeError:
                     supplied = None
-                break
 
-        if supplied is None:
+        if supplied is None and planner is None:
             await self.app(scope, receive, send)
             return
 
         token = set_request_gemini_key(supplied)
+        planner_token = set_request_planner(planner)
         try:
             await self.app(scope, receive, send)
         finally:
+            reset_request_planner(planner_token)
             reset_request_gemini_key(token)

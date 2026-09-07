@@ -8,12 +8,16 @@ in a response, or work at all on a deployment that can spend money.
 
 from __future__ import annotations
 
+import asyncio
 import json
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
 from app import runtime_keys
+from app.agent.gemini import GeminiClient
+from app.api.request_key import RequestKeyMiddleware
 from app.config import settings
 from app.main import app
 
@@ -30,6 +34,32 @@ BODY = {
         "amount": {"value": 1500, "currency": "USD"},
     },
 }
+
+
+@pytest.fixture(autouse=True)
+def model_calls(monkeypatch):
+    """Record keys at the model boundary; no test may contact Gemini."""
+    calls = []
+    outbound = []
+
+    def generate_json(client, **kwargs):
+        calls.append(client._api_key)
+        return {"action": "stop", "rationale": "Recorded model response"}
+
+    def generate_text(client, **kwargs):
+        calls.append(client._api_key)
+        return "Recorded model explanation."
+
+    def reject_network(*args, **kwargs):
+        outbound.append(args)
+        raise AssertionError("Unexpected outbound model request")
+
+    monkeypatch.setattr(GeminiClient, "generate_json", generate_json)
+    monkeypatch.setattr(GeminiClient, "generate_text", generate_text)
+    monkeypatch.setattr(httpx, "post", reject_network)
+    yield calls
+    # Model code may catch exceptions, so assert outside that fallback boundary.
+    assert not outbound
 
 
 @pytest.fixture
@@ -91,17 +121,15 @@ def test_an_unusable_value_is_dropped_rather_than_forwarded(junk):
 # --- lifetime is exactly one request ----------------------------------------
 
 
-def test_the_key_does_not_survive_into_the_next_request(client, monkeypatch):
+def test_the_key_does_not_survive_into_the_next_request(client, monkeypatch, model_calls):
     """Workers are reused. A key left bound would be spent by whoever asked next."""
     monkeypatch.setattr(settings, "gemini_api_key", "", False)
 
     assert _verify(client, idem="key-leak-1", headers=HEADER).status_code == 200
-    # A second request that supplies nothing must see nothing.
-    assert runtime_keys.request_gemini_key() is None
+    assert model_calls and set(model_calls) == {KEY}
+    model_calls.clear()
     assert _verify(client, idem="key-leak-2").status_code == 200
-    assert runtime_keys.effective_gemini_key() is None or (
-        runtime_keys.effective_gemini_key() != KEY
-    )
+    assert model_calls == []
 
 
 def test_nothing_is_bound_once_the_response_has_been_sent(client, monkeypatch):
@@ -214,3 +242,111 @@ def test_no_key_anywhere_still_reports_greedy(monkeypatch):
     monkeypatch.setattr(settings, "planner", "llm", False)
     monkeypatch.setattr(settings, "gemini_api_key", "", False)
     assert effective_planner() == "greedy"
+
+
+def _scope(key=None):
+    return {
+        "type": "http",
+        "headers": [(b"x-isnad-gemini-key", key.encode())] if key else [],
+    }
+
+
+async def _unused(*args):
+    pass
+
+
+@pytest.mark.parametrize("fails", [False, True])
+async def test_request_cleanup_in_the_same_worker_context(monkeypatch, fails):
+    monkeypatch.setattr(settings, "gemini_api_key", "")
+    observed = []
+
+    async def endpoint(scope, receive, send):
+        observed.append(runtime_keys.request_gemini_key())
+        if fails and len(observed) == 1:
+            raise RuntimeError("Endpoint failed")
+
+    middleware = RequestKeyMiddleware(endpoint)
+    if fails:
+        with pytest.raises(RuntimeError, match="Endpoint failed"):
+            await middleware(_scope(KEY), _unused, _unused)
+    else:
+        await middleware(_scope(KEY), _unused, _unused)
+    assert runtime_keys.request_gemini_key() is None
+    await middleware(_scope(), _unused, _unused)
+    assert observed == [KEY, None]
+
+
+async def test_concurrent_requests_keep_their_own_model_keys(monkeypatch, model_calls):
+    from app.agent.planner import LLMPlanner
+
+    monkeypatch.setattr(settings, "gemini_api_key", "")
+    all_entered = asyncio.Event()
+    entered = 0
+    observed = []
+
+    async def endpoint(scope, receive, send):
+        nonlocal entered
+        before = runtime_keys.request_gemini_key()
+        entered += 1
+        if entered == 3:
+            all_entered.set()
+        await asyncio.wait_for(all_entered.wait(), timeout=2)
+
+        def use_model():
+            client = LLMPlanner._maybe_client()
+            if client:
+                client.generate_json(system="", prompt="", max_tokens=10)
+            return runtime_keys.request_gemini_key()
+
+        after = await asyncio.to_thread(use_model)
+        observed.append((before, after))
+
+    middleware = RequestKeyMiddleware(endpoint)
+    second_key = KEY + "-second"
+    await asyncio.gather(*(
+        middleware(_scope(key), _unused, _unused)
+        for key in (KEY, second_key, None)
+    ))
+    assert set(observed) == {(KEY, KEY), (second_key, second_key), (None, None)}
+    assert sorted(model_calls) == sorted([KEY, second_key])
+
+
+@pytest.mark.parametrize("provider,demo_mode", [("mock", False), ("nac", True)])
+async def test_refused_headers_never_reach_the_handler(monkeypatch, provider, demo_mode):
+    monkeypatch.setattr(settings, "provider", provider)
+    monkeypatch.setattr(settings, "demo_mode", demo_mode)
+    observed = []
+
+    async def endpoint(scope, receive, send):
+        observed.append(runtime_keys.request_gemini_key())
+
+    await RequestKeyMiddleware(endpoint)(_scope(KEY), _unused, _unused)
+    assert observed == [None]
+
+
+def test_explicit_greedy_does_not_call_model_even_with_keys(client, monkeypatch, model_calls):
+    monkeypatch.setattr(settings, 'planner', 'llm')
+    monkeypatch.setattr(settings, 'gemini_api_key', 'configured-test-key')
+    response = _verify(client, idem='explicit-greedy',
+                       headers={**HEADER, 'X-Isnad-Planner': 'greedy'})
+    assert response.status_code == 200
+    assert response.json()['planner'] == 'greedy'
+    assert model_calls == []
+    response = _verify(client, idem='explicit-llm',
+                       headers={**HEADER, 'X-Isnad-Planner': 'llm'})
+    assert response.status_code == 200
+    assert model_calls and set(model_calls) == {KEY}
+
+
+async def test_planner_override_is_reset_after_an_exception(monkeypatch):
+    monkeypatch.setattr(settings, 'planner', 'llm')
+
+    async def endpoint(scope, receive, send):
+        assert runtime_keys.requested_planner() == 'greedy'
+        raise RuntimeError('Endpoint failed')
+
+    scope = _scope()
+    scope['headers'].append((b'x-isnad-planner', b'greedy'))
+    with pytest.raises(RuntimeError):
+        await RequestKeyMiddleware(endpoint)(scope, _unused, _unused)
+    assert runtime_keys.requested_planner() == 'llm'

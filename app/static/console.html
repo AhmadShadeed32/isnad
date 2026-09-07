@@ -5,10 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Isnad — Live Agent Console</title>
 <meta name="isnad-demo-token" content="__ISNAD_CONSOLE_TOKEN__">
-<link rel="stylesheet" href="/ui/shared.css">
 <link rel="stylesheet" href="/ui/pages/console.css">
+<link rel="stylesheet" href="/ui/shared.css">
 </head>
-<body>
+<body class="site-page"><main class="site-shell">
+  <header class="site-header">
+    <a class="site-brand" href="/judge" aria-label="Isnad home"><span lang="ar">إسناد</span><span>Isnad<small data-i18n="ui.site_tagline">Network-verified trust</small></span></a>
+    <div class="site-language-slot"></div>
+  </header>
+  <nav class="site-nav" aria-label="Main navigation">
+    <a href="/judge" data-i18n="ui.nav_demo">Checkout demo</a>
+    <a href="/console" data-i18n="ui.nav_console" aria-current="page">Console</a>
+    <a href="/lab" data-i18n="ui.nav_lab">Lab</a>
+    <a href="/privacy" data-i18n="ui.nav_privacy">Privacy</a>
+  </nav>
+  <div id="sharedGemini"></div>
   <header>
     <h1><span class="ar">إسناد</span>Isnad — Live Agent Console</h1>
     <span class="sub">network-verified trust engine</span>
@@ -17,6 +28,7 @@
          live. It resumes the record of a run, never the run itself. -->
     <button id="recoverBtn" class="recover" type="button" disabled>Recover missed events</button>
   </header>
+
   <p id="recoverNote" class="recover-note" aria-live="polite"></p>
   <!-- The live stream giving up for good, which only a reload fixes. role=alert
        because the presenter is looking at the terminal, not at the header. -->
@@ -171,6 +183,8 @@
     </div>
   </div>
 
+</main>
+<script src="/ui/shared.js"></script>
 <script src="/ui/pages/console.js"></script>
 <script src="/ui/i18n.js" defer></script>
 </body>

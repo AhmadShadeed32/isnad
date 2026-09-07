@@ -1,0 +1,105 @@
+/* One tab-scoped key, shared by the site's navigation pages. */
+window.IsnadKey = (() => {
+  const store = 'isnad.byok.gemini';
+  const plannerStore = 'isnad.planner';
+  let enabled = false;
+  let serverGemini = false;
+  let feedback = '';
+  const read = () => { try { return sessionStorage.getItem(store) || ''; } catch { return ''; } };
+  const choice = () => { try { return sessionStorage.getItem(plannerStore) === 'greedy' ? 'greedy' : (sessionStorage.getItem(plannerStore) === 'llm' && serverGemini || read() ? 'llm' : 'greedy'); } catch { return 'greedy'; } };
+  const mount = document.getElementById('sharedGemini');
+  const text = (key, fallback) => window.Isnad ? window.Isnad.t('ui.' + key, fallback) : fallback;
+  if (mount) mount.innerHTML = `
+    <div class="planner-bar">
+      <label for="plannerChoice" data-i18n="ui.planner_label">Planner</label>
+      <select id="plannerChoice" disabled>
+        <option value="greedy" data-i18n="ui.planner_greedy">Greedy · deterministic</option>
+        <option value="llm" data-i18n="ui.planner_llm">Gemini · LLM</option>
+      </select>
+      <span data-i18n="ui.planner_scope">Applies to your next investigation. Lab recordings stay unchanged.</span>
+    </div>
+    <details class="site-key" id="byok">
+      <summary><span data-i18n="ui.key_title">Gemini API key</span><span id="byokState" role="status"></span></summary>
+      <div class="site-key-body">
+        <p data-i18n="ui.key_scope">One key for Checkout, Console, and Lab model runs in this browser tab. Viewing recordings does not call Gemini.</p>
+        <form id="byokForm" class="site-key-actions">
+          <label for="byokKey" data-i18n="ui.key_label">Your Gemini key</label>
+          <input id="byokKey" type="password" autocomplete="off" spellcheck="false" placeholder="AIza…" aria-describedby="byokPromise" disabled>
+          <button id="byokUse" type="submit" disabled data-i18n="ui.key_save">Save key</button>
+          <button id="byokForget" type="button" data-i18n="ui.key_forget">Forget key</button>
+        </form>
+        <p id="byokPromise" data-i18n="ui.key_privacy">Stored in this tab’s session storage. Sent to this app’s server for model requests, then to Google. The app does not write it to its database, receipts, or logs. Calls use your saved key’s quota, or the site key when none is saved.</p>
+        <p><a id="googleStudioLink" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" data-i18n="ui.key_get">Get a key from Google AI Studio</a></p>
+        <p id="byokFeedback" role="status"></p>
+      </div>
+    </details>`;
+  function render() {
+    if (!mount) return;
+    const saved = !!read();
+    document.getElementById('plannerChoice').value = choice();
+    document.getElementById('plannerChoice').disabled = !enabled;
+    document.getElementById('byokState').textContent = saved
+      ? text('key_saved', 'Saved · connection unverified')
+      : serverGemini ? text('key_server', 'Site Gemini key available · no personal key needed') : text('key_unset', 'No key saved');
+    document.getElementById('byokForget').disabled = !saved;
+    document.getElementById('byokUse').disabled = !enabled;
+    document.getElementById('byokKey').disabled = !enabled;
+    document.getElementById('byokFeedback').textContent = feedback ? text(...feedback) : '';
+  }
+  if (mount) {
+    document.getElementById('plannerChoice').addEventListener('change', event => {
+      if (event.target.value === 'llm' && !read() && !serverGemini) {
+        feedback = ['planner_key_needed', 'Save a Gemini key to enable LLM mode.'];
+        document.getElementById('byok').open = true;
+        document.getElementById('byokKey').focus();
+        render(); return;
+      }
+      try { sessionStorage.setItem(plannerStore, event.target.value); feedback = ''; }
+      catch { feedback = ['key_storage_error', 'Could not save the key. Allow session storage and try again.']; }
+      render();
+    });
+    document.getElementById('byokForm').addEventListener('submit', event => {
+      event.preventDefault();
+      if (!enabled) return;
+      const input = document.getElementById('byokKey');
+      const value = input.value.trim();
+      if (!/^[\x21-\x7e]{1,200}$/.test(value)) {
+        feedback = ['key_invalid', 'Enter a key without spaces, up to 200 characters.']; render(); return;
+      }
+      try { sessionStorage.setItem(store, value); sessionStorage.setItem(plannerStore, 'llm'); }
+      catch { feedback = ['key_storage_error', 'Could not save the key. Allow session storage and try again.']; render(); return; }
+      input.value = '';
+      feedback = ['key_next', 'Ready for your next investigation. The trace will show model selections or errors.'];
+      render();
+    });
+    document.getElementById('byokForget').addEventListener('click', () => {
+      try { sessionStorage.removeItem(store); }
+      catch { feedback = ['key_forget_error', 'Could not remove the saved key. Clear this site’s session storage.']; render(); return; }
+      document.getElementById('byokKey').value = '';
+      feedback = ['key_forgotten', 'Key removed. Requests already in progress may finish.']; render();
+    });
+    render();
+    document.addEventListener('DOMContentLoaded', () => {
+      if (window.Isnad) window.Isnad.onChange(render);
+      render();
+    });
+  }
+  const ready = fetch('/ui/settings.json')
+    .then(response => { if (!response.ok) throw new Error('Settings unavailable'); return response.json(); })
+    .then(data => {
+      enabled = data.accepts_request_key === true;
+      serverGemini = data.server_gemini_available === true;
+      if (!enabled) feedback = ['key_disabled', 'Personal keys are disabled on this deployment.'];
+      render();
+    })
+    .catch(() => { feedback = ['key_unavailable', 'Could not check key support. Reload to try again.']; render(); });
+  function headers(path) {
+    const url = new URL(path, location.href);
+    // Never attach a credential to external links, recordings, assets, or polling.
+    const modelRequest = /^\/v1\/(console\/run\/|lab\/run\/|verify$|reverse-verify$|chains\/[^/]+\/explain$|consents\/[^/]+\/verify$)/.test(url.pathname);
+    if (!enabled || !modelRequest || url.origin !== location.origin) return {};
+    const planner = choice();
+    return {'X-Isnad-Planner': planner, ...(planner === 'llm' && read() ? {'X-Isnad-Gemini-Key': read()} : {})};
+  }
+  return {headers, ready};
+})();

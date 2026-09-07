@@ -46,7 +46,7 @@ class UnknownCase(ValueError):
     any work, the same as an unknown scenario id."""
 
 
-async def run_case(case_id: str) -> LabRun:
+async def run_case(case_id: str, *, planner=None) -> LabRun:
     if case_id not in CASES:
         raise UnknownCase(case_id)
     case = CASES[case_id]
@@ -69,7 +69,8 @@ async def run_case(case_id: str) -> LabRun:
         provider_override = FaultInjectingProvider(MockProvider(), profile=case["fault_profile"])
 
     return await run_scenario(
-        scenario_id, request_override=request_override, provider_override=provider_override
+        scenario_id, request_override=request_override, provider_override=provider_override,
+        planner=planner,
     )
 
 

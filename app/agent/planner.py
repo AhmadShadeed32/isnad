@@ -12,7 +12,7 @@ from app.agent.gemini import GeminiClient, GeminiNoResponse
 from app.config import settings
 from app.domain.enums import Action, Hypothesis
 from app.policy.engine import PolicyEngine
-from app.runtime_keys import effective_gemini_key, request_gemini_key
+from app.runtime_keys import effective_gemini_key, requested_planner
 
 # Actions the agent may take to gather low-friction evidence. step_up_otp is excluded
 # here — it is reserved for the CHALLENGE step-up path (adds user friction).
@@ -399,7 +399,7 @@ def get_planner(engine: PolicyEngine) -> Planner:
     handing it a key is exactly the request to stop doing that. Without this the
     panel that takes the key would be decorative.
     """
-    if settings.planner == "llm" or request_gemini_key():
+    if requested_planner() == "llm":
         return LLMPlanner(engine)
     return GreedyPlanner(engine)
 
@@ -414,7 +414,7 @@ def effective_planner() -> str:
     *before* the first row exists has to ask this instead, or it advertises an
     agent that is not going to run.
     """
-    asked_for_llm = settings.planner == "llm" or request_gemini_key() is not None
+    asked_for_llm = requested_planner() == "llm"
     if asked_for_llm and LLMPlanner._maybe_client() is not None:
         return LLMPlanner.source
     return GreedyPlanner.source

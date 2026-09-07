@@ -152,13 +152,13 @@ def test_the_bundle_is_downloadable():
     assert response.json() == json.loads(BUNDLE_PATH.read_text(encoding="utf-8"))
 
 
-def test_the_lab_offers_no_way_to_start_an_investigation():
-    """I9's bound: the only input is which recording to show. If a POST, or a
-    parameterised run route, ever appears here, this goes red."""
+def test_model_runs_have_one_explicit_route_separate_from_readonly_pages():
+    """Only the bounded case endpoint executes; page and bundle remain read-only."""
     from app.api import routes_lab
 
     paths = {(route.path, tuple(sorted(route.methods))) for route in routes_lab.router.routes}
-    assert paths == {("/lab", ("GET",)), ("/lab/bundle.json", ("GET",))}
+    assert paths == {("/lab", ("GET",)), ("/lab/bundle.json", ("GET",)),
+                     ("/v1/lab/run/{case_id}", ("POST",))}
     for method in ("post", "put", "patch", "delete"):
         assert getattr(client, method)("/lab").status_code == 405
 
@@ -171,8 +171,11 @@ def test_the_lab_page_is_read_only_over_the_whole_app():
 # --- the page itself ------------------------------------------------------------
 
 
-def test_the_page_has_zero_external_origins():
-    assert re.findall(r'(?:src|href)\s*=\s*["\'](?:https?:)?//', LAB_HTML) == []
+def test_the_page_loads_no_external_assets_and_only_links_to_studio():
+    assert re.findall(r'src\s*=\s*["\'](?:https?:)?//', LAB_HTML) == []
+    assert re.findall(r'href="(https?://[^" ]+)"', LAB_HTML) == [
+        "https://aistudio.google.com/apikey"
+    ]
 
 
 def test_the_page_renders_every_value_as_text_not_markup():
@@ -180,18 +183,17 @@ def test_the_page_renders_every_value_as_text_not_markup():
         assert re.search(sink, LAB_SCRIPT) is None, sink
 
 
-def test_the_page_never_fetches_anything():
-    """Replay is a local scrub over an embedded list. A fetch here would be the
-    first step towards a control that costs something."""
-    assert "fetch(" not in LAB_SCRIPT
-    assert "XMLHttpRequest" not in LAB_SCRIPT
+def test_model_execution_is_an_explicit_button_action():
+    assert "$('runLabLlm').addEventListener('click'" in LAB_SCRIPT
+    assert "method:'POST'" in LAB_SCRIPT
+    assert "'/v1/lab/run/'" in LAB_SCRIPT
     assert "EventSource" not in LAB_SCRIPT
 
 
 def test_the_page_says_the_runs_are_recordings_before_any_result():
     prose = LAB_HTML.split("<script>")[0]
-    assert "Recorded runs, not a live console" in prose
-    assert "replays what was recorded" in prose
+    assert "five recorded investigations" in prose
+    assert "Offline playback · no API spend" in prose
     assert "re-sends nothing and costs nothing" in prose
 
 

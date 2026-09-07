@@ -3,37 +3,35 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="isnad-demo-token" content="__ISNAD_LAB_TOKEN__">
 <title>Isnad — judge lab</title>
-<!--
-  I1/I2/I3/I4/I9 — the lab a judge can drive.
-
-  Zero external origins, like console.html and receipt.html. Every value on
-  this page comes out of one committed artifact bundle that was generated
-  offline; there is no endpoint behind any control here that can start an
-  investigation, call a provider, or spend a model token. "Replay" means
-  scrubbing a recorded event list, and that is the literal implementation.
-
-  Nothing here is signed, and nothing here is a merchant decision. The signed
-  path is /v1/verify and its receipt at /r/{chain_id}; these are recordings of
-  the same engine run against authored fixtures.
--->
-<link rel="stylesheet" href="/ui/shared.css">
+<!-- Recorded playback stays offline. Only the explicit Gemini button submits
+     a model request; all Lab network evidence remains synthetic and unsigned. -->
 <link rel="stylesheet" href="/ui/pages/lab.css">
+<link rel="stylesheet" href="/ui/shared.css">
 </head>
-<body>
-<main class="shell">
-  <header>
-    <div class="brand"><span class="arabic">إسناد</span><span>Isnad<small>Judge lab</small></span></div>
-    <nav><a href="/judge">Checkout demo</a><a href="/lab/bundle.json" id="bundleLink">Download these artifacts</a></nav>
+<body class="site-page">
+<main class="shell site-shell">
+  <header class="site-header">
+    <a class="site-brand" href="/judge" aria-label="Isnad home"><span lang="ar">إسناد</span><span>Isnad<small data-i18n="ui.site_tagline">Network-verified trust</small></span></a>
+    <div class="site-language-slot"></div>
   </header>
+  <nav class="site-nav" aria-label="Main navigation">
+    <a href="/judge" data-i18n="ui.nav_demo">Checkout demo</a>
+    <a href="/console" data-i18n="ui.nav_console">Console</a>
+    <a href="/lab" data-i18n="ui.nav_lab" aria-current="page">Lab</a>
+    <a href="/privacy" data-i18n="ui.nav_privacy">Privacy</a>
+  </nav>
+  <div id="sharedGemini"></div>
 
-  <section class="lead">
-    <div class="eyebrow">Recorded runs, not a live console</div>
-    <h1>Pick the case. Including the ones that go badly.</h1>
-    <p>Every case below was run offline against a fixed authored fixture, through the
-      same policy engine and the same deterministic planner the checkout demo uses.
-      This page replays what was recorded. Nothing here calls a network operator or a
-      model, and no control on it can.</p>
+  <section class="lead lab-hero">
+    <div>
+      <div class="eyebrow" data-i18n="ui.lab_eyebrow">THE EVIDENCE LAB</div>
+      <h1 data-i18n="ui.lab_title">Follow the evidence.<br>Understand the decision.</h1>
+      <p data-i18n="ui.lab_intro">Explore five recorded investigations. See how each check changes the risk score, where policy intervenes, and why missing evidence matters.</p>
+      <div class="lab-badges"><span data-i18n="ui.lab_synthetic">Synthetic fixtures</span><span data-i18n="ui.lab_offline">Offline playback · no API spend</span><span data-i18n="ui.lab_unsigned">Unsigned recordings</span></div>
+    </div>
+    <a class="lab-download" href="/lab/bundle.json" id="bundleLink" data-i18n="ui.lab_download">Download the evidence bundle ↓</a>
   </section>
 
   <div id="staleBanner" class="banner drift" hidden></div>
@@ -43,18 +41,15 @@
     <code>.venv311/bin/python scripts/build_lab_artifacts.py</code> and reload.
   </div>
 
-  <section class="card" id="limitsCard">
-    <h2>What this is, and what it is not</h2>
-    <p class="caption">Stated before you choose, so a surprising result is the engine's
-      and not a hidden change of policy.</p>
+  <details class="card lab-disclosure" id="limitsCard">
+    <summary data-i18n="ui.lab_limits">How to read these recordings</summary>
     <ul class="limits" id="limits"></ul>
-  </section>
+  </details>
 
   <section class="card" id="caseCard">
-    <h2>Choose a case</h2>
-    <p class="caption">Five authored cases. The only input this page accepts is which
-      recording to show — there is no phone number, provider response, threshold or
-      free-text field anywhere on it.</p>
+    <h2 data-i18n="ui.lab_choose">Choose an investigation</h2>
+    <p class="caption" data-i18n="ui.lab_choose_hint">Select a case, then replay the evidence one step at a time.</p>
+    <div class="lab-workspace"><aside class="case-library">
     <div class="cases" id="cases"></div>
     <div class="cases">
       <button class="ghost" id="shuffleBtn" type="button">Shuffle the order (seeded)</button>
@@ -62,14 +57,29 @@
       <span class="counter" id="shuffleNote"></span>
     </div>
 
+    </aside>
     <div id="caseDetail" hidden>
+      <h3 id="caseTitle"></h3>
+      <div class="lab-model-actions">
+        <button class="ghost" id="runLabLlm" type="button">Run this case with Gemini</button>
+        <button class="ghost" id="showRecorded" type="button">Show recorded Greedy run</button>
+        <p id="labModelStatus" role="status">Recorded Greedy run. Running Gemini uses the configured key’s quota with simulated network evidence.</p>
+      </div>
       <div class="assumptions" id="assumptions"></div>
 
+      <div class="risk-chart">
+        <div class="chart-heading"><strong data-i18n="ui.lab_risk">Risk score through the investigation</strong><span id="currentRisk" class="num"></span></div>
+        <svg id="riskChart" viewBox="0 0 640 150" role="img" aria-label="Recorded policy risk score at each evidence step"></svg>
+        <p class="caption" data-i18n="ui.lab_risk_note">Policy-derived score, not a calibrated fraud probability. Points come from recorded evidence.</p>
+      </div>
       <div class="replay">
+        <button class="ghost play-btn" id="playBtn" type="button" data-i18n="ui.lab_play">Play recording</button>
+        <label class="counter" for="playSpeed" data-i18n="ui.lab_speed">Speed</label>
+        <select id="playSpeed"><option value="1000">1×</option><option value="500">2×</option><option value="250">4×</option></select>
         <button class="ghost" id="stepBackBtn" type="button">&larr; Step</button>
         <button class="ghost" id="stepFwdBtn" type="button">Step &rarr;</button>
         <label class="counter" for="scrub">Recorded step</label>
-        <input type="range" id="scrub" min="1" max="1" value="1" />
+        <input type="range" id="scrub" min="0" max="1" value="1" />
         <span class="counter" id="scrubCount"></span>
         <button class="ghost" id="allBtn" type="button">Show the whole run</button>
       </div>
@@ -80,7 +90,7 @@
 
       <div class="grid2" style="margin-top:16px">
         <div class="panel">
-          <div class="counter">Recorded outcome</div>
+          <div class="counter" id="outcomeBasis">Recorded outcome</div>
           <div class="decision" id="outDecision">—</div>
           <div class="kv"><span class="k">chain grade</span><span id="outGrade"></span></div>
           <div class="kv"><span class="k">risk score</span><span class="num" id="outConfidence"></span></div>
@@ -90,19 +100,21 @@
             prices. Unsigned: this is a recording, not a merchant decision.</p>
         </div>
         <div class="panel">
-          <div class="counter">What produced it</div>
+          <details class="audit-details"><summary data-i18n="ui.lab_audit">Inspect recording provenance</summary>
           <div class="kv"><span class="k">planner</span><span id="runPlanner"></span></div>
           <div class="kv"><span class="k">fixture digest</span><span class="num" id="runFixture"></span></div>
           <div class="kv"><span class="k">policy digest</span><span class="num" id="runPolicy"></span></div>
           <div class="kv"><span class="k">code revision</span><span class="num" id="runCode"></span></div>
           <div class="kv"><span class="k">recorded at</span><span class="num" id="runWhen"></span></div>
           <div class="kv"><span class="k">timing basis</span><span id="runTiming"></span></div>
+          </details>
         </div>
       </div>
     </div>
+    </div>
   </section>
 
-  <section class="card" id="comparisonCard">
+  <section class="card lab-deep-dive" id="comparisonCard">
     <h2>One fact changed <span class="tag hypothetical">Hypothetical fixture</span></h2>
     <p class="caption">The same scenario rerun with exactly one input different, through
       the same planner and the same full policy — every affected choice and grade
@@ -122,6 +134,7 @@
   <p class="foot" id="provenanceFoot"></p>
 </main>
 
+<script src="/ui/shared.js"></script>
 <script type="application/json" id="bundleData">"__BUNDLE__"</script>
 <script type="application/json" id="liveIdentity">"__LIVE_IDENTITY__"</script>
 <script src="/ui/pages/lab.js"></script>
