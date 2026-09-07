@@ -6,9 +6,13 @@ drift from the build: if the UI changes and these do not, the diff says so.
 
 Naming is `page-language-state-width.png`.
 
-- **Languages** — `en` and `ar`. The Arabic captures are the RTL layout with
-  translated verdict prose. Arabic wording remains a draft pending native
-  review; the layout is verified.
+- **Languages** — `en` and `ar`. The Arabic captures show the full RTL layout
+  with translated chrome, headings, panels and merchant copy. **The composed
+  verdict paragraph and the per-link evidence sentences are still English**:
+  the dictionary covers authored strings, and those sentences are assembled
+  server-side from policy state. The page carries its own banner saying the
+  Arabic is a draft pending human review. Layout is verified; coverage is not
+  complete, and the capture is the evidence of exactly that.
 - **Widths** — `1440` desktop, `375` mobile.
 - **Pages** — `judge`, `console`, `lab`, `receipt`, `consent-complete`,
   `privacy`, `network-conditions`.

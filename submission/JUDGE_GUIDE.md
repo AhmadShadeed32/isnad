@@ -332,7 +332,7 @@ outcomes, and we would not claim otherwise on a slide.
 
 | Where | What |
 | --- | --- |
-| The language switcher on `/judge` | The whole interface in Arabic, RTL, including the verdict prose. Arabic wording is a draft pending native review |
+| The language switcher on `/judge` | Full RTL layout in Arabic. Honest gap: the composed verdict paragraph and evidence sentences are still English, and the page says so in its own banner — the dictionary covers authored strings, not sentences assembled from policy state |
 | <http://127.0.0.1:8010/lab> | Recorded cases replayed against alternative strategies. Selecting a recording makes no operator or model calls |
 | <http://127.0.0.1:8010/console> | The full operator console: live SSE trace, caller screening, continuity sessions, network conditions |
 | The **Network conditions** panel on `/judge` | Congestion Insights, deliberately quarantined from the verdict. It explains a slow measurement; it is never a fact about a person |
