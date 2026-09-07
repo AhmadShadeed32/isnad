@@ -25,11 +25,11 @@ a mock response or a dated test count.
 | 8 Arabic + English | PASSED, with two recorded limits | `app/static/i18n.js`, `app/static/i18n/{en,ar}.json`, `app/static/judge.html`, `tests/browser/` (new), `tests/test_i18n.py`, `requirements-dev.txt` | `pytest -q` → **1118 passed, 39.2 s** (2026-09-07), browser tests included in that single command, **0 skipped**; ruff clean | Chromium 151.0.7922.34 driving a real uvicorn instance: rapid switching, dynamic results, aborted dictionary, stored preference, input/focus preservation, byte-identical signed payload, zero `/v1/` calls on a switch, no console errors | The deterministic explanation paragraph is composed server-side from this chain's numbers and is **marked English, not translated**. CAMARA API names stay English by choice. Arabic remains **draft, human review pending** |
 | 9 UI verification | PASSED for the automated matrix; remainder recorded as not visited | `tests/browser/test_surfaces.py`, `tests/browser/test_journeys.py`, `docs/ui/release/` (35 screenshots), `app/static/lab.html` | `pytest -q` → **1187 passed, 1 xfailed** (2026-09-07) | Chromium 151.0.7922.34. Judge/console/lab/privacy/consent-landing at 375 and 1440 in EN and AR; three judge cases; receipt valid and unavailable; network-conditions subscribe→read→delete; console run. Contrast measured against each element's own backdrop; accessible names and focus ring asserted per surface | **Open defect:** `/lab` drags sideways 422px at 375px — strict xfail, cause not found. **Not visited:** 320px and tablet, 200% zoom, keyboard-only critical paths, the merchant/fake-operator three-service journey, shared proof page states |
 | 10 Core re-audit | PARTIAL | `app/network_conditions.py`, `app/db/models.py`, `app/domain/schemas.py`, `migrations/0006`, `.github/workflows/ci.yml`, `pyproject.toml` | `pytest -q` → **1187 passed, 1 xfailed**; ruff clean | Seven defects this session introduced were found and fixed (SDK hidden retries, probe record honesty ×2, `window.Isnad`, dynamic re-translation, panel contrast) plus six from the parallel review (R01–R04, R06, R08, R11) | **Not fixed:** R05 session TTL, R07 network-condition retention, R09 terminal session PII, R10 Docker lab layout, R12 unreachable hybrid mode, R13 durable verify idempotency. All pre-existing; each has a written fix and acceptance test in the handoff |
-| 11 Demo rehearsal | NOT STARTED | | | | |
+| 11 Demo rehearsal | PARTIAL | n/a | Mock/greedy journeys rehearsed through the browser suite and the installed wheel | Local deterministic journeys, the hosted swap/recycling/forwarding observations, and the wheel smoke are three separate records and are not merged | **Not done:** the bounded Gemini run over mock network data (11.2), the hosted congestion lifecycle (no callback), and the handset trial. Each is an external limit or an unspent budget, not a passed gate |
 | 12 Testing guide | PASSED (README rewritten separately) | `docs/TESTING_GUIDE.md` (new) | Every `-k` selector in the guide was run to confirm it selects the tests it claims | One row per feature with a status that must be read literally, including **Built, never called** for Gemini, congestion callbacks and Number Verification | The README rewrite in this working tree is a parallel reviewer's work, not this session's |
 | 13 Final offline release gate | PASSED, with the dependency audit unperformed | `scripts/independent_evaluation.py`, `docs/INDEPENDENT_EVALUATION.md`, `demo/lab/artifacts/bundle.json` | `pytest -q` → **1187 passed, 1 xfailed, 99.7 s**; `ruff` clean; `verify_runtime_lock.py` → 38 exact pins | Evidence pack: 5 scenarios, all signatures valid and trusted. Legacy receipt verifies byte-for-byte. Wheel built, installed into a clean 3.11 venv and launched outside the repo: `/judge`, `/console`, `/lab`, `/privacy`, `/ui/i18n.js`, `/ui/i18n/ar.json`, `/readyz`, `/lab/bundle.json`, `/consent/complete` all 200, and a real verification returned DECLINE with swap-date timing and the disagreement flag. `graphify update .` run | **`make lint` not run** — the PyPI dependency-inventory rejection stands. The wheel needs `ISNAD_VAULT_TRUSTED_PUBLIC_KEYS` pinned or startup fails closed on the signed registry (correct behaviour, now documented) |
-| 14 Commit and private push | NOT STARTED | remote `private` → `AhmadShadeed32/isnad-private` | | | |
-| 15 Handover | NOT STARTED | | | | |
+| 14 Commit and private push | PASSED | 13 commits, `ac8740a..b45d25f` | Pre-push: `pytest -q` **1187 passed, 1 xfailed**; ruff clean; `test_s14_no_tracked_secrets` passed; `git diff --check` clean | `git push private main` → `ac8740a..b45d25f`. Verified: local HEAD and `git ls-remote private refs/heads/main` are both `b45d25f134a497c709adbe053647add6c7ecc6b9`. No `.env`, database, key or credential file is in the diff | The remote had not moved since `ac8740a`, so nothing needed integrating |
+| 15 Handover | PASSED | `docs/PHASE2_HANDOFF.md` (session record), `docs/TESTING_GUIDE.md`, this ledger | n/a | Commit/remote, what changed and why, actual results, tested browser states, actual hosted calls, startup commands and material limitations are all written down | — |
 
 ## Checkpoint log
 
@@ -247,3 +247,20 @@ congestion subscription, no callback delivery.
 
 Next action: gate 14 — stage the reviewed files, commit, push to `private`, and
 compare local HEAD with `git ls-remote private refs/heads/main`.
+
+### 2026-09-07 — gate 14: pushed
+
+`git push private main` moved `AhmadShadeed32/isnad-private` from `ac8740a` to
+**`b45d25f`**, thirteen commits. Local HEAD and `git ls-remote private
+refs/heads/main` agree. The remote had not moved since the baseline, so nothing
+needed integrating and no force was involved.
+
+Checked before pushing: full suite (1187 passed, 1 xfailed), Ruff, the
+no-tracked-secrets test, `git diff --check`, and a name sweep of the diff for
+`.env`, database, key and credential files. None present.
+
+Still outstanding, and stated in the handoff rather than implied away: gate 11.2
+(one bounded Gemini run over mock network data) was not spent; the hosted
+congestion lifecycle needs a reachable HTTPS callback that does not exist; the
+handset trial needs onboarding; and R05, R07, R09, R10, R12, R13 plus the `/lab`
+mobile overflow remain open.
