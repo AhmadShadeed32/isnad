@@ -905,12 +905,24 @@ def test_two_concurrent_creates_for_one_device_produce_one_subscription(client, 
     assert sorted(results) == [201, 422]
     assert recording.creates == 1
     with SessionLocal() as session:
-        active = [
-            row
-            for row in session.query(NetworkConditionSubscriptionRow).all()
-            if row.status == "active"
-        ]
-        assert len(active) == 1
+        rows = session.query(NetworkConditionSubscriptionRow).all()
+    # One row, and it still holds this device's capacity — that is the whole
+    # invariant: a second create for the same device cannot get through.
+    #
+    # This deliberately checks "not terminal" rather than status == "active".
+    # The suite runs on `sqlite://`, which needs StaticPool, which means every
+    # session in every thread shares ONE DBAPI connection. Two request threads'
+    # transactions therefore interleave on that connection, and the loser's
+    # rollback can discard the winner's not-yet-committed `status="active"`
+    # update — leaving a row that is correct in every way except its status.
+    # Measured at roughly one run in twenty here, and zero in 150 runs against
+    # a file-backed database, where each session gets its own connection as it
+    # does in any real deployment. Asserting the stored status here would be
+    # asserting a property of the test harness. That `_mark` writes "active" on
+    # a successful create is covered single-threaded by the tests at the top of
+    # this file, which do not share a connection across threads.
+    assert len(rows) == 1
+    assert rows[0].status not in nc.TERMINAL
 
 
 # --- malformed provider data -------------------------------------------------
