@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import os
 import stat
+from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -108,7 +109,14 @@ async def test_the_cap_is_per_owner_not_global():
 
 @pytest.mark.asyncio
 async def test_terminal_records_are_pruned():
-    """`_sessions` was never pruned, so it grew for the life of the process."""
+    """`_sessions` was never pruned, so it grew for the life of the process.
+
+    Pruning is now on a clock, not on the next `create`: a terminal record is
+    deliberately kept for `session_terminal_retention_seconds` so a client
+    polling for the expiry it was waiting on can actually read it (R09). What
+    this test guards is the original defect — that records accumulate forever —
+    so it prunes past that window rather than immediately.
+    """
     mgr = SessionManager()
     token = current_owner.set(owner_hash("pruning-key"))
     try:
@@ -117,7 +125,10 @@ async def test_terminal_records_are_pruned():
         )
         await mgr.end(rec.id)
         await asyncio.sleep(0.01)
-        # Creating another prunes the ended one rather than accumulating it.
+        assert rec.id in mgr._sessions, "the terminal status must stay readable for its window"
+        rec.terminal_at = rec.terminal_at - timedelta(
+            seconds=settings.session_terminal_retention_seconds + 1
+        )
         second = await mgr.create(
             "+962790000001", ttl_seconds=30, poll_seconds=5, provider=MockProvider()
         )

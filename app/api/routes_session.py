@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, status
 from app.api.deps import get_live_provider, key_from_bearer, owner_for, require_api_key
 from app.api.rate_limit import limit_per_key
 from app.config import settings
+from app.domain.enums import SessionStatus
 from app.domain.schemas import SessionCreateRequest, SessionResponse
 from app.events import current_owner, mask_phone
 from app.providers import mock as mock_provider
@@ -20,7 +21,9 @@ def _to_response(rec: SessionRecord) -> SessionResponse:
         # Masked, as it already is on the SSE bus. The session response was the
         # one place a full number was handed back (S3), which made it the
         # cheapest thing for a leaked or borrowed key to harvest.
-        phone_number=mask_phone(rec.phone_number),
+        # The masked value is computed at creation and outlives the raw one,
+        # which is cleared at the terminal transition (R09).
+        phone_number=rec.masked_phone or mask_phone(rec.phone_number),
         reason=rec.reason,
         created_at=rec.created_at.isoformat(),
         expires_at=rec.expires_at.isoformat(),
@@ -56,7 +59,10 @@ async def create_session(
 
 @router.get("/sessions/{session_id}", response_model=SessionResponse)
 async def get_session(session_id: str, _key: str = Depends(require_api_key)) -> SessionResponse:
-    rec = sessions.get(session_id)
+    # `current`, not `get`: it applies the TTL on the clock and delivers the
+    # expiry event, so a read cannot report ACTIVE for a session whose trust
+    # has run out while the monitor happens to be sleeping (R05).
+    rec = await sessions.current(session_id)
     if rec is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -97,11 +103,18 @@ async def simulate_swap(session_id: str, authorization: str = Header(default="")
             detail={"code": "missing_api_key", "message": "Bearer API key required"},
         )
     current_owner.set(owner_for(key))
-    rec = sessions.get(session_id)
+    rec = await sessions.current(session_id)
     if rec is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"code": "session_not_found", "message": "No such session"},
+        )
+    if rec.status != SessionStatus.ACTIVE or not rec.phone_number:
+        # A terminal session has no number to inject a swap on — it is cleared
+        # at the transition (R09) — and nothing is monitoring it if it did.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "session_not_active", "message": f"Session is {rec.status.value}"},
         )
     mock_provider.trip_swap(rec.phone_number)
     return {"ok": True, "message": f"SIM swap injected for {mask_phone(rec.phone_number)}"}

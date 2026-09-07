@@ -21,6 +21,7 @@ from app import announce, velocity
 from app.config import settings
 from app.consent import consents
 from app.db import challenges, outcomes, proof_shares, run_events
+from app.session.manager import sessions
 
 log = logging.getLogger("isnad")
 
@@ -39,6 +40,11 @@ def purge_once() -> dict[str, int]:
         # effect of create() elsewhere creating traffic; an idle process now
         # reclaims these on its own timer too.
         "terminal_consents": consents.purge_expired(),
+        # R09: terminal session records were reclaimed only as a side effect of
+        # another caller creating a session, so an idle process kept them —
+        # and, before the transition started clearing it, the raw phone number
+        # with them — indefinitely.
+        "terminal_sessions": sessions.purge_terminal(),
     }
 
 

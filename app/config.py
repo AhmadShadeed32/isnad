@@ -79,6 +79,11 @@ class Settings(BaseSettings):
     # Swap *and* Device Swap. At the default interval that is 115,200 billed
     # CAMARA calls from one request (S7a). These bound it.
     session_max_ttl_seconds: int = 300
+    # How long a terminal session stays readable before its record is swept.
+    # Long enough for a client polling on its own interval to observe the
+    # expiry or revocation it was waiting for; the raw phone number is already
+    # gone by then, cleared at the transition itself (R09).
+    session_terminal_retention_seconds: int = 120
     session_max_per_owner: int = 5
     # On the billable path, a 1.5s poll is a quota amplifier rather than a
     # feature. The floor does not apply to the mock provider, where the demo
