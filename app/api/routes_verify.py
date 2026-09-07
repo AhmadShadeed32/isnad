@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-import uuid
+import logging
+import secrets
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 
@@ -9,11 +10,11 @@ from app.agent import explain
 from app.agent.investigator import build_engine_for_pricing, build_investigator
 from app.api.deps import get_live_provider, require_api_key
 from app.api.rate_limit import limit_per_key
-from app.cache import CacheCapacityExceeded, cache
+from app.cache import CacheUnavailable, cache
 from app.chain import subject
 from app.chain.vault import vault
 from app.config import settings
-from app.db import store
+from app.db import operations, store
 from app.domain.schemas import (
     ExplainRequest,
     ExplainResponse,
@@ -24,6 +25,8 @@ from app.domain.schemas import (
 from app.ownership import owner_hash
 from app.policy import counterfactual
 from app.presentation import present
+
+log = logging.getLogger("isnad")
 
 router = APIRouter(
     prefix="/v1",
@@ -75,6 +78,106 @@ def _idempotency_state_response(state_value: str, request_hash: str) -> Verifica
     )
 
 
+async def _cache_get(key: str) -> str | None:
+    """Read the accelerator, off the event loop, and never fatally.
+
+    The cache is not the record any more (R13), so a cache that is missing,
+    slow or broken costs a slower answer from the database and nothing else.
+    `to_thread` because the Redis client is synchronous: called inline, one
+    stalled socket blocked every other request in the process (R14).
+    """
+    try:
+        return await asyncio.to_thread(cache.get, key)
+    except CacheUnavailable:
+        log.warning("idempotency cache read failed; falling back to the durable record")
+        return None
+
+
+async def _cache_set(key: str, value: str) -> None:
+    try:
+        await asyncio.to_thread(cache.set, key, value, settings.idempotency_ttl_seconds)
+    except CacheUnavailable:
+        log.warning("idempotency cache write failed; the durable record still holds the mapping")
+
+
+async def _replay_or_refuse(
+    existing: operations.Operation, request_hash: str, req: VerificationRequest
+) -> VerificationResponse:
+    """Answer a key that is already reserved, without spending anything.
+
+    Four outcomes, and the ordering matters. A body mismatch is checked first:
+    a key reused against a *different* request is a caller bug, and answering
+    it with the earlier result would be worse than refusing it.
+    """
+    if not secrets.compare_digest(existing.request_hash, request_hash):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "idempotency_key_reused",
+                "message": "This Idempotency-Key was used with a different request body",
+            },
+        )
+    if existing.state == operations.DONE and existing.chain_id:
+        verdict = await store.get_async(existing.chain_id)
+        if verdict is not None:
+            # Rebuilt from the signed chain, not from a cached copy of the
+            # response. This is the path a restart takes, and it is the reason
+            # the mapping is a row: the original answer is still reachable
+            # after the cache that held it is gone.
+            return _response_for(verdict, req, alternative=True)
+        # `done` with a chain that is not readable by this owner or no longer
+        # exists. Refusing is the only safe answer: the work was performed.
+    if existing.is_orphaned() or existing.state == operations.UNCERTAIN:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "idempotency_reconciliation_required",
+                "message": (
+                    "A previous attempt with this key may have completed provider work. "
+                    "Retry with a new Idempotency-Key after reconciling."
+                ),
+            },
+        )
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail={
+            "code": "idempotency_request_in_progress",
+            "message": "Matching request is still processing; retry shortly",
+        },
+    )
+
+
+def _response_for(
+    verdict, req: VerificationRequest, alternative: bool = False
+) -> VerificationResponse:
+    """One place that turns a Verdict into the wire response.
+
+    Shared by the live path and the durable replay so a replayed answer cannot
+    drift from the original in shape — the numbers all come from the immutable
+    signed verdict either way.
+    """
+    return VerificationResponse(
+        decision=verdict.decision,
+        planner=verdict.planner,
+        alternative=(
+            counterfactual.compute(verdict, req.phone_number, build_engine_for_pricing())
+            if alternative
+            else None
+        ),
+        chain_grade=verdict.chain_grade,
+        confidence=verdict.confidence,
+        hypothesis=verdict.hypothesis,
+        reason=verdict.reason,
+        chain_id=verdict.chain_id,
+        chain=verdict.chain if req.options.return_chain else None,
+        evidence_cost=verdict.evidence_cost,
+        latency_ms=verdict.latency_ms,
+        evidence_steps=len(verdict.chain),
+        provider_sources=verdict.provider_sources,
+        presentation=present(verdict),
+    )
+
+
 @router.post("/verify", response_model=VerificationResponse)
 async def verify(
     req: VerificationRequest,
@@ -92,80 +195,64 @@ async def verify(
     # keyed commitment, not bare SHA-256: receipts are public and predictable
     # request bodies otherwise make the signed digest an offline PII oracle.
     request_hash = subject.request_commitment(req)
-    # The key is hashed, not embedded. In memory the plaintext was harmless,
-    # but under the Redis backend a cache key is written into KEYS, MONITOR
-    # output and RDB snapshots — that is a credential on disk (S12).
-    cache_key = f"idem:{owner_hash(_key)}:{idempotency_key}" if idempotency_key else None
-    reservation_key = cache_key
-    reservation_value: str | None = None
-    reservation_completed = False
-    if cache_key:
-        state_value = cache.get(cache_key)
+    owner = owner_hash(_key)
+    # The key is hashed, not embedded, in both stores. In memory the plaintext
+    # was harmless, but under the Redis backend a cache key is written into
+    # KEYS, MONITOR output and RDB snapshots — that is a credential on disk
+    # (S12) — and the durable row outlives the request entirely.
+    key_hash = operations.key_digest(idempotency_key) if idempotency_key else None
+    cache_key = f"idem:{owner}:{key_hash}" if key_hash else None
+    reserved = False
+    work_started = False
+    if key_hash:
+        # The cache first, because it is the fast path and, under Redis, the
+        # cross-replica one. It is never the authority: a miss here falls
+        # through to the row, which survives a restart.
+        state_value = await _cache_get(cache_key)
         if state_value is not None:
             response = _idempotency_state_response(state_value, request_hash)
             if response is not None:
                 return response
-        # Reserve before starting paid evidence. `set_if_absent` is a lock in
-        # memory and SET NX in Redis, so two concurrent retries cannot both
-        # investigate and charge while they race through a get/set pair.
-        reservation_value = f"pending:{request_hash}:{uuid.uuid4().hex}"
-        try:
-            owns_reservation = cache.set_if_absent(
-                cache_key, reservation_value, settings.idempotency_ttl_seconds
-            )
-        except CacheCapacityExceeded as exc:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail={"code": "idempotency_capacity_exceeded", "message": "Retry shortly"},
-            ) from exc
-        if not owns_reservation:
-            state_value = cache.get(cache_key)
-            if state_value is not None:
-                response = _idempotency_state_response(state_value, request_hash)
-                if response is not None:
-                    return response
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail={
-                    "code": "idempotency_request_in_progress",
-                    "message": "Matching request is still processing; retry shortly",
-                },
-            )
+        existing = await operations.reserve_async(owner, key_hash, request_hash)
+        if existing is not None:
+            return await _replay_or_refuse(existing, request_hash, req)
+        reserved = True
     try:
         investigator = build_investigator(get_live_provider())
+        # Past this line a provider call may have been made, so the reservation
+        # can no longer be released on failure: see the `except` below.
+        work_started = True
         verdict = await investigator.investigate(
             req, run_id=console_run_id, parallel=req.options.parallel
         )
-        await store.save_async(verdict, subject=req.phone_number, request_hash=request_hash)
-        response = VerificationResponse(
-            decision=verdict.decision,
-            planner=verdict.planner,
-            alternative=counterfactual.compute(
-                verdict, req.phone_number, build_engine_for_pricing()
-            ),
-            chain_grade=verdict.chain_grade,
-            confidence=verdict.confidence,
-            hypothesis=verdict.hypothesis,
-            reason=verdict.reason,
-            chain_id=verdict.chain_id,
-            chain=verdict.chain if req.options.return_chain else None,
-            evidence_cost=verdict.evidence_cost,
-            latency_ms=verdict.latency_ms,
-            evidence_steps=len(verdict.chain),
-            provider_sources=verdict.provider_sources,
-            presentation=present(verdict),
+        # The chain and the key->chain mapping commit together (R13).
+        await store.save_async(
+            verdict,
+            subject=req.phone_number,
+            request_hash=request_hash,
+            operation=(owner, key_hash) if key_hash else None,
         )
+        response = _response_for(verdict, req, alternative=True)
         if cache_key:
-            cache.set(
-                cache_key,
-                f"done:{request_hash}:{response.model_dump_json()}",
-                settings.idempotency_ttl_seconds,
-            )
-            reservation_completed = True
+            # Acceleration only. The mapping is already durable at this point,
+            # so a failure here costs a slower replay, never a second charge —
+            # which is exactly what it used to cost.
+            await _cache_set(cache_key, f"done:{request_hash}:{response.model_dump_json()}")
         return response
-    finally:
-        if reservation_key and reservation_value and not reservation_completed:
-            cache.delete_if_value(reservation_key, reservation_value)
+    except BaseException:
+        # `BaseException`, so a cancelled request is covered: cancellation was
+        # one of the three ways this window used to lose the mapping.
+        if reserved:
+            if work_started:
+                # Something may have reached the operator and this service
+                # cannot prove otherwise. The key stays spent and a retry is
+                # refused for reconciliation, because the alternative is
+                # charging the merchant twice for one question.
+                await operations.mark_uncertain_async(owner, key_hash)
+            else:
+                # Nothing had been attempted yet, so the key is genuinely free.
+                await operations.release_async(owner, key_hash)
+        raise
 
 
 @router.get("/chains/{chain_id}", response_model=VerificationResponse)

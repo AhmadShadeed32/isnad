@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import secrets
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from sqlalchemy.exc import IntegrityError
 
@@ -10,7 +11,7 @@ from app.chain.models import Verdict
 from app.chain.subject import owner_binding, subject_hash
 from app.chain.vault import vault
 from app.db.database import SessionLocal
-from app.db.models import ChainRow
+from app.db.models import ChainRow, VerificationOperationRow
 from app.events import current_owner
 from app.ownership import ANONYMOUS
 
@@ -46,6 +47,7 @@ def save(
     verdict: Verdict,
     subject: str | None = None,
     request_hash: str = "",
+    operation: tuple[str, str] | None = None,
 ) -> ChainRecord:
     """Persist a chain, signing the exact stored JSON so it is tamper-evident.
 
@@ -58,6 +60,13 @@ def save(
     sibling column. As a column it sat outside the signed bytes, so anyone with
     database write access could backdate a chain and verification still reported
     valid.
+
+    `operation` is an (owner_hash, key_hash) pair naming the idempotency
+    reservation this chain answers. Its completion is written in the SAME
+    transaction as the chain, which is the whole point: the mapping from the
+    caller's key to the signed result cannot be lost while the chain survives,
+    so a crash can no longer leave a paid-for chain that the retry cannot find
+    and therefore pays for again (R13).
     """
     owner = _owner()
     verdict.subject_hash = subject_hash(subject) if subject else ""
@@ -88,6 +97,12 @@ def save(
                 public_key=public_key,
             )
         )
+        if operation is not None:
+            row = s.get(VerificationOperationRow, operation)
+            if row is not None:
+                row.state = "done"
+                row.chain_id = verdict.chain_id
+                row.updated_at = datetime.now(UTC)
         try:
             s.commit()
         except IntegrityError as exc:
@@ -145,8 +160,9 @@ async def save_async(
     verdict: Verdict,
     subject: str | None = None,
     request_hash: str = "",
+    operation: tuple[str, str] | None = None,
 ) -> ChainRecord:
-    return await asyncio.to_thread(save, verdict, subject, request_hash)
+    return await asyncio.to_thread(save, verdict, subject, request_hash, operation)
 
 
 async def get_async(chain_id: str) -> Verdict | None:

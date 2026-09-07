@@ -267,7 +267,22 @@ class Settings(BaseSettings):
     # --- Cache / idempotency ---
     cache_backend: str = "memory"  # memory | redis
     redis_url: str | None = None
+    # Every Redis operation is bounded by this. The cache is called from async
+    # handlers, so an unbounded one blocks the event loop and takes liveness
+    # and every unrelated request down with it (R14).
+    redis_timeout_seconds: float = 2.0
     idempotency_ttl_seconds: int = 86400
+    # How long a `pending` verification operation is believed to belong to a
+    # request still in flight. Past it, the row is an orphan from a process
+    # that died, and a retry is refused for reconciliation rather than allowed
+    # to re-charge the operator (R13).
+    idempotency_lease_seconds: int = 300
+    # `uncertain` rows outlive settled ones: they are the only record that
+    # something may be owed at an operator.
+    idempotency_uncertain_retention_seconds: int = 604800  # 7 days
+    # Upper bound on rows any one retention sweep deletes, so a long-idle
+    # process cannot open a single enormous transaction on its first tick.
+    purge_batch_size: int = 500
 
     @property
     def api_keys(self) -> set[str]:

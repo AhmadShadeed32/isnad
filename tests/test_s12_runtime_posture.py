@@ -196,8 +196,14 @@ def test_the_consent_store_is_bounded():
 # --- the API key inside a cache key -----------------------------------------
 
 
-def test_the_api_key_is_not_written_into_a_cache_key():
-    """Harmless in memory; under Redis it lands in KEYS, MONITOR and RDB files."""
+def test_no_caller_supplied_secret_is_written_into_a_cache_key():
+    """Harmless in memory; under Redis it lands in KEYS, MONITOR and RDB files.
+
+    Both halves of the key are hashed now. The API key was the original defect;
+    the caller's `Idempotency-Key` joined it once that value also became a
+    durable database column, because merchants routinely put an order id — or
+    something worse — in it (R13).
+    """
     from app.cache import cache
 
     client.post(
@@ -206,9 +212,10 @@ def test_the_api_key_is_not_written_into_a_cache_key():
         json={"phone_number": "+99999991001", "context": {"event": "signup"}},
     )
 
-    keys = getattr(cache, "_store", {}).keys()
-    assert any("posture-check" in k for k in keys)
+    keys = [k for k in getattr(cache, "_store", {}) if k.startswith("idem:")]
+    assert keys, "the idempotency entry was not cached at all"
     assert not any("demo-merchant-key" in k for k in keys)
+    assert not any("posture-check" in k for k in keys)
 
 
 # --- S13: the redirect URI ---------------------------------------------------

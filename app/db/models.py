@@ -397,3 +397,44 @@ class NetworkConditionEventRow(Base):
     level: Mapped[str] = mapped_column(String(16))
     occurred_at: Mapped[datetime] = mapped_column(UtcDateTime, index=True)
     received_at: Mapped[datetime] = mapped_column(UtcDateTime)
+
+
+class VerificationOperationRow(Base):
+    """One `/v1/verify` call that a caller gave an `Idempotency-Key`.
+
+    `/v1/verify` used to hold this mapping only in `app.cache`. The chain was
+    committed first and the cache entry written after, so a crash, a
+    cancellation or a failed cache write in between left a *signed chain with
+    no way back to it*: the retry saw no reservation, investigated again, and
+    paid the operator a second time for a question already answered. The
+    default memory cache lost every completed entry on restart as well (R13).
+
+    This row is the reservation and the record of what it produced, and
+    `db.store.save` writes `chain_id`/`state` in the same transaction that
+    commits the chain — so the mapping cannot exist without the chain, and the
+    chain cannot exist without the mapping.
+
+    The primary key IS the race resolution, as in `IdempotencyRecordRow`: two
+    concurrent requests for one key both attempt this insert and the database
+    decides which of them is allowed to spend money.
+
+    `state` is deliberately three-valued. `uncertain` is not a failure code —
+    it means work may have reached the operator and this service cannot prove
+    otherwise, so a retry must be refused rather than repeated. Only a state
+    that is *known* not to have spent anything is released.
+    """
+
+    __tablename__ = "verification_operations"
+
+    owner_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    # sha256 of the caller's Idempotency-Key, never the key itself: it is a
+    # caller-chosen string that can carry an order id or worse, and this table
+    # outlives the request (the same reasoning as the cache key in S12).
+    key_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    # The keyed request commitment. A key replayed against a different body is
+    # a conflict, not a replay.
+    request_hash: Mapped[str] = mapped_column(String(64))
+    state: Mapped[str] = mapped_column(String(16), index=True)
+    chain_id: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=lambda: datetime.now(UTC))
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=lambda: datetime.now(UTC))

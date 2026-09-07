@@ -20,7 +20,7 @@ import logging
 from app import announce, velocity
 from app.config import settings
 from app.consent import consents
-from app.db import challenges, outcomes, proof_shares, run_events
+from app.db import challenges, operations, outcomes, proof_shares, run_events
 from app.session.manager import sessions
 
 log = logging.getLogger("isnad")
@@ -45,6 +45,9 @@ def purge_once() -> dict[str, int]:
         # and, before the transition started clearing it, the raw phone number
         # with them — indefinitely.
         "terminal_sessions": sessions.purge_terminal(),
+        # R13: durable /v1/verify reservations. `uncertain` rows are kept far
+        # longer than settled ones — see `operations.purge_expired`.
+        "verification_operations": operations.purge_expired(),
     }
 
 
