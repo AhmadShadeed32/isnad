@@ -27,6 +27,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from urllib.parse import urlsplit
 
 # Aliased: this module has its own public `delete` (the subscription one).
 from sqlalchemy import delete as sql_delete
@@ -182,7 +183,7 @@ def _row(session, subscription_id: str, owner_hash: str):
 
 def _effective_status(row: NetworkConditionSubscriptionRow, now: datetime) -> str:
     """Expiry is a fact about the clock, not a job that has to have run."""
-    if row.status in TERMINAL:
+    if row.status in TERMINAL or row.status == "unknown":
         return row.status
     return "expired" if row.expires_at <= now else row.status
 
@@ -200,9 +201,10 @@ def _active_counts(session, owner_hash: str, device_hash: str, now: datetime):
     expiry is a fact about the clock, so a row whose sweep has not run yet must
     not be counted as live here either.
     """
-    live = (
+    live = (NetworkConditionSubscriptionRow.status == "unknown") | (
         NetworkConditionSubscriptionRow.status.notin_(tuple(TERMINAL))
-    ) & (NetworkConditionSubscriptionRow.expires_at > now)
+        & (NetworkConditionSubscriptionRow.expires_at > now)
+    )
     per_owner = session.execute(
         select(func.count())
         .select_from(NetworkConditionSubscriptionRow)
@@ -332,7 +334,9 @@ def _require_callback() -> None:
             "no server-configured HTTPS callback exists for network conditions",
             status_code=503,
         )
-    if not base.startswith("https://"):
+    parsed = urlsplit(base)
+    if (parsed.scheme != "https" or not parsed.hostname or parsed.username
+            or parsed.password or parsed.query or parsed.fragment):
         raise NetworkConditionError(
             "callback_not_https", "the configured callback must be HTTPS", status_code=503
         )
@@ -347,7 +351,7 @@ def _definitely_rejected(exc: Exception) -> bool:
     subscription and then creates a second one on retry.
     """
     status = getattr(exc, "status_code", None)
-    return isinstance(status, int) and 400 <= status < 500
+    return isinstance(status, int) and 400 <= status < 500 and status != 408
 
 
 def create(
@@ -531,6 +535,58 @@ def get(owner_hash: str, subscription_id: str) -> dict | None:
         return as_public(row) if row is not None else None
 
 
+def list_owned(owner_hash: str, limit: int = 50, offset: int = 0) -> list[dict]:
+    """Local recovery inventory. Listing never contacts the operator."""
+    with SessionLocal() as session:
+        rows = session.execute(
+            select(NetworkConditionSubscriptionRow)
+            .where(NetworkConditionSubscriptionRow.owner_hash == owner_hash)
+            .order_by(NetworkConditionSubscriptionRow.created_at.desc(),
+                      NetworkConditionSubscriptionRow.subscription_id)
+            .limit(limit).offset(offset)
+        ).scalars()
+        return [as_public(row) for row in rows]
+
+
+def reconcile(owner_hash: str, subscription_id: str, provider) -> dict:
+    """Resolve a lost create response without issuing another remote create.
+
+    A negative listing cannot establish that a timed-out write never happened;
+    keep unknown records reserved until a matching remote ID is found.
+    """
+    with SessionLocal() as session:
+        row = _row(session, subscription_id, owner_hash)
+        if row is None:
+            raise NetworkConditionError("not_found", "no such subscription", 404)
+        if row.provider_kind != settings.provider:
+            raise NetworkConditionError("provider_changed", "created by a different provider")
+        if row.status != "unknown" or row.provider_id:
+            return as_public(row)
+    lookup = getattr(provider, "find_congestion_subscription", None)
+    if not callable(lookup):
+        raise NetworkConditionError("not_supported", "provider cannot reconcile subscriptions", 501)
+    try:
+        provider_id = lookup(callback_url_for(subscription_id))
+    except Exception:  # noqa: BLE001 - any lookup failure leaves the record reserved
+        # Deliberately opaque: the caller learns that remote state is still
+        # unresolved, not how the operator's API failed. Narrowing this would
+        # let an unlisted provider error fall through and mark a reserved
+        # record resolved, which is the outcome reconciliation exists to avoid.
+        raise NetworkConditionError(
+            "reconciliation_failed", "operator state could not be reconciled", 502
+        ) from None
+    if not provider_id:
+        return get(owner_hash, subscription_id)
+    with _reservation, SessionLocal() as session:
+        row = _row(session, subscription_id, owner_hash)
+        if row is not None and row.status == "unknown" and not row.provider_id:
+            row.provider_id = provider_id
+            row.status = "active"
+            row.last_error = ""
+            session.commit()
+        return as_public(row)
+
+
 def delete(owner_hash: str, subscription_id: str, provider, now: datetime | None = None) -> dict:
     """Idempotent, and honest when the operator would not let go.
 
@@ -545,6 +601,16 @@ def delete(owner_hash: str, subscription_id: str, provider, now: datetime | None
             raise NetworkConditionError("not_found", "no such subscription", status_code=404)
         already = row.status == "deleted"
         provider_id = row.provider_id
+        if row.provider_kind and row.provider_kind != settings.provider:
+            raise NetworkConditionError(
+                "provider_changed", "this subscription was created by a different provider"
+            )
+        if not provider_id and row.status in {"pending", "unknown"}:
+            raise NetworkConditionError(
+                "reconciliation_required",
+                "remote subscription state is unknown; reconcile before deleting",
+                status_code=409,
+            )
 
     if already:
         return get(owner_hash, subscription_id)
@@ -553,7 +619,11 @@ def delete(owner_hash: str, subscription_id: str, provider, now: datetime | None
         try:
             provider.delete_congestion_subscription(provider_id)
         except Exception as exc:  # noqa: BLE001
-            _mark(subscription_id, status="active", error=f"cleanup failed: {_code(exc)}")
+            # A provider 404/410 confirms that there is nothing left to delete.
+            if getattr(exc, "status_code", None) in {404, 410}:
+                _mark(subscription_id, status="deleted", deleted_at=now, error="")
+                return get(owner_hash, subscription_id)
+            _mark(subscription_id, status="unknown", error=f"cleanup failed: {_code(exc)}")
             raise NetworkConditionError(
                 "cleanup_failed",
                 "the operator did not confirm deletion; the subscription may still exist",

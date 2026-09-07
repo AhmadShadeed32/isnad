@@ -120,6 +120,12 @@ class Settings(BaseSettings):
     # --- Nokia NaC (only used when provider == "nac") ---
     nac_api_key: str | None = None
     nac_rapidapi_host: str = "network-as-code.nokia.rapidapi.com"
+    # Keep endpoint selection explicit and restricted to the two Nokia hosts
+    # whose contracts are recorded in docs/NAC_CONTRACT_MATRIX.md.
+    nac_base_url: Literal[
+        "https://network-as-code.p-eu.rapidapi.com",
+        "https://network-as-code.p-eu.apihub.nokia.io",
+    ] = "https://network-as-code.p-eu.rapidapi.com"
     nac_max_age_hours: int = 240
     nac_location_max_age_seconds: int = 3600
     nac_timeout_seconds: float = 8.0

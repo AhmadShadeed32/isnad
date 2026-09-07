@@ -1050,3 +1050,240 @@ def test_delete_cannot_use_another_provider(provider, monkeypatch):
     assert provider.deletes == 0
 
 
+# --- recovering a lost create ------------------------------------------------
+#
+# A timed-out create leaves the only honest record possible: "the operator may
+# or may not hold a subscription for this device." Reconciliation is the way
+# out of that state, and the way out must not be able to invent an answer.
+
+
+def _stranded(client, monkeypatch, provider_factory=None):
+    """Drive a create to the `unknown` state and hand back its id."""
+    monkeypatch.setattr(
+        "app.api.routes_network_conditions.get_live_provider",
+        lambda *a, **k: Recording(fail_create=True),
+    )
+    assert _subscribe(client).status_code == 502
+    with SessionLocal() as session:
+        row = session.query(NetworkConditionSubscriptionRow).one()
+        assert row.status == "unknown"
+        subscription_id = row.subscription_id
+    if provider_factory is not None:
+        monkeypatch.setattr(
+            "app.api.routes_network_conditions.get_live_provider",
+            lambda *a, **k: provider_factory,
+        )
+    return subscription_id
+
+
+def _reconcile(client, subscription_id, headers=AUTH):
+    return client.post(
+        f"/v1/network-conditions/subscriptions/{subscription_id}/reconcile", headers=headers
+    )
+
+
+class Locatable(Recording):
+    """A provider that can be asked which remote id owns a callback URL."""
+
+    def __init__(self, found="provider-sub-1", **kwargs):
+        super().__init__(**kwargs)
+        self.lookups = 0
+        self._found = found
+
+    def find_congestion_subscription(self, callback_url):
+        self.lookups += 1
+        self.looked_up = callback_url
+        if isinstance(self._found, Exception):
+            raise self._found
+        return self._found
+
+
+def test_a_matching_remote_subscription_resolves_the_unknown_record(client, monkeypatch):
+    operator = Locatable()
+    subscription_id = _stranded(client, monkeypatch, operator)
+
+    body = _reconcile(client, subscription_id).json()
+
+    assert body["status"] == "active"
+    assert operator.lookups == 1
+    # Matched by this subscription's own callback URL, not by device or number:
+    # that is the only value unique to the row we are trying to recover.
+    assert operator.looked_up == nc.callback_url_for(subscription_id)
+    assert operator.creates == 0  # recovery is never a second create
+
+
+def test_no_matching_remote_subscription_keeps_the_record_reserved(client, monkeypatch):
+    """A negative listing cannot prove a timed-out write never landed. The row
+    keeps holding this device's capacity rather than being freed on a guess."""
+    operator = Locatable(found=None)
+    subscription_id = _stranded(client, monkeypatch, operator)
+
+    body = _reconcile(client, subscription_id).json()
+
+    assert body["status"] == "unknown"
+    assert _subscribe(client).json()["detail"]["code"] == "device_already_subscribed"
+
+
+def test_a_failed_lookup_reports_unresolved_rather_than_freeing_the_record(client, monkeypatch):
+    operator = Locatable(found=RuntimeError("operator refused"))
+    subscription_id = _stranded(client, monkeypatch, operator)
+
+    response = _reconcile(client, subscription_id)
+
+    assert response.status_code == 502
+    assert response.json()["detail"]["code"] == "reconciliation_failed"
+    with SessionLocal() as session:
+        assert session.query(NetworkConditionSubscriptionRow).one().status == "unknown"
+
+
+def test_a_provider_that_cannot_list_says_so_instead_of_guessing(client, monkeypatch):
+    """`Recording` has no lookup method — the mock provider is in the same
+    position, and 501 is the honest answer for it."""
+    subscription_id = _stranded(client, monkeypatch, Recording())
+
+    response = _reconcile(client, subscription_id)
+
+    assert response.status_code == 501
+    assert response.json()["detail"]["code"] == "not_supported"
+
+
+def test_reconciling_a_resolved_record_makes_no_remote_call(client, monkeypatch):
+    """Reconciliation is idempotent and cheap: an active row already knows its
+    remote id, so asking again must not spend an operator request."""
+    operator = Locatable()
+    monkeypatch.setattr(
+        "app.api.routes_network_conditions.get_live_provider", lambda *a, **k: operator
+    )
+    subscription_id = _subscribe(client).json()["subscription_id"]
+
+    body = _reconcile(client, subscription_id).json()
+
+    assert body["status"] == "active"
+    assert operator.lookups == 0
+
+
+def test_an_unknown_record_cannot_be_deleted_before_it_is_reconciled(client, monkeypatch):
+    """There is no remote id to delete, and reporting success would strand the
+    operator-side subscription permanently."""
+    subscription_id = _stranded(client, monkeypatch, Locatable())
+
+    response = client.delete(
+        f"/v1/network-conditions/subscriptions/{subscription_id}", headers=AUTH
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "reconciliation_required"
+
+
+def test_another_tenant_cannot_reconcile_this_tenants_record(client, monkeypatch):
+    subscription_id = _stranded(client, monkeypatch, Locatable())
+
+    assert _reconcile(client, subscription_id, headers=OTHER).status_code == 404
+
+
+def test_reconciling_an_unknown_id_is_a_404(client, provider):
+    assert _reconcile(client, "sub_does_not_exist").status_code == 404
+
+
+# --- the local inventory -----------------------------------------------------
+
+
+def test_listing_is_scoped_to_the_caller_and_never_calls_the_operator(client, provider):
+    _subscribe(client)
+    _subscribe(client, headers=OTHER, number=QUIET)
+    before = provider.queries + provider.creates
+
+    mine = client.get("/v1/network-conditions/subscriptions", headers=AUTH).json()
+    theirs = client.get("/v1/network-conditions/subscriptions", headers=OTHER).json()
+
+    assert len(mine) == 1 and len(theirs) == 1
+    assert mine[0]["subscription_id"] != theirs[0]["subscription_id"]
+    assert provider.queries + provider.creates == before  # listing is local only
+
+
+def test_listing_pages_without_repeating_or_dropping_a_row(client, provider):
+    numbers = [NUMBER, QUIET, NO_DATA]
+    for number in numbers:
+        assert _subscribe(client, number=number).status_code == 201
+
+    first = client.get("/v1/network-conditions/subscriptions?limit=2", headers=AUTH).json()
+    second = client.get(
+        "/v1/network-conditions/subscriptions?limit=2&offset=2", headers=AUTH
+    ).json()
+
+    assert len(first) == 2 and len(second) == 1
+    ids = [row["subscription_id"] for row in first + second]
+    assert len(set(ids)) == len(numbers)
+
+
+def test_listing_requires_a_key(client, provider):
+    assert client.get("/v1/network-conditions/subscriptions").status_code in (401, 403)
+
+
+class LostTheAnswer(Locatable):
+    """The operator received the create and kept the callback token; the
+    response never came back. This is what a real timeout leaves behind, and
+    the reason `unknown` exists — the fake that merely raises pretends the
+    request never left, which is the one case that is NOT ambiguous."""
+
+    def create_congestion_subscription(self, phone_number, callback_url, callback_token, expires_at):
+        self.creates += 1
+        self.callback_url = callback_url
+        self.callback_token = callback_token
+        raise TimeoutError("the answer was lost in flight")
+
+
+def test_a_delivered_callback_does_not_resolve_the_unknown_record(client, monkeypatch):
+    """Pins current behaviour so the gap is visible; it does not endorse it.
+
+    An authenticated callback is the operator posting to a URL only this
+    subscription has, carrying a token only this subscription was issued. It
+    proves the remote subscription EXISTS. The flow currently makes no use of
+    that: the event is stored, the row stays `unknown`, the caller still
+    cannot delete it (409 `reconciliation_required`), and reconciliation still
+    has to be driven by hand against a lookup only `NacProvider` implements.
+
+    What the callback does NOT carry is the operator's own subscription id —
+    `NetworkConditionEvent` is `extra="forbid"` over `event_id`, `level` and
+    `occurred_at`, and it arrives at OUR `subscription_id` in the path. So it
+    settles existence, not identity, and `reconcile` still has a job: fetching
+    the `provider_id`. Resolving straight to `active` on a callback would put
+    the row in the exact state `test_an_empty_provider_id_never_becomes_an_
+    active_subscription` exists to forbid — active with no provider id, where
+    `delete` skips the operator entirely and reports success for a
+    subscription that is still live.
+
+    Fixing this therefore means recording existence-confirmed, not activating.
+    Doing so inverts the assertions below.
+    """
+    operator = LostTheAnswer()
+    monkeypatch.setattr(
+        "app.api.routes_network_conditions.get_live_provider", lambda *a, **k: operator
+    )
+    assert _subscribe(client).status_code == 502
+    with SessionLocal() as session:
+        row = session.query(NetworkConditionSubscriptionRow).one()
+        assert row.status == "unknown"
+        subscription_id = row.subscription_id
+
+    delivered = client.post(
+        f"/v1/network-conditions/callbacks/{subscription_id}",
+        headers={"Authorization": f"Bearer {operator.callback_token}"},
+        json={
+            "event_id": "evt-after-the-timeout",
+            "level": "High",
+            "occurred_at": datetime.now(UTC).isoformat(),
+        },
+    )
+    assert delivered.status_code == 204  # the operator is demonstrably talking to us
+
+    record = client.get(
+        f"/v1/network-conditions/subscriptions/{subscription_id}", headers=AUTH
+    ).json()
+    assert record["status"] == "unknown"  # ... and we still say "maybe"
+
+    refused = client.delete(
+        f"/v1/network-conditions/subscriptions/{subscription_id}", headers=AUTH
+    )
+    assert refused.status_code == 409
+    assert refused.json()["detail"]["code"] == "reconciliation_required"

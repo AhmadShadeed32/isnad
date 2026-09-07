@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import asyncio
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 
 from app import network_conditions as nc
 from app.api.deps import get_live_provider, owner_for, require_api_key
@@ -45,6 +45,27 @@ def _fail(exc: nc.NetworkConditionError) -> HTTPException:
     return HTTPException(
         status_code=exc.status_code, detail={"code": exc.code, "message": exc.message}
     )
+
+
+@router.get("/subscriptions", response_model=list[NetworkConditionSubscription])
+async def list_subscriptions(
+    key: str = Depends(require_api_key),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0, le=10000),
+) -> list[dict]:
+    return await asyncio.to_thread(nc.list_owned, owner_for(key), limit, offset)
+
+
+@router.post("/subscriptions/{subscription_id}/reconcile", response_model=NetworkConditionSubscription)
+async def reconcile_subscription(
+    subscription_id: str, key: str = Depends(require_api_key),
+) -> dict:
+    try:
+        return await asyncio.to_thread(
+            nc.reconcile, owner_for(key), subscription_id, get_live_provider()
+        )
+    except nc.NetworkConditionError as exc:
+        raise _fail(exc) from None
 
 
 @router.post(

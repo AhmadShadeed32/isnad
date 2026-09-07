@@ -74,6 +74,7 @@ class NacProvider:
             self.client = api_class(
                 rapidapi_host=settings.nac_rapidapi_host,
                 api_key=settings.nac_api_key,
+                base_url=settings.nac_base_url,
             )
             return
 
@@ -183,6 +184,22 @@ class NacProvider:
         self.client.congestion_insights.delete_subscription(
             resource_id=provider_id, request_options=_bounded()
         )
+
+    def find_congestion_subscription(self, callback_url: str) -> str | None:
+        """Recover only the remote resource bound to our unique callback URL."""
+        rows = self.client.congestion_insights.list_subscriptions(request_options=_bounded())
+        if not isinstance(rows, list) or len(rows) > 500:
+            raise RuntimeError("subscription listing is not bounded")
+        matches = []
+        for row in rows:
+            webhook = self._value(row, "webhook", None)
+            if self._value(webhook, "notification_url", None) == callback_url:
+                identifier = self._value(row, "subscription_id", None)
+                if isinstance(identifier, str) and identifier.strip():
+                    matches.append(identifier)
+        if len(matches) > 1:
+            raise RuntimeError("multiple remote subscriptions match the callback")
+        return matches[0] if matches else None
 
     def query_congestion(self, phone_number: str, start=None, end=None) -> list[dict]:
         """Both bounds absent asks for the forecast; both present asks history."""
@@ -439,13 +456,13 @@ class NacProvider:
                     "EVIDENCE_UNAVAILABLE",
                     "number verification adapter is not configured",
                 )
-            try:
-                response = verify(
-                    authorization=f"Bearer {self.number_verification_token}",
-                    phone_number=phone,
-                )
-            except TypeError:
-                response = verify(self.number_verification_token, phone_number=phone)
+            # SDK 10 is the supported runtime contract. Retrying on TypeError
+            # could repeat a call whose provider implementation already ran.
+            response = verify(
+                authorization=f"Bearer {self.number_verification_token}",
+                phone_number=phone,
+                request_options=_bounded(),
+            )
             verified = self._value_any(
                 response,
                 "device_phone_number_verified",

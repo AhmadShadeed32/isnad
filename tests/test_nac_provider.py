@@ -108,9 +108,10 @@ class FakeNumberVerification:
             "id_token": _manual_id_token("nonce-abc", audience="sdk-client-id"),
         }
 
-    def verify(self, token, **kwargs):
-        assert token == "one-time-access-token"
+    def verify(self, *, authorization, **kwargs):
+        assert authorization == "Bearer one-time-access-token"
         assert kwargs["phone_number"] == "+99999991000"
+        assert kwargs["request_options"]["max_retries"] == 0
         return {"device_phone_number_verified": True}
 
 
