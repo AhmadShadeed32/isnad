@@ -8,9 +8,9 @@ Built on GSMA Open Gateway CAMARA APIs via the Nokia Network-as-Code platform.
 | | |
 | --- | --- |
 | **Team** | Ahmad Shadeed (lead) · Yousef Al Masri — Princess Sumaya University for Technology, Amman, Jordan |
-| **Judges start here** | **[submission/JUDGE_GUIDE.md](submission/JUDGE_GUIDE.md)** — three commands, eight checks, ~15 minutes |
+| **Judges start here** | **[submission/JUDGE_GUIDE.md](submission/JUDGE_GUIDE.md)** — nine steps, ~15 minutes, no credentials |
 | **Run it now** | `make setup && make judge` → <http://127.0.0.1:8010/judge> |
-| **CAMARA APIs orchestrated** | 9, of which 6 have recorded HTTP responses from Nokia's hosted simulator |
+| **CAMARA APIs integrated** | 8 on Nokia Network-as-Code — 4 exercised against Nokia's hosted simulator, the rest against the sandbox, all recorded |
 | **AI agent layer** | Gemini chooses which network check to buy next; policy decides what the answer means |
 | **Verification** | 1,310 automated tests pass in 163 s, browser tests included |
 
@@ -118,28 +118,40 @@ then, after seeing that result:
 > relevant to the account takeover hypothesis alongside the confirmed SIM swap."
 
 Two calls against a ceiling of six — it stopped because the chain was decided,
-not because the budget ran out. Per the Resource & Tooling Guide, the agent
-layer uses Google Gemini and nothing else; the adapter is a direct REST client
-in [`app/agent/gemini.py`](app/agent/gemini.py) over the project's existing
-`httpx` dependency, with no third-party agent framework.
+not because the budget ran out.
 
-## CAMARA APIs orchestrated
+The agent layer uses exactly one tool from the hackathon's Resource & Tooling
+Guide: **Google AI Studio (Gemini)**, which the guide lists as a free-tier
+model API. There is no second model provider and no third-party agent
+framework — the adapter is a direct REST client in
+[`app/agent/gemini.py`](app/agent/gemini.py) over the project's existing
+`httpx` dependency, chosen so that a missing SDK can never silently turn an
+`llm` run into a greedy one.
 
-Nine CAMARA APIs on Nokia Network-as-Code. The agent chooses which to call at
-run time; policy assigns each one a cost and a weight in
+## CAMARA APIs integrated
+
+Eight CAMARA APIs have a working Nokia Network-as-Code adapter in
+[`app/providers/nac.py`](app/providers/nac.py). The agent chooses which to call
+at run time; policy assigns each one a cost and a weight in
 [`app/policy/policy.yaml`](app/policy/policy.yaml).
 
 | CAMARA API | Role in the evidence chain | Cost | Recorded against Nokia |
 | --- | --- | ---: | --- |
-| Number Verification | Proves the number belongs to this device. Replaces the OTP. | 1 | Sandbox, `CONSENT_REQUIRED` path |
-| SIM Swap | The primary account-takeover signal. | 2 | **Hosted simulator, 200** |
-| Device Swap | The mule-phone signal. | 2 | **Hosted simulator, 200** |
-| Location Verification | Yes/no against an address the customer already claimed. Never a coordinate. | 3 | Sandbox |
-| Device Reachability Status | Bot-farm and burner patterns. | 2 | Sandbox |
-| Device Roaming Status | Impossible travel; also a stability proxy for thin-file approval. | 2 | Sandbox |
-| Device Intelligence | Device reputation, as corroboration only. | 2 | Sandbox returned `EVIDENCE_UNAVAILABLE` — recorded as unavailable, not as a pass |
-| Number Recycling | Was this number reassigned to someone else? | 1 | **Hosted simulator, 200 + a 400 we now prevent** |
-| Congestion Insights | Network *information*, never evidence about a person. | — | **Hosted simulator, 200** |
+| Number Verification | Proves the number belongs to this device. Replaces the OTP. | 1 | Sandbox, 30 Aug — the `CONSENT_REQUIRED` path |
+| SIM Swap | The primary account-takeover signal. | 2 | **Hosted simulator, 6 Sept — 200** |
+| Device Swap | The mule-phone signal. | 2 | **Hosted simulator, 6 Sept — 200** |
+| Location Verification | Yes/no against an address the customer already claimed. Never a coordinate. | 3 | Sandbox, 30 Aug |
+| Device Reachability Status | Bot-farm and burner patterns. | 2 | Sandbox, 30 Aug |
+| Device Roaming Status | Impossible travel; also a stability proxy for thin-file approval. | 2 | Sandbox, 30 Aug |
+| Number Recycling | Was this number reassigned to someone else? | 1 | **Hosted simulator, 6 Sept — 200, plus a 400 we now prevent** |
+| Congestion Insights | Network *information*, never evidence about a person. | — | **Hosted simulator, 6 Sept — 200** |
+
+A ninth, **Device Intelligence**, exists in the policy vocabulary and runs
+under the mock provider, but has **no Nokia adapter**: the 30 August sandbox
+capture returned `EVIDENCE_UNAVAILABLE`, so the NaC path returns unavailable by
+construction rather than pretending to a reputation verdict nobody gave us. It
+is listed here because leaving it out of the code would have been tidier than
+leaving it in and saying why.
 
 Two design decisions are worth a judge's attention:
 

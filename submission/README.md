@@ -15,7 +15,7 @@ of reasoning and an Ed25519 signature over it.
 
 1. **[JUDGE_GUIDE.md](JUDGE_GUIDE.md)** — install, run and verify from a clean
    clone. Nine steps, ~15 minutes, no credentials needed. Each step states what
-   you should see.
+   you should see, so a mismatch is a finding rather than a guess.
 2. **[../README.md](../README.md)** — the problem, the solution, the AI agent
    layer, the API table, and what is real versus simulated.
 3. **[CAMARA_API_USAGE.md](CAMARA_API_USAGE.md)** — every CAMARA API, how the
@@ -32,18 +32,32 @@ make setup && make judge     # then open http://127.0.0.1:8010/judge
 
 | Requirement | Where |
 | --- | --- |
-| Uses ≥1 CAMARA API on Nokia Network-as-Code | Nine of them — [CAMARA_API_USAGE.md](CAMARA_API_USAGE.md); adapter at [`app/providers/nac.py`](../app/providers/nac.py) |
+| Uses ≥1 CAMARA API on Nokia Network-as-Code | Eight with a working adapter — [CAMARA_API_USAGE.md](CAMARA_API_USAGE.md), [`app/providers/nac.py`](../app/providers/nac.py) |
 | AI agent layer orchestrating CAMARA as data sources, not buttons | [`app/agent/`](../app/agent/) — README section *The AI agent layer*; recorded run at [`docs/nac/observations/2026-09-07-gemini-rehearsal.json`](../docs/nac/observations/2026-09-07-gemini-rehearsal.json) |
-| Agent built only with approved tooling | Google Gemini via a direct REST adapter, [`app/agent/gemini.py`](../app/agent/gemini.py). No third-party agent framework |
+| Agent built only with approved tooling | Google AI Studio (Gemini), listed in the Resource & Tooling Guide as a free-tier model API. One provider, no second model, no third-party agent framework — [`app/agent/gemini.py`](../app/agent/gemini.py) |
 | Original code | Written by the team during the hackathon. 1,310 tests, full git history |
 | Aligned to one of the seven themes | Theme 4. Theme 1 is the adjacent neighbour and the same engine serves it |
+
+## Against the Resource & Tooling Guide's own advice
+
+The guide closes with tips for participants. They read like a checklist, so
+here is ours:
+
+| Their tip | Isnad |
+| --- | --- |
+| "Treat each CAMARA API as a tool the agent decides when to call, not a button the user presses" | No evidence call is bound to a control. Pressing a button starts an *investigation*; the agent decides what to ask |
+| "Have a clear fallback when an API or model is rate-limited — agents that gracefully degrade demo much better" | Missing key, transport failure, empty answer or call ceiling all fall back to greedy, and the verdict records which strategy ran |
+| "Cache demo data. Live API calls fail at the worst moment" | The demo path is authored fixtures through the real engine; `/lab` replays a committed bundle with no operator or model calls |
+| "Show the agent's reasoning trace on screen during the demo" | The trace *is* the demo — every selection, its rationale, its source and the remaining budget |
+| "Pick one focus area on day one and resist scope creep" | One question, asked well: can this interaction be trusted right now? |
 
 ## Phase 1 material
 
 [`Isnad_Idea_Capture_Phase1.pdf`](Isnad_Idea_Capture_Phase1.pdf) — the idea
 capture template submitted in the Idea Phase, kept here for continuity. The
-build has moved past it: nine CAMARA APIs rather than seven, recorded hosted
-simulator calls, a bilingual UI and 1,310 tests.
+build has moved past it: eight integrated CAMARA APIs including Congestion
+Insights and Number Recycling, recorded hosted-simulator calls, a bilingual UI
+and 1,310 tests.
 
 ## Still to attach before the deadline
 

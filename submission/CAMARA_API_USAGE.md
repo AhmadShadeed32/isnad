@@ -6,15 +6,22 @@ and what has not.
 
 The hackathon's mandatory requirement is that CAMARA APIs act as *trusted
 real-time data sources orchestrated by an AI agent*, not as user-triggered
-buttons. In Isnad no CAMARA call is ever bound to a UI control. Every call is
-selected at run time by the investigator agent from the request context, the
-hypothesis it has formed, the evidence gathered so far, and the budget it has
-left. Pressing a button on `/judge` starts an *investigation*; the agent then
-decides what to ask the network.
+buttons. In Isnad **no evidence call is bound to a UI control**. Every evidence
+call is selected at run time by the investigator agent from the request
+context, the hypothesis it has formed, the evidence gathered so far, and the
+budget it has left. Pressing a button on `/judge` starts an *investigation*;
+the agent then decides what to ask the network.
+
+The one deliberate exception proves the rule. Congestion Insights **does** have
+explicit buttons on `/judge` — subscribe, forecast, last hour, delete — because
+it sits outside the agent by design. It is network information, not evidence
+about a person, so it is never selected as part of an investigation, never
+enters the risk score, and is requested only when a human explicitly asks for
+it. Nothing is sent to the operator until that button is pressed.
 
 ---
 
-## The nine APIs
+## The eight integrated APIs, and one that is not
 
 Costs and weights are the policy surface in
 [`app/policy/policy.yaml`](../app/policy/policy.yaml). Costs are normalized
@@ -62,10 +69,13 @@ suspicion.
 Impossible-travel detection, and a stability proxy when assessing a thin-file
 customer for inclusion.
 
-**Device Intelligence** — cost 2, gain 1.4
-Device reputation, used only as corroboration when device evidence is
-contested. The recorded sandbox call returned `EVIDENCE_UNAVAILABLE`, and that
-is what the capability manifest says — an unavailable capability, not a pass.
+**Device Intelligence** — cost 2, gain 1.4 · **no Nokia adapter**
+Device reputation, intended as corroboration when device evidence is contested.
+The 30 August sandbox capture returned `EVIDENCE_UNAVAILABLE`, so there is no
+NaC adapter for it: `app/providers/nac.py` returns unavailable by construction
+and no scenario is allowed to assert a reputation verdict. It runs under the
+mock provider only. Counted separately from the eight above, and named here
+because deleting it would have been tidier than keeping it and saying why.
 
 **Congestion Insights** — no evidence cost
 Deliberately **quarantined from the verdict**. A congested cell can explain a

@@ -38,8 +38,9 @@ cd isnad
 make setup
 ```
 
-This creates `.venv311/` and installs the runtime and development
-dependencies. It touches nothing outside the repository directory.
+This creates `.venv311/` inside the repository and installs the runtime and
+development dependencies into it. Nothing is installed system-wide (pip's own
+download cache in your home directory is the only thing written outside).
 
 **Expect:** the script prints the Python version it used and ends with
 `Done. Activate with: source .venv311/bin/activate`.
@@ -117,8 +118,9 @@ Under **Technical and audit details**, press **Check Ed25519 signature**.
 
 **Expect:** `✓ Signature valid`.
 
-Now do it yourself, offline, without trusting our page. Copy the `chain_id`
-from the receipt (or from the API response in step 6), then:
+Now do it yourself, offline, without trusting our page. Press **Open signed
+receipt ↗** — the `chn_…` you need is the last path segment of the URL that
+opens. Then:
 
 ```bash
 CHAIN=chn_...                                    # paste yours
@@ -222,6 +224,10 @@ Steps 3–6 use the deterministic `greedy` planner so your results match this
 document byte for byte. To watch the model choose instead, you need a free
 Google AI Studio key from <https://aistudio.google.com/apikey>.
 
+This is the **only step in this guide we could not run for you**, because it
+needs your key. The recorded run linked at the end of this step is what we can
+show without one.
+
 Stop the server (Ctrl-C), then:
 
 ```bash
@@ -283,6 +289,7 @@ The full API-by-API breakdown is in
 
 ```bash
 .venv311/bin/python -m playwright install chromium    # once
+# on a fresh Linux runner: python -m playwright install --with-deps chromium
 make test
 ```
 
@@ -356,6 +363,11 @@ outcome data to calibrate against real decisions.
 
 ## Cleaning up
 
-Ctrl-C the server. The demo wrote `isnad-demo.db*` and
-`.isnad/demo-vault-key.pem` inside the repository directory and nothing else.
-Delete the directory and it is gone.
+Ctrl-C the server. Inside the repository directory the demo wrote
+`isnad-demo.db*`, `.isnad/demo-vault-key.pem`, `.venv311/` and the usual
+`__pycache__/` folders — and nothing anywhere else. Delete the clone and it is
+gone.
+
+Everything in this guide was run end to end against a clean clone before it was
+written down, on macOS with Python 3.11. The one exception is step 7, which
+needs a key we cannot supply for you; it is marked there.
