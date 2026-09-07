@@ -52,7 +52,11 @@ def test_the_mode_the_console_needs_is_behind_a_key():
     assert client.get("/v1/console/mode").status_code == 401
 
     body = client.get("/v1/console/mode", headers=AUTH).json()
-    assert set(body) == {"provider", "planner", "demo_mode"}
+    # `accepts_request_key` says whether this deployment will honour a
+    # reviewer's own model key on the request. It is derived from `demo_mode`
+    # and the provider, both already in this response, so it tells a caller
+    # nothing they could not compute from the other two fields.
+    assert set(body) == {"provider", "planner", "demo_mode", "accepts_request_key"}
 
 
 # --- blocking writes ---------------------------------------------------------

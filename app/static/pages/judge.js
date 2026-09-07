@@ -157,8 +157,15 @@ function appendTiming(event){
   row.append(mark, body, side);
   trace.appendChild(row); trace.scrollTop = trace.scrollHeight;
 }
+// The reviewer's own model key, if they lent us one. sessionStorage, never
+// localStorage: it should not outlive the tab. It is attached per request and
+// the server drops it the moment the response is sent.
+const BYOK_STORE = 'isnad.byok.gemini';
+function byokKey(){ try { return sessionStorage.getItem(BYOK_STORE) || ''; } catch { return ''; } }
+function byokHeader(){ const k = byokKey(); return k ? {'X-Isnad-Gemini-Key': k} : {}; }
+
 async function apiJson(path, options = {}){
-  const response = await fetch(path, { ...options, headers:{'Authorization':'Bearer ' + key(), ...(options.body ? {'Content-Type':'application/json'} : {}), ...(options.headers || {})} });
+  const response = await fetch(path, { ...options, headers:{'Authorization':'Bearer ' + key(), ...byokHeader(), ...(options.body ? {'Content-Type':'application/json'} : {}), ...(options.headers || {})} });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.detail?.message || data.detail?.code || 'request failed (' + response.status + ')');
   return data;
@@ -619,3 +626,43 @@ Locale.setLocale(Locale.preferred());
   try { setMode(await apiJson('/v1/console/mode')); await connectStream(); }
   catch(err){ mode.textContent = 'SERVER MODE UNKNOWN'; mode.className = 'mode sim'; checkout.disabled = true; cleanCheckout.disabled = true; gapCheckout.disabled = true; fallback.textContent = 'Could not read the secure demo mode: ' + safeError(err); fallback.classList.add('visible'); }
 }());
+
+// --- bring your own Gemini key ----------------------------------------------
+// Shown only where the server says a request may carry one: demo mode, and a
+// provider that cannot spend money. Anywhere else the panel would be a lie.
+(function setupByok(){
+  const panel = document.getElementById('byok');
+  if (!panel) return;
+  const input = document.getElementById('byokKey');
+  const use = document.getElementById('byokUse');
+  const forget = document.getElementById('byokForget');
+  const state = document.getElementById('byokState');
+
+  function render(){
+    const k = byokKey();
+    forget.disabled = !k;
+    state.className = 'byok-state' + (k ? ' on' : '');
+    state.textContent = k
+      ? 'Your key is set for this tab — runs will use planner: llm. ' + k.slice(0, 4) + '…' + k.slice(-4)
+      : 'No key set — running the deterministic planner.';
+    if (k) input.value = '';
+  }
+
+  use.addEventListener('click', () => {
+    const value = (input.value || '').trim();
+    if (!value) { state.textContent = 'Paste a key first.'; return; }
+    try { sessionStorage.setItem(BYOK_STORE, value); } catch { /* private mode */ }
+    render();
+  });
+  forget.addEventListener('click', () => {
+    try { sessionStorage.removeItem(BYOK_STORE); } catch { /* private mode */ }
+    input.value = '';
+    render();
+  });
+
+  // `setMode` has already run by the time the page settles; ask the same
+  // endpoint rather than duplicating its state.
+  apiJson('/v1/console/mode')
+    .then(mode => { if (mode && mode.accepts_request_key === true) { panel.hidden = false; render(); } })
+    .catch(() => { /* leave the panel hidden rather than promising a feature */ });
+})();

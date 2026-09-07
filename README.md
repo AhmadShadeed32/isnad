@@ -12,7 +12,7 @@ Built on GSMA Open Gateway CAMARA APIs via the Nokia Network-as-Code platform.
 | **Run it now** | `make setup && make judge` → <http://127.0.0.1:8010/judge> |
 | **CAMARA APIs integrated** | 8 on Nokia Network-as-Code — 4 exercised against Nokia's hosted simulator, the rest against the sandbox, all recorded |
 | **AI agent layer** | Gemini chooses which network check to buy next; policy decides what the answer means |
-| **Verification** | 1,310 automated tests pass in 163 s, browser tests included |
+| **Verification** | 1,329 automated tests pass in 153 s, browser tests included |
 | **Demo video** | [`submission/isnad-demo.mp4`](submission/isnad-demo.mp4) — 3:39, real application footage |
 
 ---
@@ -99,6 +99,15 @@ which is displayed in the trace rather than summarised away.
 evidence, change a weight, exceed the budget, or reach a verdict. Policy grades
 the evidence; the model only chooses what to buy. A model that returns
 malformed output is rejected and recorded as rejected, not quietly obeyed.
+
+**How a reviewer runs it without our key.** The `/judge` page has a panel that
+takes a Gemini key of your own. It is held in a `ContextVar` for exactly one
+request — never written to the database, never into a signed receipt, never to
+a log, never echoed back — and any deployment that could spend money refuses
+the header outright. Supplying a key also *selects* the model planner, so it
+works on the offline demo without a restart. The guarantees are asserted in
+[`tests/test_request_supplied_model_key.py`](tests/test_request_supplied_model_key.py),
+not just described here.
 
 **What happens when the model is unavailable.** A missing key, a transport
 failure, an empty answer or a hit call ceiling falls back to a greedy
@@ -279,7 +288,7 @@ Every number below comes from a command in this repository, run on 7 September
 2026 against this commit.
 
 ```bash
-make test                                   # 1,310 passed in 163 s
+make test                                   # 1,329 passed in 153 s
 .venv311/bin/python scripts/evidence_pack.py --output-dir /tmp/isnad-evidence
 .venv311/bin/python scripts/independent_evaluation.py
 ```
@@ -341,7 +350,7 @@ verification is the same evidence chain with a different hypothesis.
 | `app/db/`, `migrations/` | Persistence and Alembic revisions |
 | `demo/` | Offline fake operator, merchant pilot harness, lab runner and recordings |
 | `scripts/` | Reproducible experiments: evidence pack, evaluation, NaC probe, receipt verification |
-| `tests/` | 1,310 tests, including Playwright coverage of both languages |
+| `tests/` | 1,329 tests, including Playwright coverage of both languages |
 | `docs/nac/observations/` | Recorded Nokia and Gemini calls — the provenance behind the claims above |
 | `submission/` | Judge guide, CAMARA usage detail, Phase 1 idea capture |
 

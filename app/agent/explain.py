@@ -6,6 +6,7 @@ from app.agent.gemini import GeminiClient
 from app.chain.models import Verdict
 from app.config import settings
 from app.domain.enums import GRADE_MEANING
+from app.runtime_keys import effective_gemini_key
 
 # "Ask the agent" (T4): a judge types a question about a decision that just
 # happened and the agent answers from the chain.
@@ -100,10 +101,10 @@ def answer(verdict: Verdict, question: str, client=None) -> str:
 
 
 def _maybe_client() -> object | None:
-    if not settings.gemini_api_key:
+    if not effective_gemini_key():
         return None
     return GeminiClient(
-        api_key=settings.gemini_api_key,
+        api_key=effective_gemini_key(),
         model=settings.llm_model,
         timeout_seconds=settings.llm_timeout_seconds,
     )

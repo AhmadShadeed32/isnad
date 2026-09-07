@@ -22,6 +22,7 @@ from app.policy import counterfactual
 from app.presentation import present
 from app.providers import mock as mock_provider
 from app.providers.mock import MockProvider
+from app.runtime_keys import accepts_request_key
 from app.screening import screen_call
 from app.ui import page_path
 
@@ -156,6 +157,10 @@ async def console_mode(_key: str = Depends(require_api_key)) -> dict:
         # run greedy is choosing is the console's most testable false claim.
         "planner": effective_planner(),
         "demo_mode": settings.demo_mode,
+        # Whether this deployment will honour a reviewer's own model key on the
+        # request. The page hides that panel unless the answer is yes, so it
+        # never offers a control the server would ignore.
+        "accepts_request_key": accepts_request_key(),
     }
 
 

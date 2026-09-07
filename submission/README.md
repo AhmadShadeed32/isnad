@@ -40,7 +40,7 @@ make setup && make judge     # then open http://127.0.0.1:8010/judge
 | Uses ≥1 CAMARA API on Nokia Network-as-Code | Eight with a working adapter — [CAMARA_API_USAGE.md](CAMARA_API_USAGE.md), [`app/providers/nac.py`](../app/providers/nac.py) |
 | AI agent layer orchestrating CAMARA as data sources, not buttons | [`app/agent/`](../app/agent/) — README section *The AI agent layer*; observed run at [`docs/nac/observations/2026-09-07-gemini-judge-run.json`](../docs/nac/observations/2026-09-07-gemini-judge-run.json), where the model selects, policy corroborates, the model stops and policy overrules it |
 | Agent built only with approved tooling | Google AI Studio (Gemini), listed in the Resource & Tooling Guide as a free-tier model API. One provider, no second model, no third-party agent framework — [`app/agent/gemini.py`](../app/agent/gemini.py) |
-| Original code | Written by the team during the hackathon window. The Idea Phase submission of 20 August names this repository; public snapshots were pushed 2 September and 7 September. 1,310 tests. The full working history is available to the panel on request |
+| Original code | Written by the team during the hackathon window. The Idea Phase submission of 20 August names this repository; public snapshots were pushed 2 September and 7 September. 1,329 tests. The full working history is available to the panel on request |
 | Aligned to one of the seven themes | Theme 4. Theme 1 is the adjacent neighbour and the same engine serves it |
 
 ## Against the Resource & Tooling Guide's own advice
@@ -62,7 +62,7 @@ Eight integrated CAMARA APIs rather than the seven proposed, now including
 Congestion Insights and Number Recycling. Recorded calls to Nokia's hosted
 simulator. A Gemini planner whose selections and overrides are visible in the
 trace. A full RTL Arabic interface, with the composed verdict prose still
-English and labelled as such. 39 tests became 1,310.
+English and labelled as such. 39 tests became 1,329.
 
 ## Submission artefacts
 

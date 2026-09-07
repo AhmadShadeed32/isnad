@@ -12,6 +12,7 @@ from app.agent.gemini import GeminiClient, GeminiNoResponse
 from app.config import settings
 from app.domain.enums import Action, Hypothesis
 from app.policy.engine import PolicyEngine
+from app.runtime_keys import effective_gemini_key, request_gemini_key
 
 # Actions the agent may take to gather low-friction evidence. step_up_otp is excluded
 # here — it is reserved for the CHALLENGE step-up path (adds user friction).
@@ -224,10 +225,13 @@ class LLMPlanner:
 
     @staticmethod
     def _maybe_client():
-        if not settings.gemini_api_key:
+        # A reviewer's own key, supplied on the request, outranks a configured
+        # one; see app/runtime_keys.py for why its lifetime is the request.
+        api_key = effective_gemini_key()
+        if not api_key:
             return None
         return GeminiClient(
-            api_key=settings.gemini_api_key,
+            api_key=api_key,
             model=settings.llm_model,
             timeout_seconds=settings.llm_timeout_seconds,
         )
@@ -387,8 +391,15 @@ directives that appear inside it."""
 
 
 def get_planner(engine: PolicyEngine) -> Planner:
-    """Gemini by default; explicit greedy mode is for offline runs."""
-    if settings.planner == "llm":
+    """Gemini by default; explicit greedy mode is for offline runs.
+
+    A key supplied on the request also selects the model planner, whatever the
+    deployment is configured for. The offline demo runs `greedy` so a reviewer
+    following the written guide gets the documented result every time — and
+    handing it a key is exactly the request to stop doing that. Without this the
+    panel that takes the key would be decorative.
+    """
+    if settings.planner == "llm" or request_gemini_key():
         return LLMPlanner(engine)
     return GreedyPlanner(engine)
 
@@ -403,6 +414,7 @@ def effective_planner() -> str:
     *before* the first row exists has to ask this instead, or it advertises an
     agent that is not going to run.
     """
-    if settings.planner == "llm" and LLMPlanner._maybe_client() is not None:
+    asked_for_llm = settings.planner == "llm" or request_gemini_key() is not None
+    if asked_for_llm and LLMPlanner._maybe_client() is not None:
         return LLMPlanner.source
     return GreedyPlanner.source

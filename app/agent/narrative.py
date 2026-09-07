@@ -6,6 +6,7 @@ from app.agent.gemini import GeminiClient
 from app.chain.models import Verdict
 from app.config import settings
 from app.domain.enums import API_LABEL, GRADE_MEANING, Action
+from app.runtime_keys import effective_gemini_key
 
 # A plain-English account of a finished chain — what makes "human-readable
 # evidence chain" literally true rather than a claim about a JSON array (T3).
@@ -101,10 +102,10 @@ def narrate(verdict: Verdict, client=None) -> str:
 
 
 def _maybe_client() -> object | None:
-    if not settings.gemini_api_key or settings.planner != "llm":
+    if not effective_gemini_key() or settings.planner != "llm":
         return None
     return GeminiClient(
-        api_key=settings.gemini_api_key,
+        api_key=effective_gemini_key(),
         model=settings.llm_model,
         timeout_seconds=settings.llm_timeout_seconds,
     )

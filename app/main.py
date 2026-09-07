@@ -27,6 +27,7 @@ from app.api import (
     routes_verified_caller,
     routes_verify,
 )
+from app.api.request_key import RequestKeyMiddleware
 from app.api.request_limits import RequestLimitsMiddleware
 from app.api.security_headers import SecurityHeadersMiddleware
 from app.chain.vault import vault
@@ -88,6 +89,7 @@ def create_app() -> FastAPI:
     )
     # Raw ASGI, and added before the routers so it wraps every response
     # including the SSE stream (S10, S12).
+    app.add_middleware(RequestKeyMiddleware)
     app.add_middleware(RequestLimitsMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
     app.include_router(routes_verify.router)

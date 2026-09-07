@@ -53,3 +53,24 @@
 .nc-level.low{color:var(--green)}.nc-level.medium{color:var(--amber)}.nc-level.high{color:var(--red)}.nc-level.unknown{color:var(--muted)}
 .nc-interval{padding:.4rem 0;border-block-start:1px solid var(--line)}
 .nc-note{color:var(--muted)}
+
+/* Bring-your-own-key. Styled like the network-conditions panel because it is
+   the same kind of thing: an optional control that sits outside the decision. */
+.byok{margin-block:1.5rem;padding:1rem 1.25rem;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.byok h2{margin:0 0 .35rem;font-size:.95rem;letter-spacing:.04em;text-transform:uppercase;color:var(--text)}
+.byok-scope{margin:0 0 .75rem;max-width:70ch;color:var(--muted);font-size:.85rem;line-height:1.55}
+.byok-scope a{color:var(--gold)}
+.byok-scope code{font:inherit;font-family:var(--mono);color:var(--text)}
+.byok-actions{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-block-end:.75rem}
+.byok-actions input{flex:1 1 22rem;min-width:0;padding:.5rem .7rem;border:1px solid var(--line);border-radius:8px;
+  background:#0c1230;color:var(--text);font:inherit;font-family:var(--mono);font-size:.85rem}
+.byok-actions input:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.byok-actions button{padding:.5rem .85rem;border:1px solid #526695;border-radius:8px;background:var(--surface2);
+  color:var(--text);cursor:pointer;font:inherit;font-size:.85rem;font-weight:600}
+.byok-actions button:hover:not(:disabled){border-color:var(--gold);color:var(--gold)}
+.byok-actions button:disabled{opacity:.45;cursor:not-allowed}
+.byok-actions button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.byok-promise{margin:0 0 .6rem;max-width:70ch;color:var(--muted);font-size:.78rem;line-height:1.55;
+  border-inline-start:2px solid var(--gold);padding-inline-start:11px}
+.byok-state{font-size:.85rem;color:var(--muted);font-family:var(--mono)}
+.byok-state.on{color:var(--green)}

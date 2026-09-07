@@ -66,6 +66,33 @@
     </article>
   </section>
 
+  <section class="byok" id="byok" aria-labelledby="byokTitle" hidden>
+    <h2 id="byokTitle">Run the agent with your own Gemini key</h2>
+    <p class="byok-scope">
+      The demo above uses the deterministic <code>greedy</code> planner, so your
+      result matches the written guide exactly. Paste a free
+      Google AI Studio key
+      to watch the model choose the evidence instead — and watch policy overrule it.
+      We ship no key of our own here on purpose.
+    </p>
+    <p class="byok-scope">Get a free key at <code>aistudio.google.com/apikey</code>.</p>
+    <div class="byok-actions">
+      <label class="visually-hidden" for="byokKey">Gemini API key</label>
+      <input id="byokKey" type="password" autocomplete="off" spellcheck="false"
+             placeholder="AIza…" aria-describedby="byokPromise">
+      <button id="byokUse" type="button">Use my key</button>
+      <button id="byokForget" type="button" disabled>Forget it</button>
+    </div>
+    <p id="byokPromise" class="byok-promise">
+      Your key stays in this browser tab and is sent only to this demo, as one
+      header, on the runs you start. It is never written to our database, never
+      enters a signed receipt, never reaches a log, and is discarded the moment
+      each request finishes. Close the tab and it is gone. It spends your quota,
+      not ours.
+    </p>
+    <div id="byokState" class="byok-state">No key set — running the deterministic planner.</div>
+  </section>
+
   <section class="network-conditions" aria-labelledby="ncTitle">
     <h2 id="ncTitle" data-i18n="ui.network_conditions_title">Network conditions</h2>
     <p class="nc-scope" data-i18n="ui.network_conditions_scope">Information about the network, shown separately from the trust decision. A congested cell can explain a slow or failed verification. It is not evidence about a person, it never changes the risk score, and it never waives a check.</p>

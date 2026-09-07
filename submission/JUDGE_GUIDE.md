@@ -224,7 +224,28 @@ Steps 3–6 use the deterministic `greedy` planner so your results match this
 document byte for byte. To watch the model choose instead, you need a free
 Google AI Studio key from <https://aistudio.google.com/apikey>.
 
-Stop the server (Ctrl-C), then:
+**The easy way — no restart, no environment variables.** Scroll down the
+`/judge` page to **“Run the agent with your own Gemini key”**, paste the key,
+press **Use my key**. That is it; the next run uses the model. The panel only
+appears when the deployment can honour it, and it tells you exactly what
+happens to your key:
+
+> Your key stays in this browser tab and is sent only to this demo, as one
+> header, on the runs you start. It is never written to our database, never
+> enters a signed receipt, never reaches a log, and is discarded the moment
+> each request finishes. Close the tab and it is gone. It spends your quota,
+> not ours.
+
+That is enforced, not just promised —
+[`tests/test_request_supplied_model_key.py`](../tests/test_request_supplied_model_key.py)
+asserts the key never survives into the next request, never reaches any
+database table, never appears in a receipt or a response, and is refused
+outright by any deployment that could spend money.
+
+Press **Forget it** when you are done, or just close the tab.
+
+**Or the environment-variable way**, if you prefer. Stop the server (Ctrl-C),
+then:
 
 ```bash
 export ISNAD_GEMINI_API_KEY=your-key-here
@@ -266,9 +287,16 @@ what evidence to buy. Policy decides what the evidence means, what may not be
 skipped, and when a single adverse fact is not enough. Neither one can do the
 other's job, and the trace tells you which is speaking at every step.
 
-The verdict: **CHALLENGE / DEGRADED at 0.28**, over four links. Greedy reached
-CHALLENGE / DEGRADED at 0.322 over five. Two different strategies, buying
-different evidence in a different order, agreeing on the answer.
+The verdict on that run: **CHALLENGE / DEGRADED at 0.28**, over four links,
+where greedy reached CHALLENGE / DEGRADED at 0.322 over five.
+
+**Your run may differ, and that is the honest part.** The model is not
+deterministic: a later run of ours on the same fixture bought three links and
+reached DECLINE. Greedy is the reproducible planner precisely so the rest of
+this guide can state exact expected values; the model is the one that gets to
+surprise you. What does not change is the boundary — whatever the model picks,
+policy still grades it, still demands corroboration before one adverse signal
+can decline, and still names which of the two is speaking on every row.
 
 **No key? Nothing breaks, and nothing lies.** Missing credentials, a transport
 failure, an empty answer or a hit call ceiling all fall back to greedy, and the
@@ -316,12 +344,12 @@ The full API-by-API breakdown is in
 make test
 ```
 
-**Expect:** `1310 passed` in roughly 160 seconds, including Playwright coverage
+**Expect:** `1329 passed` in roughly 155 seconds, including Playwright coverage
 of both English and Arabic. Three Starlette deprecation warnings are known and
 harmless.
 
 For a backend-only run with no Chromium needed: `make test-fast` →
-`1245 passed` in about 25 seconds.
+`1264 passed` in about 25 seconds.
 
 ```bash
 .venv311/bin/python scripts/evidence_pack.py --output-dir /tmp/isnad-evidence
