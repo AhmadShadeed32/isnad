@@ -61,7 +61,8 @@ here is ours:
 Eight integrated CAMARA APIs rather than the seven proposed, now including
 Congestion Insights and Number Recycling. Recorded calls to Nokia's hosted
 simulator. A Gemini planner whose selections and overrides are visible in the
-trace. A bilingual interface. 39 tests became 1,310.
+trace. A full RTL Arabic interface, with the composed verdict prose still
+English and labelled as such. 39 tests became 1,310.
 
 ## Submission artefacts
 
