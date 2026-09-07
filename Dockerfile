@@ -74,6 +74,34 @@ ENV PATH="/opt/venv/bin:$PATH" \
 WORKDIR /app
 COPY --chown=isnad:isnad app ./app
 COPY --chown=isnad:isnad pyproject.toml ./
+# `/lab` imports `demo.lab.runner` unconditionally and reads the recorded
+# bundle from `demo/lab/artifacts/`, so an image without them answers /readyz
+# happily and then fails that route (R10). Only `demo/lab` is copied: the
+# merchant pilot and the fake operator are development harnesses, and a
+# runtime image has no business carrying a fake operator.
+#
+# `demo/__init__.py` comes along because `demo.lab` is not importable without
+# it. `demo/lab/runner.py` imports nothing outside `app` and `demo.lab`, and
+# `_code_revision` already degrades honestly when there is no `.git` and no
+# git binary — which is this image.
+COPY --chown=isnad:isnad demo/__init__.py ./demo/
+COPY --chown=isnad:isnad demo/lab ./demo/lab
+
+# Signing the shipped registry is a DEPLOY-time step, not a build-time one, and
+# it has two halves that must be done together:
+#
+#   1. sign `app/registry/*.yaml` with this deployment's vault key — the dev
+#      `.sig` is deliberately kept out of the build context (see
+#      .dockerignore), because a signature made with the developer's key is
+#      not one a fresh volume's key can verify;
+#   2. set ISNAD_VAULT_TRUSTED_PUBLIC_KEYS to the public key that signed it.
+#
+# Doing only the first with ISNAD_REGISTRY_SIGNATURE_REQUIRED=true is how a
+# container starts, verifies, and refuses: the signature is present and is
+# rejected as untrusted. Leaving both undone starts unsigned, which is the
+# default posture and is reported as such rather than claimed as verified.
+# A wheel install hits the same wall for the opposite reason — it DOES ship the
+# dev .sig — and that is why this is written down here as well.
 
 # The persistent volume. Both paths below MUST be absolute and MUST live on it:
 # a relative vault path plus a restart means a new signing key and every stored

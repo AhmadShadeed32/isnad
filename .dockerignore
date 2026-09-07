@@ -18,6 +18,14 @@ __pycache__/
 tests/
 docs/
 demo/
+# ...except the recorded lab, which `/lab` imports and reads at runtime (R10).
+# The merchant pilot and the fake operator stay out: they are development
+# harnesses, and a runtime image has no business carrying a fake operator.
+# Docker takes the LAST matching pattern, so the re-exclusion below still wins
+# for bytecode caches.
+!demo/__init__.py
+!demo/lab/**
+demo/lab/**/__pycache__/
 
 # The registry signature is made with the DEPLOYMENT vault key, not the
 # developer's. Shipping the dev .sig into an image makes a fresh volume — which
