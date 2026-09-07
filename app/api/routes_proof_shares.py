@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -13,12 +12,13 @@ from app.chain.subject import idempotency_fingerprint
 from app.config import settings
 from app.db import proof_shares, store
 from app.domain.schemas import ProofShareCreateRequest, ProofShareCreateResponse
+from app.ui import page_path
 
 router = APIRouter(prefix="/v1", tags=["proof-shares"], dependencies=[Depends(limit_per_key)])
 # No /v1 prefix, no auth: the bearer token in the path IS the credential.
 page_router = APIRouter(tags=["proof-shares"], dependencies=[Depends(limit_per_ip)])
 
-_PROOF_HTML = Path(__file__).parent.parent / "static" / "proof.html"
+_PROOF_HTML = page_path("proof")
 
 _CHAIN_NOT_FOUND = HTTPException(
     status_code=status.HTTP_404_NOT_FOUND,

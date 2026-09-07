@@ -18,6 +18,7 @@ from app.config import settings
 from app.db.database import SessionLocal
 from app.db.models import NetworkConditionSubscriptionRow
 from app.main import app
+from tests.ui_source import read_ui_source
 
 AUTH = {"Authorization": "Bearer demo-merchant-key"}
 OTHER = {"Authorization": "Bearer other-merchant-key"}
@@ -280,7 +281,7 @@ def test_a_failed_cleanup_is_surfaced_rather_than_reported_as_deleted(client, mo
     assert response.json()["detail"]["code"] == "cleanup_failed"
 
     still = client.get(f"/v1/network-conditions/subscriptions/{subscription_id}", headers=AUTH)
-    assert still.json()["status"] == "active"
+    assert still.json()["status"] == "unknown"
     assert "cleanup failed" in still.json()["reason"]
 
 
@@ -757,7 +758,7 @@ def test_every_panel_string_is_authored_in_both_languages(locale):
 def test_the_panel_is_a_separate_section_from_the_verdict():
     from pathlib import Path
 
-    page = Path("app/static/judge.html").read_text(encoding="utf-8")
+    page = read_ui_source(Path("app/static/judge.html"))
 
     assert 'class="network-conditions"' in page
     assert "ui.network_conditions_scope" in page
@@ -779,7 +780,7 @@ def test_a_level_carries_a_glyph_as_well_as_a_colour():
     has to be able to read the level."""
     from pathlib import Path
 
-    page = Path("app/static/judge.html").read_text(encoding="utf-8")
+    page = read_ui_source(Path("app/static/judge.html"))
 
     assert "ncLevelNode" in page
     assert "▲" in page and "◆" in page and "●" in page
@@ -790,7 +791,7 @@ def test_the_panel_never_requests_anything_on_load():
     operator is a bill the reader never agreed to."""
     from pathlib import Path
 
-    page = Path("app/static/judge.html").read_text(encoding="utf-8")
+    page = read_ui_source(Path("app/static/judge.html"))
     panel = page[page.index("--- network conditions") : page.index("function setFactGroup")]
 
     for call in ("apiJson('/v1/network-conditions", "apiJson(`/v1/network-conditions"):
@@ -1012,3 +1013,40 @@ def test_a_window_entirely_in_the_future_is_not_history():
 def test_a_window_starting_within_clock_skew_is_still_accepted():
     start = datetime.now(UTC) + timedelta(seconds=30)
     assert nc.validate_period(start, start + timedelta(minutes=10)) == nc.HISTORY
+
+# Integration-audit regressions: uncertain remote state must remain recoverable.
+def test_unknown_subscription_does_not_expire_out_of_its_reservation(provider):
+    now = datetime.now(UTC)
+    created = nc.create('audit-owner', NUMBER, provider, now=now)
+    with SessionLocal() as session:
+        row = session.get(NetworkConditionSubscriptionRow, created['subscription_id'])
+        row.status = 'unknown'
+        session.commit()
+    later = now + timedelta(days=1)
+    with SessionLocal() as session:
+        row = session.get(NetworkConditionSubscriptionRow, created['subscription_id'])
+        assert nc.as_public(row, later)['status'] == 'unknown'
+        assert nc._active_counts(session, 'audit-owner', row.device_hash, later) == (1, 1)
+
+
+def test_delete_cannot_forget_unknown_remote_subscription(provider):
+    created = nc.create('audit-owner', NUMBER, provider)
+    with SessionLocal() as session:
+        row = session.get(NetworkConditionSubscriptionRow, created['subscription_id'])
+        row.status = 'unknown'
+        row.provider_id = None
+        session.commit()
+    with pytest.raises(nc.NetworkConditionError, match='reconcil'):
+        nc.delete('audit-owner', created['subscription_id'], provider)
+    assert nc.get('audit-owner', created['subscription_id'])['status'] == 'unknown'
+    assert provider.deletes == 0
+
+
+def test_delete_cannot_use_another_provider(provider, monkeypatch):
+    created = nc.create('audit-owner', NUMBER, provider)
+    monkeypatch.setattr(settings, 'provider', 'nac')
+    with pytest.raises(nc.NetworkConditionError, match='different provider'):
+        nc.delete('audit-owner', created['subscription_id'], provider)
+    assert provider.deletes == 0
+
+

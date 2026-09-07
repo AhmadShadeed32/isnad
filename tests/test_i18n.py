@@ -12,13 +12,14 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from app.main import app
+from tests.ui_source import read_ui_source
 
 client = TestClient(app)
 
-RECEIPT_HTML = Path("app/static/receipt.html").read_text(encoding="utf-8")
+RECEIPT_HTML = read_ui_source(Path("app/static/receipt.html"))
 RECEIPT_SCRIPT = RECEIPT_HTML.split("<script>")[-1].split("</script>")[0]
 SWITCH_JS = Path("app/static/i18n.js").read_text(encoding="utf-8")
-JUDGE_HTML = Path("app/static/judge.html").read_text(encoding="utf-8")
+JUDGE_HTML = read_ui_source(Path("app/static/judge.html"))
 JUDGE_SCRIPT = JUDGE_HTML.split("<script>")[-1].split("</script>")[0]
 
 

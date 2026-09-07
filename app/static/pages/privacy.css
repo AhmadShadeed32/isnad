@@ -1,0 +1,22 @@
+:root{--bg:#0d1117;--fg:#e6edf3;--mut:#8b949e;--green:#3fb950;--amber:#d29922;
+        --line:#30363d;--card:#161b22}
+  
+  body{margin:0;padding:1.4rem;background:var(--bg);color:var(--fg);
+       font:14px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  main{max-width:720px;margin:0 auto}
+  h1{font-size:1.35rem;margin:0 0 .3rem}
+  .sub{color:var(--mut);margin:0 0 1.6rem}
+  h2{font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;
+     color:var(--amber);margin:1.8rem 0 .7rem;font-weight:600}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:8px;
+        padding:.9rem 1rem;margin-bottom:.6rem}
+  .kv{display:grid;grid-template-columns:minmax(120px,auto) 1fr;gap:.4rem 1rem}
+  .k{color:var(--mut)}
+  .yes{color:var(--green)}
+  .no{color:var(--mut);text-decoration:line-through}
+  .why{color:var(--mut);margin:.45rem 0 0;font-size:13px}
+  ul{margin:0;padding-left:1.1rem}
+  li{margin-bottom:.5rem;color:var(--mut)}
+  .win{font-size:1.5rem;color:var(--green)}
+  code{color:var(--amber)}
+  .err{color:var(--amber)}

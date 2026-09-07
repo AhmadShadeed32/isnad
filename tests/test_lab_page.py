@@ -17,11 +17,12 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from tests.ui_source import read_ui_source
 
 client = TestClient(app)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-LAB_HTML = (REPO_ROOT / "app" / "static" / "lab.html").read_text(encoding="utf-8")
+LAB_HTML = read_ui_source(REPO_ROOT / "app" / "static" / "lab.html")
 LAB_SCRIPT = LAB_HTML.split("<script>")[-1].split("</script>")[0]
 BUNDLE_PATH = REPO_ROOT / "demo" / "lab" / "artifacts" / "bundle.json"
 

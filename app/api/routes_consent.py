@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 
@@ -22,13 +20,14 @@ from app.domain.schemas import (
 )
 from app.policy import counterfactual
 from app.presentation import present
+from app.ui import page_path
 
 router = APIRouter(prefix="/v1", tags=["consent"], dependencies=[Depends(limit_per_key)])
 # No /v1 prefix: this is a browser-facing landing page, not the JSON API —
 # same split as routes_judge.page_router / routes_console.page_router.
 page_router = APIRouter(tags=["consent"], dependencies=[Depends(limit_per_ip)])
 
-_CONSENT_COMPLETE_HTML = Path(__file__).parent.parent / "static" / "consent_complete.html"
+_CONSENT_COMPLETE_HTML = page_path("consent_complete")
 
 
 # Extracted to app/api/content_negotiation.py so the I13 proof-share route

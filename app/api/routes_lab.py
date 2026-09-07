@@ -25,10 +25,11 @@ from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from app.api.rate_limit import limit_per_ip
+from app.ui import page_path
 
 router = APIRouter(tags=["lab"])
 
-_LAB_HTML = Path(__file__).parent.parent / "static" / "lab.html"
+_LAB_HTML = page_path("lab")
 _BUNDLE = Path(__file__).resolve().parents[2] / "demo" / "lab" / "artifacts" / "bundle.json"
 
 _MISSING_BUNDLE = HTTPException(

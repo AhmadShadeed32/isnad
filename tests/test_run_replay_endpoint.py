@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 
 from app.events import current_owner, emit
 from app.main import app
+from tests.ui_source import read_ui_source
 
 client = TestClient(app)
 AUTH = {"Authorization": "Bearer demo-merchant-key"}
@@ -158,7 +159,7 @@ async def test_the_replayed_sequence_matches_the_live_one():
 
 # --- the console's own recovery control ---------------------------------------
 
-CONSOLE_HTML = Path("app/static/console.html").read_text(encoding="utf-8")
+CONSOLE_HTML = read_ui_source(Path("app/static/console.html"))
 CONSOLE_SCRIPT = CONSOLE_HTML.split("<script>")[-1].split("</script>")[0]
 
 

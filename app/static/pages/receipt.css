@@ -1,0 +1,48 @@
+:root{--bg:#0d1117;--fg:#e6edf3;--mut:#8b949e;--green:#3fb950;--red:#f85149;
+        --line:#30363d;--card:#161b22;--amber:#d29922}
+  
+  body{margin:0;padding:1.2rem;background:var(--bg);color:var(--fg);
+       font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  main{max-width:640px;margin:0 auto}
+  h1{font-size:15px;font-weight:600;margin:0 0 .2rem}
+  .sub{color:var(--mut);font-size:12px;margin-bottom:1rem;word-break:break-all}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:6px;
+        padding:.9rem;margin-bottom:.8rem}
+  .status{font-size:18px;font-weight:600;display:flex;align-items:center;gap:.5rem}
+  .ok{color:var(--green)} .bad{color:var(--red)} .pending{color:var(--mut)}
+  /* The steps table has six columns and does not fit a 375px viewport. Without
+     a scoped scroll container the table simply overflowed its card, which
+     stretched the whole page wider than the viewport (mobile browsers then
+     grow their own layout viewport to match, so the entire receipt — not just
+     the table — became horizontally scrollable and the right-hand columns
+     were clipped with no visible way to reach them). Scoping the scroll to
+     this wrapper keeps the rest of the page fixed at device width. */
+  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{width:100%;min-width:480px;border-collapse:collapse;font-size:12px}
+  th{text-align:left;color:var(--mut);font-weight:normal;padding:.2rem .3rem}
+  td{padding:.2rem .3rem;border-top:1px solid var(--line)}
+  .k{color:var(--mut)}
+  .row{display:flex;justify-content:space-between;gap:1rem;padding:.15rem 0}
+  button{background:#21262d;border:1px solid var(--line);color:inherit;font:inherit;
+         padding:.4rem .8rem;border-radius:4px;cursor:pointer;margin-top:.6rem}
+  button:disabled{opacity:.5;cursor:default}
+  .mono{font-size:11px;color:var(--mut);word-break:break-all}
+  .note{font-size:11px;color:var(--mut);margin-top:.5rem}
+  /* I6: logical properties so a dir="rtl" flip needs no separate rules. */
+  .toolbar{display:flex;gap:.5rem;align-items:center;margin-block-end:.8rem;flex-wrap:wrap}
+  .toolbar select{background:#21262d;border:1px solid var(--line);color:inherit;
+                  font:inherit;padding:.35rem .5rem;border-radius:4px}
+  .toolbar select:focus-visible{outline:2px solid var(--green);outline-offset:1px}
+  .draft{font-size:11px;color:var(--amber)}
+  th,td{text-align:start}
+  .row{text-align:start}
+  /* I6 step 2: an unknown key falls back to English *visibly*. An English
+     string surviving inside an Arabic page is a missing translation, not an
+     editorial choice, so it is marked rather than left to look deliberate. */
+  [dir="rtl"] [lang="en"]{border-block-end:1px dotted var(--mut)}
+  /* Anything the signature covers stays LTR whatever the page direction: a
+     chain id, hex key or ISO timestamp reordered by the bidi algorithm would
+     no longer be the string the reader is meant to compare. */
+  
+  /* The translation that sits beside a signed token, never in place of it. */
+  .gloss{color:var(--mut)}

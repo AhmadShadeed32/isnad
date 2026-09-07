@@ -8,11 +8,12 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from app.main import app
+from tests.ui_source import read_ui_source
 
 client = TestClient(app)
 AUTH = {"Authorization": "Bearer demo-merchant-key"}
 
-CONSOLE_HTML = Path("app/static/console.html").read_text(encoding="utf-8")
+CONSOLE_HTML = read_ui_source(Path("app/static/console.html"))
 PAYLOAD = "<img src=x onerror=alert(1)>"
 
 

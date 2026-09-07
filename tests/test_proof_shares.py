@@ -19,6 +19,7 @@ from app.chain.vault import vault
 from app.db import store
 from app.domain.enums import ChainGrade, Decision
 from app.main import app
+from tests.ui_source import read_ui_source
 
 client = TestClient(app)
 AUTH = {"Authorization": "Bearer demo-merchant-key"}
@@ -291,9 +292,7 @@ def test_a_browser_navigation_gets_the_page_and_a_script_gets_json():
 def test_the_page_separates_signature_integrity_from_link_access():
     """An expired link's downloaded summary still verifies; the page must not
     let those two facts read as one."""
-    page = (Path(__file__).resolve().parents[1] / "app" / "static" / "proof.html").read_text(
-        encoding="utf-8"
-    )
+    page = read_ui_source(Path(__file__).resolve().parents[1] / "app" / "static" / "proof.html")
     assert "still verifies" in page
     assert "does not withdraw the original receipt" in page
     # Never claims to be a redacted copy of the original signature.
@@ -301,9 +300,7 @@ def test_the_page_separates_signature_integrity_from_link_access():
 
 
 def test_the_page_never_renders_the_source_payload_itself():
-    page = (Path(__file__).resolve().parents[1] / "app" / "static" / "proof.html").read_text(
-        encoding="utf-8"
-    )
+    page = read_ui_source(Path(__file__).resolve().parents[1] / "app" / "static" / "proof.html")
     assert "source_payload_digest" in page
     assert "signed_payload" not in page
 

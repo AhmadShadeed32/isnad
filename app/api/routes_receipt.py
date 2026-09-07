@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 import segno
 from fastapi import APIRouter, HTTPException, Request, status
@@ -10,6 +9,7 @@ from fastapi.responses import HTMLResponse
 from app.api.rate_limit import limit_per_ip
 from app.chain.vault import vault
 from app.db import store
+from app.ui import page_path
 
 # T6 — a public, read-only receipt anyone can verify on their own phone.
 #
@@ -18,7 +18,7 @@ from app.db import store
 # WebCrypto against the public key, with no library and no external origin.
 
 router = APIRouter(tags=["receipt"])
-_RECEIPT_HTML = Path(__file__).parent.parent / "static" / "receipt.html"
+_RECEIPT_HTML = page_path("receipt")
 
 # Fields the page is allowed to show. Everything else in the signed payload is
 # available for verification but is not rendered.

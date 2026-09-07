@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from app.config import settings
 from app.main import app
+from tests.ui_source import demo_token_from
 
 client = TestClient(app)
 
@@ -120,7 +121,4 @@ def test_a_console_token_cannot_read_a_merchants_chain():
 
 
 def _console_token() -> str:
-    body = client.get("/console").text
-    marker = "const CONSOLE_TOKEN = '"
-    start = body.index(marker) + len(marker)
-    return body[start : body.index("'", start)]
+    return demo_token_from(client.get("/console").text)

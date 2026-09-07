@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import json
 from datetime import UTC, datetime
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from fastapi.responses import HTMLResponse, StreamingResponse
@@ -24,12 +23,13 @@ from app.presentation import present
 from app.providers import mock as mock_provider
 from app.providers.mock import MockProvider
 from app.screening import screen_call
+from app.ui import page_path
 
 router = APIRouter(prefix="/v1", tags=["console"], dependencies=[Depends(limit_per_key)])
 # /console is reachable without a key, so it is limited by address.
 page_router = APIRouter(tags=["console"], dependencies=[Depends(limit_per_ip)])
 
-_CONSOLE_HTML = Path(__file__).parent.parent / "static" / "console.html"
+_CONSOLE_HTML = page_path("console")
 
 # A synthetic claimed location for demo acts whose story assumes the customer
 # made one. This is a demo INPUT to the location check — what the customer

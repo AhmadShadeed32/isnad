@@ -19,17 +19,16 @@ privacy notice is supposed to state out loud. It is rate limited per address.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 
 from app.api.rate_limit import limit_per_ip
 from app.config import settings
+from app.ui import page_path
 
 router = APIRouter(tags=["privacy"], dependencies=[Depends(limit_per_ip)])
 
-_PAGE = Path(__file__).parent.parent / "static" / "privacy.html"
+_PAGE = page_path("privacy")
 
 
 def _human(seconds: int) -> str:

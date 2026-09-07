@@ -12,7 +12,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 # markup, the CSP is defence in depth rather than the only control.
 CSP = (
     "default-src 'self'; "
-    "script-src 'self' 'unsafe-inline'; "
+    "script-src 'self'; "
     "style-src 'self' 'unsafe-inline'; "
     "img-src 'self' data:; "
     "connect-src 'self'; "

@@ -1,0 +1,3 @@
+/* Shared primitives. Page palettes and layouts live in pages/<name>.css. */
+*{box-sizing:border-box}
+bdi{unicode-bidi:isolate}

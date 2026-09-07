@@ -24,6 +24,7 @@ from app.config import settings
 from app.domain.enums import Action, ChainGrade, Decision, Hypothesis, Result
 from app.main import app
 from app.policy.engine import PolicyEngine
+from tests.ui_source import read_ui_source
 
 client = TestClient(app)
 AUTH = {"Authorization": "Bearer demo-merchant-key"}
@@ -409,7 +410,7 @@ def test_a_partial_fallback_is_labelled_honestly(monkeypatch):
 def test_the_console_shows_the_planner_that_produced_each_run():
     from pathlib import Path
 
-    console = Path("app/static/console.html").read_text(encoding="utf-8")
+    console = read_ui_source(Path("app/static/console.html"))
     assert "plannerPill" in console
     assert "setPlannerBadge" in console
 

@@ -22,6 +22,7 @@ from app.chain.vault import vault
 from app.db import store
 from app.domain.enums import ChainGrade, Decision
 from app.main import app
+from tests.ui_source import read_ui_source
 
 client = TestClient(app)
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -114,7 +115,7 @@ def test_a_malformed_bundle_is_rejected_not_crashed(tmp_path):
 
 # --- the browser download (I7 step 1) ----------------------------------------
 
-RECEIPT_HTML = (REPO_ROOT / "app" / "static" / "receipt.html").read_text(encoding="utf-8")
+RECEIPT_HTML = read_ui_source(REPO_ROOT / "app" / "static" / "receipt.html")
 RECEIPT_SCRIPT = RECEIPT_HTML.split("<script>")[-1].split("</script>")[0]
 
 

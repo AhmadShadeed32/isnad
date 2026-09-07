@@ -20,6 +20,7 @@ from app.domain.enums import Action, Result
 from app.domain.schemas import RequestContext, VerificationRequest
 from app.providers import timing as timing_lib
 from app.providers.mock import MockProvider
+from tests.ui_source import read_ui_source
 
 NOW = datetime(2026, 9, 6, 20, 0, tzinfo=UTC)
 LEGACY = Path(__file__).resolve().parent / "fixtures" / "legacy_receipt_pre_swap_dates.json"
@@ -463,7 +464,7 @@ def test_every_availability_value_has_a_display_key():
 def test_the_exact_timestamp_is_rendered_ltr_isolated():
     """Under an RTL page the bidi algorithm reorders a bare ISO timestamp at
     its neutral edges, and a reordered exact value is the wrong value."""
-    judge = Path("app/static/judge.html").read_text(encoding="utf-8")
+    judge = read_ui_source(Path("app/static/judge.html"))
 
     assert "appendTiming" in judge
     assert "Isnad.isolate(event.provider_time)" in judge
@@ -472,5 +473,5 @@ def test_the_exact_timestamp_is_rendered_ltr_isolated():
 def test_the_date_row_is_separate_from_the_evidence_row_in_both_surfaces():
     """Merging them would present a second call as part of the first."""
     for path in ("app/static/judge.html", "app/static/console.html"):
-        page = Path(path).read_text(encoding="utf-8")
+        page = read_ui_source(Path(path))
         assert "'enrichment'" in page, path

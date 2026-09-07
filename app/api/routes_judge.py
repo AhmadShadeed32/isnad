@@ -8,21 +8,20 @@ second (and less reviewed) way to trigger provider calls.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from fastapi import APIRouter, Depends
 from fastapi.responses import HTMLResponse
 
 from app.api import demo_token
 from app.api.rate_limit import limit_per_ip
 from app.config import settings
+from app.ui import page_path
 
 # A render mints a short-lived demo credential, so Judge Mode has the same
 # address-level page limit as the full console.  It is not a free token-minting
 # endpoint for a refresh loop.
 page_router = APIRouter(tags=["judge"], dependencies=[Depends(limit_per_ip)])
 
-_JUDGE_HTML = Path(__file__).parent.parent / "static" / "judge.html"
+_JUDGE_HTML = page_path("judge")
 _TOKEN_PLACEHOLDER = "__ISNAD_JUDGE_TOKEN__"
 
 

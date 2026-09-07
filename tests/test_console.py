@@ -12,6 +12,7 @@ from app.domain.schemas import Money, RequestContext, VerificationRequest
 from app.events import subscribe
 from app.main import app
 from app.providers.mock import MockProvider
+from tests.ui_source import fetch_ui_source
 
 client = TestClient(app)
 
@@ -41,7 +42,9 @@ def test_console_page_serves():
     r = client.get("/console")
     assert r.status_code == 200
     assert "Isnad" in r.text
-    assert "/v1/console/stream" in r.text  # wired to the live stream
+    # The stream wiring lives in the page's own script, which is now a separate
+    # asset; the page is only serving correctly if that asset serves too.
+    assert "/v1/console/stream" in fetch_ui_source(client, "/console")
 
 
 def test_console_run_act1_allows():
@@ -102,7 +105,7 @@ def test_a_rejected_demo_token_tells_the_presenter_to_reload():
     console left open past the TTL invalidates the token baked into the page.
     That is the common case on stage, and the generic message actively misleads.
     """
-    page = client.get("/console").text
+    page = fetch_ui_source(client, "/console")
     # The page must carry the reload instruction for both rejection codes.
     assert "demo session expired" in page
     assert "reload the page" in page
@@ -122,7 +125,7 @@ def test_a_rejected_operator_key_is_cleared_rather_than_retried_forever():
     """apiKey() reads sessionStorage, and requireApiKey() only prompts when the
     stored value is empty — so a wrong merchant key used to wedge the tab until
     it was closed. The handler drops it on rejection."""
-    page = client.get("/console").text
+    page = fetch_ui_source(client, "/console")
     assert "sessionStorage.removeItem(TOKEN_KEY)" in page
 
 
@@ -131,7 +134,7 @@ def test_the_act_buttons_send_a_credential():
     with `auth:false`. Every Act button and the full-stage run 401ed before the
     investigator started, which also left the ask-the-agent box disabled because
     setLatestChain() never ran on that path."""
-    page = client.get("/console").text
+    page = fetch_ui_source(client, "/console")
     assert "auth:false, headers:{'X-Console-Run-Id'" not in page
 
 
@@ -139,7 +142,7 @@ def test_reverse_isnad_verdicts_are_styled():
     """Reverse Isnad returns TRUST_CALLER / CAUTION / REJECT_CALLER, not the
     forward flow's ALLOW / CHALLENGE / DECLINE, and setVerdict() sets the class
     directly — so without these rules the panel stays grey whatever the answer."""
-    page = client.get("/console").text
+    page = fetch_ui_source(client, "/console")
     for cls in ("TRUST_CALLER", "CAUTION", "REJECT_CALLER"):
         assert f".verdict.{cls}{{" in page, f"no style for {cls}"
 
@@ -147,7 +150,7 @@ def test_reverse_isnad_verdicts_are_styled():
 def test_the_planner_pill_is_set_from_server_mode_on_page_load():
     """Until the first verdict, the pill read `planner: —` even though the
     authenticated mode endpoint already returns the planner."""
-    page = client.get("/console").text
+    page = fetch_ui_source(client, "/console")
 
     assert "setPlannerBadge(health.planner);" in page
 
@@ -155,7 +158,7 @@ def test_the_planner_pill_is_set_from_server_mode_on_page_load():
 def test_the_console_labels_unpriced_rows_and_the_default_country():
     """An em dash looks like a rendering defect in a live demo, not the
     deliberate absence of a merchant-specific price."""
-    page = client.get("/console").text
+    page = fetch_ui_source(client, "/console")
 
     assert "not priced — merchant-specific" in page
     assert "regional default list price" in page

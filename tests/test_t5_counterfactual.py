@@ -13,6 +13,7 @@ from app.chain.models import EvidenceLink, Verdict
 from app.domain.enums import Action, Decision, Result
 from app.main import app
 from app.policy import counterfactual
+from tests.ui_source import read_ui_source
 
 client = TestClient(app)
 AUTH = {"Authorization": "Bearer demo-merchant-key"}
@@ -209,7 +210,7 @@ def test_the_response_note_labels_the_whole_block():
 
 
 def test_the_console_renders_both_paths_side_by_side():
-    console = Path("app/static/console.html").read_text(encoding="utf-8")
+    console = read_ui_source(Path("app/static/console.html"))
 
     assert "renderCounterfactual" in console
     assert "one SMS OTP" in console

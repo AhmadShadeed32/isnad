@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from app.api import demo_token
 from app.config import InsecureConfiguration, Settings, check_startup_posture
 from app.main import app
+from tests.ui_source import demo_token_from
 
 client = TestClient(app)
 
@@ -44,8 +45,8 @@ def test_no_token_is_minted_when_demo_mode_is_off(monkeypatch):
 
     monkeypatch.setattr(settings, "demo_mode", False)
     body = client.get("/console").text
-    # The placeholder collapses to an empty string, not to a credential.
-    assert "CONSOLE_TOKEN = ''" in body
+    # The placeholder collapses to an empty attribute, not to a credential.
+    assert demo_token_from(body) == ""
     with pytest.raises(RuntimeError):
         demo_token.mint()
 
@@ -136,7 +137,4 @@ def test_startup_does_not_gate_the_mock_provider():
 
 
 def _token_from_console() -> str:
-    body = client.get("/console").text
-    marker = "const CONSOLE_TOKEN = '"
-    start = body.index(marker) + len(marker)
-    return body[start : body.index("'", start)]
+    return demo_token_from(client.get("/console").text)

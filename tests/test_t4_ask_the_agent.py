@@ -14,6 +14,7 @@ from app.db import store
 from app.events import current_owner
 from app.main import app
 from app.ownership import owner_hash
+from tests.ui_source import read_ui_source
 
 client = TestClient(app)
 AUTH = {"Authorization": "Bearer demo-merchant-key"}
@@ -237,7 +238,7 @@ def test_it_is_rate_limited_per_key(chain_id, fake, monkeypatch):
 
 
 def test_the_console_has_an_ask_box_enabled_once_a_chain_exists():
-    console = Path("app/static/console.html").read_text(encoding="utf-8")
+    console = read_ui_source(Path("app/static/console.html"))
 
     assert 'id="askInput"' in console
     assert "askTheAgent" in console

@@ -12,6 +12,8 @@ import json
 import os
 from pathlib import Path
 
+from tests.ui_source import read_ui_source
+
 os.environ.setdefault("ISNAD_MERCHANT_API_KEY", "test-merchant-key")
 os.environ.setdefault("PILOT_OPERATOR_USERNAME", "operator")
 os.environ.setdefault("PILOT_OPERATOR_PASSWORD", "correct-horse-battery-staple")
@@ -741,9 +743,9 @@ def test_trust_session_and_release_require_a_session_and_csrf(monkeypatch):
 # --- UI surfaces (static assertions, matching test_t6_receipt.py's own pattern) ---
 
 _STATIC = Path(__file__).resolve().parents[1] / "demo" / "merchant_pilot" / "static"
-INDEX_HTML = (_STATIC / "index.html").read_text(encoding="utf-8")
-FLOW_HTML = (_STATIC / "flow.html").read_text(encoding="utf-8")
-CAPABILITIES_HTML = (_STATIC / "capabilities.html").read_text(encoding="utf-8")
+INDEX_HTML = read_ui_source(_STATIC / "index.html")
+FLOW_HTML = read_ui_source(_STATIC / "flow.html")
+CAPABILITIES_HTML = read_ui_source(_STATIC / "capabilities.html")
 
 
 def test_the_checkout_form_offers_a_claimed_location_labelled_as_a_claim():

@@ -15,13 +15,14 @@ from fastapi.testclient import TestClient
 from app.config import settings
 from app.db import store
 from app.main import app
+from tests.ui_source import read_ui_source
 
 client = TestClient(app)
 AUTH = {"Authorization": "Bearer demo-merchant-key"}
 SUBJECT = "+962790000002"
 
-RECEIPT_HTML = Path("app/static/receipt.html").read_text(encoding="utf-8")
-CONSOLE_HTML = Path("app/static/console.html").read_text(encoding="utf-8")
+RECEIPT_HTML = read_ui_source(Path("app/static/receipt.html"))
+CONSOLE_HTML = read_ui_source(Path("app/static/console.html"))
 
 
 @pytest.fixture

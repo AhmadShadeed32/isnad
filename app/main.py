@@ -9,6 +9,7 @@ from fastapi.responses import RedirectResponse, Response
 
 from app import __version__, retention
 from app.api import (
+    routes_assets,
     routes_challenge,
     routes_consent,
     routes_console,
@@ -105,6 +106,10 @@ def create_app() -> FastAPI:
     app.include_router(routes_registry.router)
     app.include_router(routes_verified_caller.router)
     app.include_router(routes_i18n.router)
+    # Order matters: routes_assets owns the `/ui/{path}` catch-all, so the
+    # i18n router's own `/ui/i18n.js` and `/ui/i18n/{locale}.json` must be
+    # mounted ahead of it or they resolve to an unregistered-asset 404.
+    app.include_router(routes_assets.router)
     app.include_router(routes_network_conditions.router)
     app.include_router(routes_network_conditions.callback_router)
     app.include_router(routes_proof_shares.router)

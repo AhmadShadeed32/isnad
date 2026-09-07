@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from app.api import routes_judge
 from app.config import settings
 from app.main import app
+from tests.ui_source import demo_token_from, expand_ui_source
 
 client = TestClient(app)
 
@@ -30,7 +31,12 @@ def _reset_limiters():
 
 
 def _page_body() -> str:
-    return asyncio.run(routes_judge.judge_page()).body.decode("utf-8")
+    """The render, with the page's own script inlined.
+
+    The behaviour these tests assert on moved into a static asset; the render
+    still decides what the script is handed, so both halves are read together.
+    """
+    return expand_ui_source(asyncio.run(routes_judge.judge_page()).body.decode("utf-8"))
 
 
 def test_judge_page_is_a_checkout_to_signed_receipt_story():
@@ -77,8 +83,9 @@ def test_judge_page_mints_a_short_lived_token_only_in_demo_mode(monkeypatch):
     monkeypatch.setattr(settings, "demo_mode", True)
     demo_page = _page_body()
     assert "__ISNAD_JUDGE_TOKEN__" not in demo_page
-    assert "const DEMO_TOKEN = 'demo_" in demo_page
+    assert demo_token_from(demo_page).startswith("demo_")
 
     monkeypatch.setattr(settings, "demo_mode", False)
     production_page = _page_body()
-    assert "const DEMO_TOKEN = '';" in production_page
+    # The placeholder collapses to an empty attribute, not to a credential.
+    assert demo_token_from(production_page) == ""
