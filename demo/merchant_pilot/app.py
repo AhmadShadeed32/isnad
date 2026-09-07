@@ -382,28 +382,122 @@ def _require_csrf(request: Request, session: _Session, csrf_header: str | None) 
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="missing or bad CSRF token")
 
 
+# `/ui/i18n.js` resolves here because the pilot mounts the Isnad locale router
+# (see `locale_router` above) — it is served, not borrowed from the other port.
+# The script prepends its own `.isnad-language` bar to any page without a
+# `#locale` control of its own, so this page styles that bar rather than
+# leaving a system-font strip on a themed background.
+#
+# `__ERROR__` rather than `str.format`: the stylesheet is mostly braces, and
+# every one of them had to be doubled to survive a format call. That is a
+# needless edit hazard for a page whose only variable is one banner.
 _LOGIN_PAGE = """<!doctype html>
+<html lang="en">
+<head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Merchant pilot — sign in</title>
 <style>
-body{{font-family:system-ui,sans-serif;max-width:360px;margin:4rem auto}}
-input{{display:block;width:100%;padding:.5rem;margin:.3rem 0 1rem;box-sizing:border-box}}
-button{{width:100%;padding:.6rem;background:#1a7f37;color:#fff;border:0;border-radius:4px}}
-.err{{color:#b91c1c}}
+:root{
+  --night:#070b20; --surface:#111834; --surface2:#182247; --line:#2d3b70;
+  --text:#eef2ff; --muted:#aab5d4; --gold:#e5bb59; --red:#ff7979;
+  --sans:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"SFMono-Regular",Consolas,"Liberation Mono",monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;min-height:100vh;padding:24px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+  background:radial-gradient(circle at 14% -10%,#243673 0,transparent 31rem),var(--night);
+  color:var(--text);font-family:var(--sans);
+}
+/* i18n.js prepends this bar itself and ships its own system-font rules for it.
+   Restated here with the page's tokens so it reads as part of the card, not as
+   something that landed on top of it. */
+.isnad-language{
+  width:100%;max-width:400px;margin:0;padding:0;
+  font:12px var(--sans);color:var(--muted);
+}
+.isnad-language select{
+  padding:7px 9px;font:inherit;font-size:12px;color:var(--text);
+  background:var(--surface2);border:1px solid var(--line);border-radius:8px;
+}
+.isnad-language select:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.card{
+  width:100%;max-width:400px;padding:30px 28px 28px;
+  background:linear-gradient(145deg,rgba(24,34,71,.96),rgba(13,19,45,.96));
+  border:1px solid var(--line);border-radius:18px;
+  box-shadow:0 18px 48px rgba(0,0,0,.28);
+}
+.brand{display:flex;align-items:center;gap:12px;font-weight:700;letter-spacing:.02em}
+.brand .arabic{font-size:23px;color:var(--gold);font-weight:500}
+.brand small{display:block;margin-top:2px;font-size:12px;font-weight:500;letter-spacing:0;color:var(--muted)}
+h1{margin:26px 0 6px;font-size:23px;letter-spacing:-.03em}
+.lede{margin:0 0 22px;font-size:13px;line-height:1.5;color:var(--muted)}
+label{display:block;margin-bottom:14px;font-size:12px;font-weight:600;color:var(--muted)}
+input{
+  display:block;width:100%;margin-top:6px;padding:11px 12px;
+  font:inherit;font-size:14px;color:var(--text);
+  background:var(--surface2);border:1px solid var(--line);border-radius:9px;
+}
+input:focus-visible,button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+button{
+  width:100%;margin-top:8px;padding:13px 16px;
+  font:inherit;font-weight:800;color:#17162b;
+  background:linear-gradient(110deg,#f4cf71,var(--gold));
+  border:0;border-radius:10px;cursor:pointer;
+  box-shadow:0 8px 20px rgba(229,187,89,.18);
+  transition:transform .16s;
+}
+button:hover{transform:translateY(-1px)}
+/* The banner only exists on the failed-POST render, and autofocus drops the
+   caret in the username field directly below it — so announcing at first
+   paint is exactly what a screen-reader user needs here. */
+.err{
+  margin:0 0 18px;padding:10px 12px;
+  border:1px solid #70404b;border-radius:10px;
+  background:#321d2a;color:#ffc4c4;
+  font-size:13px;line-height:1.45;
+}
+.foot{
+  margin:22px 0 0;padding-top:16px;border-top:1px solid var(--line);
+  font:11px var(--mono);line-height:1.5;color:var(--muted);
+}
+@media(max-width:420px){body{padding:14px}.card{padding:24px 20px}}
 </style>
-<form method="post" action="/login">
-<h1>Merchant pilot</h1>
-{error}
-<label>Username<input type="text" name="username" autocomplete="username" required></label>
-<label>Password<input type="password" name="password" autocomplete="current-password" required></label>
-<button type="submit">Sign in</button>
-</form>
-<script src="/ui/i18n.js" defer></script>"""
+</head>
+<body>
+<main class="card">
+  <div class="brand"><span class="arabic">إسناد</span><span>Isnad<small>Merchant pilot harness</small></span></div>
+  <h1>Sign in</h1>
+  <p class="lede">Operator access to the pilot checkout harness.</p>
+  __ERROR__
+  <form method="post" action="/login">
+    <label>Username<input type="text" name="username" autocomplete="username" autofocus required></label>
+    <label>Password<input type="password" name="password" autocomplete="current-password" required></label>
+    <button type="submit">Sign in</button>
+  </form>
+  <p class="foot">Loopback / private networks only. This harness terminates no TLS of its own.</p>
+</main>
+<script src="/ui/i18n.js" defer></script>
+</body>
+</html>"""
+
+
+def _login_html(error: str = "") -> str:
+    """The page, with at most one banner substituted in."""
+    return _LOGIN_PAGE.replace("__ERROR__", error)
+
+
+def _login_error(message: str) -> str:
+    return f'<p class="err" role="alert">{message}</p>'
+
 
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page() -> HTMLResponse:
-    return HTMLResponse(_LOGIN_PAGE.format(error=""))
+    return HTMLResponse(_login_html())
 
 
 @app.post("/login")
@@ -415,9 +509,7 @@ async def login(request: Request) -> RedirectResponse:
 
     if not login_throttle.check(client_key):
         return HTMLResponse(
-            _LOGIN_PAGE.format(
-                error='<p class="err">Too many attempts. Try again later.</p>'
-            ),
+            _login_html(_login_error("Too many attempts. Try again later.")),
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
         )
 
@@ -427,7 +519,7 @@ async def login(request: Request) -> RedirectResponse:
     if not valid:
         login_throttle.record_failure(client_key)
         return HTMLResponse(
-            _LOGIN_PAGE.format(error='<p class="err">Wrong username or password.</p>'),
+            _login_html(_login_error("Wrong username or password.")),
             status_code=status.HTTP_401_UNAUTHORIZED,
         )
 
