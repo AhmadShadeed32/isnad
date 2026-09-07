@@ -13,6 +13,7 @@ Built on GSMA Open Gateway CAMARA APIs via the Nokia Network-as-Code platform.
 | **CAMARA APIs integrated** | 8 on Nokia Network-as-Code — 4 exercised against Nokia's hosted simulator, the rest against the sandbox, all recorded |
 | **AI agent layer** | Gemini chooses which network check to buy next; policy decides what the answer means |
 | **Verification** | 1,310 automated tests pass in 163 s, browser tests included |
+| **Demo video** | [`submission/isnad-demo.mp4`](submission/isnad-demo.mp4) — 3:39, real application footage |
 
 ---
 
@@ -106,20 +107,28 @@ so a run never claims an LLM chose when it did not. This is why `make judge`
 uses `greedy`: a reviewer gets a byte-identical result every time. `make
 judge-ai` runs the same demo with Gemini in the seat.
 
-A recorded Gemini run is committed at
-[`docs/nac/observations/2026-09-07-gemini-rehearsal.json`](docs/nac/observations/2026-09-07-gemini-rehearsal.json).
-Two model selections, both labelled `planner: llm`, with the model's own text:
+Here is a real run, recorded at
+[`docs/nac/observations/2026-09-07-gemini-judge-run.json`](docs/nac/observations/2026-09-07-gemini-judge-run.json).
+Four rows, and the architecture is visible in all four:
 
-> "Checking for a recent SIM swap yields the highest expected information to
-> evaluate the account takeover hypothesis."
+| Row | Chosen by | Sentence |
+| --- | --- | --- |
+| SIM Swap | `llm` | *"Checking for a recent SIM swap provides the highest relevant information value to investigate the account takeover hypothesis."* |
+| Device Swap | **`policy`** | *"corroborate before this signal alone can decline"* |
+| STOP | `llm` | *"None of the remaining affordable actions are relevant to assessing the account takeover hypothesis."* |
+| Number Verification | **`policy`** | *"cheapest step that could resolve the doubt"* |
 
-then, after seeing that result:
+The model opened with a single adverse signal; policy would not let one signal
+carry a decline, so it required corroboration. The model then said stop; policy
+overruled it and bought the cheapest check that could resolve the doubt. The
+trace names which of the two is speaking on every row.
 
-> "Checking for a recent device swap provides strong additional evidence
-> relevant to the account takeover hypothesis alongside the confirmed SIM swap."
+It reached CHALLENGE / DEGRADED at 0.28 over four links. Greedy reaches
+CHALLENGE / DEGRADED at 0.322 over five. Different strategies, different
+evidence, same answer.
 
-Two calls against a ceiling of six — it stopped because the chain was decided,
-not because the budget ran out.
+An earlier bounded rehearsal is at
+[`2026-09-07-gemini-rehearsal.json`](docs/nac/observations/2026-09-07-gemini-rehearsal.json).
 
 The agent layer uses exactly one tool from the hackathon's Resource & Tooling
 Guide: **Google AI Studio (Gemini)**, which the guide lists as a free-tier
@@ -365,6 +374,7 @@ network by accident. Live evidence goes through `nac` or not at all.
 
 [Judge guide](submission/JUDGE_GUIDE.md) ·
 [CAMARA API usage in detail](submission/CAMARA_API_USAGE.md) ·
+[Why the demo runs on mock](submission/MOCK_VS_NAC.md) ·
 [Risk score interpretation](docs/RISK_SCORE.md) ·
 [Feature-level test guide](docs/TESTING_GUIDE.md) ·
 [Synthetic evaluation method](docs/INDEPENDENT_EVALUATION.md) ·

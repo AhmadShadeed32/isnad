@@ -45,3 +45,9 @@ env/
 CLAUDE.md
 graphify-out/
 docs/_internal/
+
+# Video production. The finished submission video lives in submission/;
+# the pipeline that renders it does not belong in an application repository.
+video-build/
+*.webm
+audio/

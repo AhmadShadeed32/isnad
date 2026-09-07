@@ -2,10 +2,10 @@
 
 **MENA Ignite Hackathon 2026 · Theme 4 · Team Isnad**
 
-Everything below runs on your own machine, offline, with no Nokia or Google
-credentials. Total time: about **15 minutes**, or **3 minutes** for steps 1–3
-alone. Each step lists what you should see, so a mismatch is a finding, not a
-guess.
+Everything below runs on your own machine, offline. Steps 1–6 and 8–10 need no
+credentials at all; step 7 needs a free Google AI Studio key. Total time: about
+**20 minutes**, or **3 minutes** for steps 1–3 alone. Each step lists what you
+should see, so a mismatch is a finding, not a guess.
 
 If anything here does not behave as written, that is a bug and we want to know.
 
@@ -218,15 +218,11 @@ Interactive OpenAPI is at <http://127.0.0.1:8010/docs> (demo mode only).
 
 ---
 
-## Step 7 — The AI agent layer, with Gemini in the seat (2 minutes, optional)
+## Step 7 — The AI agent layer, with Gemini in the seat (2 minutes)
 
 Steps 3–6 use the deterministic `greedy` planner so your results match this
 document byte for byte. To watch the model choose instead, you need a free
 Google AI Studio key from <https://aistudio.google.com/apikey>.
-
-This is the **only step in this guide we could not run for you**, because it
-needs your key. The recorded run linked at the end of this step is what we can
-show without one.
 
 Stop the server (Ctrl-C), then:
 
@@ -235,22 +231,49 @@ export ISNAD_GEMINI_API_KEY=your-key-here
 make judge-ai
 ```
 
-Run the SIM-change investigation again.
+Run the SIM-change investigation again. **This is what we saw on 7 September**
+(recorded at [`docs/nac/observations/2026-09-07-gemini-judge-run.json`](../docs/nac/observations/2026-09-07-gemini-judge-run.json)):
 
-**Expect:** the trace header now reads `planner: llm`, and each
-`Agent selects …` row carries the model's own rationale instead of the greedy
-heuristic's fixed sentence. The verdict is reached the same way — the model
-picks *which evidence to buy*; policy alone decides what the evidence means.
+The trace header reads **`planner: llm`**, and the first row is the model's own
+sentence, not a heuristic's fixed one:
+
+> **Agent selects SIM Swap** — *"Checking for a recent SIM swap provides the
+> highest relevant information value to investigate the account takeover
+> hypothesis."* · `llm · budget 12`
+
+Then watch what happens to it. The next two rows are labelled **`policy`**, not
+`llm`:
+
+> **Agent selects Device Swap** — *"corroborate before this signal alone can
+> decline"* · `policy · budget 9`
+
+The model had produced a single adverse signal. Policy would not let that
+signal carry a decline on its own, so it required corroboration and the UI
+names the gate rather than dressing the check up as the model's idea.
+
+Then the model says stop:
+
+> **Agent stops** — *"None of the remaining affordable actions are relevant to
+> assessing the account takeover hypothesis."* · `llm · budget 3`
+
+And policy overrules it:
+
+> **Agent selects Number Verification** — *"cheapest step that could resolve
+> the doubt"* · `policy · budget 3`
+
+**That sequence is the whole architecture in four rows.** The model chooses
+what evidence to buy. Policy decides what the evidence means, what may not be
+skipped, and when a single adverse fact is not enough. Neither one can do the
+other's job, and the trace tells you which is speaking at every step.
+
+The verdict: **CHALLENGE / DEGRADED at 0.28**, over four links. Greedy reached
+CHALLENGE / DEGRADED at 0.322 over five. Two different strategies, buying
+different evidence in a different order, agreeing on the answer.
 
 **No key? Nothing breaks, and nothing lies.** Missing credentials, a transport
 failure, an empty answer or a hit call ceiling all fall back to greedy, and the
 verdict records which strategy actually ran. A run never claims an LLM chose
 when it did not.
-
-If you would rather not spend a key at all, a recorded Gemini run is committed
-at [`docs/nac/observations/2026-09-07-gemini-rehearsal.json`](../docs/nac/observations/2026-09-07-gemini-rehearsal.json)
-— two model selections, both labelled `planner: llm`, with the model's own text
-and a note on how to read it.
 
 ---
 
@@ -328,6 +351,53 @@ outcomes, and we would not claim otherwise on a slide.
 
 ---
 
+## Step 10 — Satisfy yourself about the mock (3 minutes)
+
+The demo runs on authored fixtures, and you should want to know how far that
+is from Nokia. The full answer is in
+[MOCK_VS_NAC.md](MOCK_VS_NAC.md); here is how to check it rather than read it.
+
+```bash
+.venv311/bin/python -m pytest -q tests/test_nac_contract.py \
+  tests/test_provider_vocabulary.py tests/test_consent.py \
+  tests/test_s9_consent_replay.py tests/test_consent_contract.py
+```
+
+**Expect:** `70 passed`. Those tests enforce that a fixture cannot emit a signal
+no recorded Nokia response returned, that every action the agent can take has a
+recorded response on file, and that no fixture claims a precision CAMARA does
+not offer.
+
+Then look at what the mock is actually made of:
+
+```bash
+cat docs/nac/sim_swap.json          # what Nokia returned, 30 Aug, with SDK version
+sed -n '1,40p' app/providers/vocabulary.py   # the only sentences any provider may speak
+grep -n "_GHOST" -A 12 app/providers/mock.py # a scenario: signals, never prose
+```
+
+**What you should conclude:** a mock scenario is a mapping of action to
+`(Result, signal)`. The sentence a judge reads comes from `detail_for()` —
+the same function `nac.py` calls. A fixture author cannot write a more
+convincing sentence because they cannot write a sentence at all.
+
+**And what you should not conclude:** that mock equals live. It does not.
+Mock's answers are chosen, its latencies are scripted, its failure modes are
+only the ones we wrote, and its consent basis is a string rather than a round
+trip. What is shared is the code path, the interface, the vocabulary and the
+contract tests — the engine cannot tell the difference, and we label it so you
+can.
+
+The one detail that shows the fixtures came from real responses: the mock
+inherits Nokia's *limitations*. SIM Swap answers a boolean against a window, so
+no row may say "swapped 41 minutes ago". The change date is a second billable
+call, shown as its own row. The date and the boolean can disagree — because on
+the hosted simulator they did. Device Intelligence returns unavailable, because
+the capture did, and a test forbids any scenario from inventing a reputation
+verdict. Those are inconvenient, and they survived.
+
+---
+
 ## Also worth a look, if you have time
 
 | Where | What |
@@ -368,6 +438,7 @@ Ctrl-C the server. Inside the repository directory the demo wrote
 `__pycache__/` folders — and nothing anywhere else. Delete the clone and it is
 gone.
 
-Everything in this guide was run end to end against a clean clone before it was
-written down, on macOS with Python 3.11. The one exception is step 7, which
-needs a key we cannot supply for you; it is marked there.
+Every step in this guide was run end to end before it was written down, on
+macOS with Python 3.11 — steps 1–6 and 8–10 against a clean `git clone`, and
+step 7 against the same build with a real Gemini key. Nothing here is
+described from reading the code.

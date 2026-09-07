@@ -1,0 +1,146 @@
+1
+00:00:00,800 --> 00:00:08,250
+Her SIM card stopped working on Tuesday. She replaced it. By
+Friday, that routine change blocked her checkout.
+
+2
+00:00:08,760 --> 00:00:16,171
+Here, cash on delivery is most of e-commerce. A fake order
+costs a merchant a real van and a real driver.
+
+3
+00:00:16,596 --> 00:00:26,620
+So merchants use a rule. SIM changed recently: decline. It is
+cheap, and it is wrong. Most people who replace a SIM lost a
+phone.
+
+4
+00:00:27,342 --> 00:00:36,409
+Generative A.I. has broken every soft proof that someone is
+genuine. Deepfakes pass liveness. Voice clones defeat call
+centres.
+
+5
+00:00:36,833 --> 00:00:45,639
+The one thing a model cannot fake is a physical SIM, in radio
+range of a real cell tower, with years of history behind it.
+
+6
+00:00:46,064 --> 00:00:51,814
+CAMARA is the first time that truth has been programmable by
+anyone outside the operator.
+
+7
+00:00:52,536 --> 00:00:59,743
+Isnad treats a SIM change as the start of an investigation,
+not the end of a customer relationship.
+
+8
+00:01:00,168 --> 00:01:08,593
+The name is literal. Isnad is the classical chain of
+transmission: judging a report by scrutinising every link that
+carried it.
+
+9
+00:01:09,018 --> 00:01:15,350
+Human, SIM, device, location, history. Each link a CAMARA
+call, each shown with its own source.
+
+10
+00:01:16,073 --> 00:01:23,119
+Here is the checkout. Fifteen hundred dollars, cash on
+delivery, a new account, and a SIM replaced this week.
+
+11
+00:01:23,501 --> 00:01:29,600
+The agent buys number verification first: cheapest useful
+check. The network number matches.
+
+12
+00:01:29,982 --> 00:01:40,004
+Then SIM swap. It comes back adverse, and it stays in the
+chain. The operator change date is a separate row, because it
+is a second billable call.
+
+13
+00:01:40,387 --> 00:01:46,714
+Device swap: the handset is unchanged. Location: she is where
+she said. Same person, new SIM.
+
+14
+00:01:47,139 --> 00:01:57,260
+Challenge, not decline. Policy score zero point three two two,
+between the thresholds on screen. The merchant asks one more
+question instead of losing her.
+
+15
+00:01:57,982 --> 00:02:03,347
+Every decision is signed. The receipt proves this instance
+issued exactly these bytes.
+
+16
+00:02:03,729 --> 00:02:08,828
+Change one word and verification fails, offline, with no call
+back to us.
+
+17
+00:02:09,210 --> 00:02:16,627
+What it does not prove is that the operator told the truth. A
+signed mock receipt is still mock, and the page says so.
+
+18
+00:02:17,349 --> 00:02:21,077
+Now with Gemini choosing. Watch who is speaking on each row.
+
+19
+00:02:21,418 --> 00:02:33,274
+The model opens with SIM swap, in its own words. One adverse
+signal cannot carry a decline, so policy demands
+corroboration. The trace says policy, not model.
+
+20
+00:02:33,699 --> 00:02:40,257
+Then the model says stop, and policy overrules it to buy the
+cheapest check that could still resolve the doubt.
+
+21
+00:02:40,683 --> 00:02:46,102
+The model chooses what to buy. Policy decides what it means,
+and what may not be skipped.
+
+22
+00:02:46,824 --> 00:02:55,558
+Eight CAMARA APIs on Nokia Network as Code. Fourteen recorded
+calls to Nokia's hosted simulator, failures included.
+
+23
+00:02:55,940 --> 00:03:08,091
+On a thirteen-case evaluation, Isnad spends forty-nine
+provider operations where a run-everything pipeline spends
+seventy-eight. At pennies per call, that gap is the business
+model.
+
+24
+00:03:08,473 --> 00:03:13,096
+One thousand three hundred and ten automated tests, English
+and Arabic.
+
+25
+00:03:13,819 --> 00:03:21,324
+What we have not proven: no physical handset has completed a
+consent round trip, and the risk score is uncalibrated.
+
+26
+00:03:21,748 --> 00:03:28,176
+We name those, because an engine whose whole argument is
+provenance does not get to be vague about its own.
+
+27
+00:03:28,899 --> 00:03:33,837
+Clone it, run make setup and make judge, and every number here
+is one command away.
+
+28
+00:03:34,219 --> 00:03:38,930
+The internet never got its isnad. Every verdict this engine
+issues is one.

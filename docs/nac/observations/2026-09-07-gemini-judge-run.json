@@ -1,0 +1,43 @@
+{
+  "observed_at_utc": "2026-09-07T07:50:09+00:00",
+  "purpose": "Verify the judge guide's step 7 by running `make judge-ai` and reading the trace",
+  "how": "make judge-ai PORT=8013, ISNAD_PROVIDER=mock ISNAD_PLANNER=llm; key read from settings, never printed or logged",
+  "provider": "mock",
+  "planner_setting": "llm",
+  "model": "gemini-3.6-flash",
+  "external_requests": {"nokia": 0, "gemini_selection_calls": 3},
+  "verdict": {
+    "decision": "CHALLENGE",
+    "chain_grade": "DEGRADED",
+    "planner_label": "llm",
+    "policy_score": 0.28,
+    "links": 4
+  },
+  "trace": [
+    {"phase": "investigation", "planner": "llm", "action": "sim_swap", "budget_left": 12,
+     "rationale": "Checking for a recent SIM swap provides the highest relevant information value to investigate the account takeover hypothesis.",
+     "result": "FLAG", "signal": "SIM_SWAPPED", "score_after": 0.876},
+    {"phase": "investigation", "planner": "policy", "action": "device_swap", "budget_left": 9,
+     "rationale": "corroborate before this signal alone can decline",
+     "result": "PASS", "signal": "DEVICE_STABLE", "score_after": 0.811},
+    {"phase": "investigation", "planner": "policy", "action": "location_verify", "budget_left": 6,
+     "rationale": "corroborate before this signal alone can decline",
+     "result": "PASS", "signal": "AT_CLAIMED_LOCATION", "score_after": 0.564},
+    {"phase": "investigation", "planner": "llm", "action": "STOP", "budget_left": 3,
+     "rationale": "None of the remaining affordable actions are relevant to assessing the account takeover hypothesis."},
+    {"phase": "resolution", "planner": "policy", "action": "number_verify", "budget_left": 3,
+     "rationale": "cheapest step that could resolve the doubt",
+     "result": "PASS", "signal": "NUMBER_MATCH", "score_after": 0.28}
+  ],
+  "reading": [
+    "The trace header read `planner: llm`, and the first selection carries planner=llm with the model's own sentence. No fallback fired.",
+    "The model and the greedy heuristic buy different evidence in a different order and both reach CHALLENGE. Greedy spends 5 links and lands at 0.322; the model spends 4 and lands at 0.28.",
+    "Steps 2 and 3 are labelled `policy`, not `llm`. The model's first answer was a single adverse signal; policy required corroboration before that signal could carry a decline, and the UI names the gate rather than presenting the check as the model's idea.",
+    "Step 4 is the model choosing STOP. Step 5 overrides it: policy still required the cheapest doubt-resolving check. This is the boundary working in public - the model chooses what to buy, and policy decides both what it means and what may not be skipped.",
+    "Every evidence row is stamped SIMULATOR / mock fixture. The model calls were real; the operator answers were not."
+  ],
+  "not_shown": [
+    "No Nokia call was made in this run.",
+    "The same run against live operator data has not been performed."
+  ]
+}
