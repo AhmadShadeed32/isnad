@@ -23,8 +23,8 @@ a mock response or a dated test count.
 | 7c Consent Info | **DEFERRED, recorded** | none | n/a | Contract pinned in `tests/test_nac_wire_contract.py` (v0.1 path, scopes/purpose/requestCaptureUrl); **never called** | Deferred because it reports status and may hand back an operator capture URL — a redirect-ownership surface that needs its own state/replay protection, and no product path needs it before the required gates |
 | 7d Forwarding and tenure | **DEFERRED, recorded** | none | Call forwarding was **observed** (gate 3: active/inactive plus documented 422 and 503) | Contract and hosted behaviour known | No demonstrated product path. Forwarding is voice-only and not fraud by itself; tenure is not merchant history. Implementing either without a path would be an untested array of checks |
 | 8 Arabic + English | PASSED, with two recorded limits | `app/static/i18n.js`, `app/static/i18n/{en,ar}.json`, `app/static/judge.html`, `tests/browser/` (new), `tests/test_i18n.py`, `requirements-dev.txt` | `pytest -q` → **1118 passed, 39.2 s** (2026-09-07), browser tests included in that single command, **0 skipped**; ruff clean | Chromium 151.0.7922.34 driving a real uvicorn instance: rapid switching, dynamic results, aborted dictionary, stored preference, input/focus preservation, byte-identical signed payload, zero `/v1/` calls on a switch, no console errors | The deterministic explanation paragraph is composed server-side from this chain's numbers and is **marked English, not translated**. CAMARA API names stay English by choice. Arabic remains **draft, human review pending** |
-| 9 UI verification | PASSED for the automated matrix; remainder recorded as not visited | `tests/browser/test_surfaces.py`, `tests/browser/test_journeys.py`, `docs/ui/release/` (35 screenshots), `app/static/lab.html` | `pytest -q` → **1187 passed, 1 xfailed** (2026-09-07) | Chromium 151.0.7922.34. Judge/console/lab/privacy/consent-landing at 375 and 1440 in EN and AR; three judge cases; receipt valid and unavailable; network-conditions subscribe→read→delete; console run. Contrast measured against each element's own backdrop; accessible names and focus ring asserted per surface | **Open defect:** `/lab` drags sideways 422px at 375px — strict xfail, cause not found. **Not visited:** 320px and tablet, 200% zoom, keyboard-only critical paths, the merchant/fake-operator three-service journey, shared proof page states |
-| 10 Core re-audit | PARTIAL | `app/network_conditions.py`, `app/db/models.py`, `app/domain/schemas.py`, `migrations/0006`, `.github/workflows/ci.yml`, `pyproject.toml` | `pytest -q` → **1187 passed, 1 xfailed**; ruff clean | Seven defects this session introduced were found and fixed (SDK hidden retries, probe record honesty ×2, `window.Isnad`, dynamic re-translation, panel contrast) plus six from the parallel review (R01–R04, R06, R08, R11) | **Not fixed:** R05 session TTL, R07 network-condition retention, R09 terminal session PII, R10 Docker lab layout, R12 unreachable hybrid mode, R13 durable verify idempotency. All pre-existing; each has a written fix and acceptance test in the handoff |
+| 9 UI verification | PASSED; the `/lab` xfail is now fixed (R15) | `tests/browser/test_surfaces.py`, `tests/browser/test_journeys.py`, `docs/ui/release/` (35 screenshots), `app/static/lab.html` | `pytest -q` → **1187 passed, 1 xfailed** (2026-09-07) | Chromium 151.0.7922.34. Judge/console/lab/privacy/consent-landing at 375 and 1440 in EN and AR; three judge cases; receipt valid and unavailable; network-conditions subscribe→read→delete; console run. Contrast measured against each element's own backdrop; accessible names and focus ring asserted per surface | The `/lab` overflow is **fixed** and the strict xfail removed; the browser suite is 61 passed, 0 xfailed. **Not visited:** 200% zoom, the merchant/fake-operator three-service journey, shared proof page states. 320px and tablet are covered for `/lab` by the R15 verification |
+| 10 Core re-audit | PASSED | `app/network_conditions.py`, `app/db/models.py`, `app/domain/schemas.py`, `migrations/0006`, `.github/workflows/ci.yml`, `pyproject.toml` | `pytest -q` → **1187 passed, 1 xfailed**; ruff clean | Seven defects this session introduced were found and fixed (SDK hidden retries, probe record honesty ×2, `window.Isnad`, dynamic re-translation, panel contrast) plus six from the parallel review (R01–R04, R06, R08, R11) | **All closed** in the 7 September defect-clearing session: R05, R07, R09, R10, R12, R13, plus R14 and R16 which were still open, and R15. R10's file layout is fixed but the **image was never built** — no Docker daemon — so its acceptance run is outstanding |
 | 11 Demo rehearsal | PARTIAL | `docs/nac/observations/2026-09-07-gemini-rehearsal.json` | Mock/greedy journeys rehearsed through the browser suite and the installed wheel; **11.2 spent** — one bounded run, `gemini-3.6-flash` over mock network data, **2 selection calls against a cap of 6**, both `planner="llm"`, no fallback, 4.1 s, DECLINE/REFUTED | Local deterministic journeys, the hosted swap/recycling/forwarding observations, the Gemini run and the wheel smoke are four separate records and are not merged. The Gemini run used the **mock** provider: no operator was called by it | **Not done:** the hosted congestion lifecycle (no reachable callback) and the handset trial (needs onboarding). Both are external limits, not choices |
 | 12 Testing guide | PASSED (README rewritten separately) | `docs/TESTING_GUIDE.md` (new) | Every `-k` selector in the guide was run to confirm it selects the tests it claims | One row per feature with a status that must be read literally, including **Built, never called** for congestion callbacks and Number Verification (the Gemini row moved to **Works, one observed run** after 11.2 was spent) | The README rewrite in this working tree is a parallel reviewer's work, not this session's |
 | 13 Final offline release gate | PASSED, with the dependency audit unperformed | `scripts/independent_evaluation.py`, `docs/INDEPENDENT_EVALUATION.md`, `demo/lab/artifacts/bundle.json` | `pytest -q` → **1187 passed, 1 xfailed, 99.7 s**; `ruff` clean; `verify_runtime_lock.py` → 38 exact pins | Evidence pack: 5 scenarios, all signatures valid and trusted. Legacy receipt verifies byte-for-byte. Wheel built, installed into a clean 3.11 venv and launched outside the repo: `/judge`, `/console`, `/lab`, `/privacy`, `/ui/i18n.js`, `/ui/i18n/ar.json`, `/readyz`, `/lab/bundle.json`, `/consent/complete` all 200, and a real verification returned DECLINE with swap-date timing and the disagreement flag. `graphify update .` run | **`make lint` not run** — the PyPI dependency-inventory rejection stands. The wheel needs `ISNAD_VAULT_TRUSTED_PUBLIC_KEYS` pinned or startup fails closed on the signed registry (correct behaviour, now documented) |
@@ -297,3 +297,43 @@ unconfirmed explanation, to the same standard as the `/lab` overflow xfail.
 
 Actually called since gate 14: 2 Gemini requests. Nothing else — no operator
 call, no live network, no congestion subscription, no callback delivery.
+
+### 2026-09-07 — the defect-clearing session: R05, R07, R09, R10, R12–R16
+
+Every open review item is now closed. Nine commits, one per item, each with the
+handoff's own acceptance criteria as its tests.
+
+| Item | Closed by |
+| --- | --- |
+| R05 / R09 | `e00cb7d` — expiry derived from the clock on every read and before every provider call; sleep bounded by the remaining TTL; one idempotent terminal transition; the raw phone cleared at that transition and the record swept on retention's own timer |
+| R13 / R14 | `a87a7fd` — a durable reservation row committed in the same transaction as the signed chain; uncertain work refused rather than repeated; a cache backend that cannot be built refuses to start, and its calls are bounded and off the event loop |
+| R07 | `290b88e` — expiry settled, then bounded sweeps of subscriptions and their events; `unknown` never swept; the quota check moved onto a new index |
+| R12 | `7672b48` — selective-live hybrid retired in one place with one reason, plus a configuration matrix |
+| R10 | `b614d29` — `demo/lab` shipped in the image; signing posture written down |
+| R15 | `b5400ce` — `/lab`'s sideways drag fixed; the strict xfail removed |
+| R16 | `6beae9e` — evidence and enrichment costs reported separately, with the reconciliation invariant under test |
+
+Three things worth carrying forward.
+
+**R15's cause was the absence of evidence, not a harder-to-find element.** The
+earlier investigation ruled out the audit table and swept for a border box
+escaping a clipping ancestor, found nothing, and recorded that as not yet
+knowing. Scrolling the root 422px right and taking a screenshot settles it: the
+region is empty. The scrollable area was phantom, and the empty sweep had been
+the answer all along. Tablet was affected too, which nobody had measured.
+
+**R13 forced a decision about what to do when we cannot know.** A failure after
+the investigation has begun cannot be distinguished from one that reached the
+operator, so the key stays spent and a retry is refused for reconciliation. That
+is deliberately unfriendly: the alternative is charging a merchant twice for one
+question, and `uncertain` rows outlive settled ones for the same reason.
+
+**A schema-parity test was overdue.** SQLite demos take `create_all` and
+everything else takes Alembic, and nothing compared them. The test found drift
+on its first run — `ix_call_announcements_called_participant_hash` was on the
+model and in no migration — repaired in `0007`.
+
+Actually called: nothing external in this session. No operator call, no model
+call, no live network, no congestion subscription, no callback delivery. The
+Docker image was **not built**: no daemon was available, so R10's file layout is
+fixed and asserted while its container acceptance run is outstanding.

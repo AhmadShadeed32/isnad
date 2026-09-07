@@ -119,6 +119,9 @@ strict xfail, so the day it is fixed the suite fails until the marker is removed
   ceiling — is still stub-tested only.
 - **No live network, no physical handset, no congestion subscription, and no
   callback has ever been delivered.**
+- **The Docker image was not built or started.** No Docker daemon was
+  available. The runtime file layout is asserted against the Dockerfile and
+  `.dockerignore`; running the built image is outstanding.
 - **`make lint` was not run.** It invokes a dependency audit that sends the
   dependency inventory to PyPI, and an earlier review rejected that.
 - **Not browser-verified:** 320px and tablet widths, 200% zoom, keyboard-only

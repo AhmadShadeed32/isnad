@@ -2916,20 +2916,42 @@ no callback ever delivered.**
 
 ### Still open
 
-- **`/lab` drags sideways 422px at 375px.** A strict `xfail` in
-  `tests/browser/test_surfaces.py`, not a deleted test. Ruled out by
-  measurement: the audit table's wrapper is 299px with `overflow-x: auto` and
-  `min-width: 0` and scrolls correctly on its own, and a sweep for any element
-  wider than the viewport whose ancestors are all `overflow-x: visible` comes
-  back empty. Something else contributes to the root's scrollable area.
-- **R05, R09, R13** (trust-session TTL, terminal session PII retention,
-  durable verification idempotency) are pre-existing and **not fixed here**.
-- **R07, R10, R12** (network-condition retention, Docker lab layout,
-  unreachable hybrid mode) are **not fixed here**.
+Every R-item is now closed; what remains below is a verification gap or a
+content decision, not a defect with a fix waiting to be written.
+
 - The deterministic explanation paragraph is composed server-side from each
   chain's own numbers and is marked `lang="en"` rather than translated.
 - Arabic is a **draft**. `review_status` still says so on the page. No
   automated test may be read as native review.
+- **The Docker image was never built or started** (R10). No Docker daemon was
+  available. The file-layout contract is asserted from the Dockerfile and
+  `.dockerignore`; the acceptance run against a live container is outstanding.
+- **Not browser-visited:** 200% zoom, the merchant/fake-operator three-service
+  journey, shared-proof expired and revoked states. 320px and tablet are now
+  covered for `/lab` specifically, by the R15 fix's verification.
+- Gemini has one observed run over mock data. Its fallback reason labels,
+  degraded-model behaviour and call ceiling remain stub-tested only.
+- The hosted congestion lifecycle and the handset trial stay externally
+  blocked: no reachable HTTPS callback, no onboarding.
+
+### Closed in the defect-clearing session (7 September 2026)
+
+| Item | What it was | How it was closed |
+| --- | --- | --- |
+| R05 | Sessions read ACTIVE and spent provider calls after their TTL | Expiry derived from the clock on every read and before every call; sleep bounded by remaining TTL; one idempotent terminal transition |
+| R07 | Settled network-condition rows and events were never reclaimed | Expiry settled, then bounded sweeps; `unknown` never swept; quota check moved onto a new index |
+| R09 | Ended sessions held the raw phone until some other caller created one | Number cleared at the transition; records swept on retention's own timer after a readable window |
+| R10 | The image could not serve `/lab` | `demo/lab` and its bundle copied in; `.dockerignore` re-includes exactly that subtree. **Image not built** |
+| R12 | Selective-live hybrid was unreachable by any configuration | Formally retired, in one place with one reason, with a configuration matrix test |
+| R13 | A crash between the chain commit and the cache write lost the mapping | Durable reservation row committed in the same transaction as the chain; uncertain work refused, never repeated |
+| R14 | A Redis selection silently became a memory cache; calls blocked the loop | Refuses to start when it cannot build; explicit socket timeouts; calls moved off the event loop |
+| R15 | `/lab` dragged sideways 422px at 375px | Phantom scroll area — nothing is painted out there. `overflow-x: clip` on the shell; xfail removed |
+| R16 | Per-link costs did not sum to the reported total | Evidence and enrichment costs reported separately and totalled, with the invariant under test |
+
+One pre-existing schema drift was found on the way: the index
+`ix_call_announcements_called_participant_hash` was declared on the model and
+present in no migration, so every `create_all` database had it and no migrated
+one did. Found by the new schema-parity test, repaired in `0007`.
 
 ### Dead ends worth not repeating
 
