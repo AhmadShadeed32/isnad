@@ -14,7 +14,7 @@ of reasoning and an Ed25519 signature over it.
 ## For a judge, in order
 
 1. **[JUDGE_GUIDE.md](JUDGE_GUIDE.md)** — install, run and verify from a clean
-   clone. Nine steps, ~15 minutes, no credentials needed. Each step states what
+   clone. Ten steps, ~20 minutes; only step 7 needs a key. Each step states what
    you should see, so a mismatch is a finding rather than a guess.
 2. **[../README.md](../README.md)** — the problem, the solution, the AI agent
    layer, the API table, and what is real versus simulated.
