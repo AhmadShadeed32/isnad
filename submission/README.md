@@ -27,7 +27,14 @@ of reasoning and an Ed25519 signature over it.
 5. **[DEMO_SCRIPT.md](DEMO_SCRIPT.md)** — the 90-second live-demo running order
    and the questions we expect.
 
-The fastest possible look, if you have three minutes:
+**The fastest possible look — nothing to install:** <https://ahmadshadeed32-isnad-trust-engine.hf.space/judge>
+
+Press *Investigate the SIM change*. Expect five CAMARA checks, a policy score of
+0.322, and a CHALLENGE / DEGRADED verdict with a signed receipt. It runs on the
+mock provider with no Nokia or Gemini credential attached; to watch the agent
+choose instead, paste a key of your own into the panel further down that page.
+
+Or on your own machine, in three minutes:
 
 ```bash
 make setup && make judge     # then open http://127.0.0.1:8010/judge
@@ -72,9 +79,8 @@ English and labelled as such. 39 tests became 1,329.
 | [`Isnad_Pitch_Phase2.pptx`](Isnad_Pitch_Phase2.pptx) | Phase 2 pitch deck, ten slides, with speaker notes |
 | [`Isnad_Idea_Capture_Phase1.pdf`](Isnad_Idea_Capture_Phase1.pdf) | The Idea Phase template, kept for continuity |
 
-**Still outstanding:** a deployed URL for the published web app. The Dockerfile
-builds and passes an HTTP smoke check, so any container host will serve it; the
-deployment itself is the team's to make.
+**Deployed:** <https://huggingface.co/spaces/AhmadShadeed32/isnad-trust-engine> — a Docker Space running this repository's code on the
+mock provider, with no operator or model credential attached.
 
 ---
 

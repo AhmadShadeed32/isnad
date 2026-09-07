@@ -9,6 +9,7 @@ Built on GSMA Open Gateway CAMARA APIs via the Nokia Network-as-Code platform.
 | --- | --- |
 | **Team** | Ahmad Shadeed (lead) · Yousef Al Masri — Princess Sumaya University for Technology, Amman, Jordan |
 | **Judges start here** | **[submission/JUDGE_GUIDE.md](submission/JUDGE_GUIDE.md)** — ten steps, ~20 minutes, one optional key |
+| **Try it live** | **<https://ahmadshadeed32-isnad-trust-engine.hf.space/judge>** — no install, no credentials |
 | **Run it now** | `make setup && make judge` → <http://127.0.0.1:8010/judge> |
 | **CAMARA APIs integrated** | 8 on Nokia Network-as-Code — 4 exercised against Nokia's hosted simulator, the rest against the sandbox, all recorded |
 | **AI agent layer** | Gemini chooses which network check to buy next; policy decides what the answer means |
