@@ -26,8 +26,8 @@ a mock response or a dated test count.
 | 9 UI verification | PASSED for the automated matrix; remainder recorded as not visited | `tests/browser/test_surfaces.py`, `tests/browser/test_journeys.py`, `docs/ui/release/` (35 screenshots), `app/static/lab.html` | `pytest -q` → **1187 passed, 1 xfailed** (2026-09-07) | Chromium 151.0.7922.34. Judge/console/lab/privacy/consent-landing at 375 and 1440 in EN and AR; three judge cases; receipt valid and unavailable; network-conditions subscribe→read→delete; console run. Contrast measured against each element's own backdrop; accessible names and focus ring asserted per surface | **Open defect:** `/lab` drags sideways 422px at 375px — strict xfail, cause not found. **Not visited:** 320px and tablet, 200% zoom, keyboard-only critical paths, the merchant/fake-operator three-service journey, shared proof page states |
 | 10 Core re-audit | PARTIAL | `app/network_conditions.py`, `app/db/models.py`, `app/domain/schemas.py`, `migrations/0006`, `.github/workflows/ci.yml`, `pyproject.toml` | `pytest -q` → **1187 passed, 1 xfailed**; ruff clean | Seven defects this session introduced were found and fixed (SDK hidden retries, probe record honesty ×2, `window.Isnad`, dynamic re-translation, panel contrast) plus six from the parallel review (R01–R04, R06, R08, R11) | **Not fixed:** R05 session TTL, R07 network-condition retention, R09 terminal session PII, R10 Docker lab layout, R12 unreachable hybrid mode, R13 durable verify idempotency. All pre-existing; each has a written fix and acceptance test in the handoff |
 | 11 Demo rehearsal | NOT STARTED | | | | |
-| 12 Testing guide + README | NOT STARTED | `docs/TESTING_GUIDE.md` does not exist | | | |
-| 13 Final offline release gate | NOT STARTED | | | | |
+| 12 Testing guide | PASSED (README rewritten separately) | `docs/TESTING_GUIDE.md` (new) | Every `-k` selector in the guide was run to confirm it selects the tests it claims | One row per feature with a status that must be read literally, including **Built, never called** for Gemini, congestion callbacks and Number Verification | The README rewrite in this working tree is a parallel reviewer's work, not this session's |
+| 13 Final offline release gate | PASSED, with the dependency audit unperformed | `scripts/independent_evaluation.py`, `docs/INDEPENDENT_EVALUATION.md`, `demo/lab/artifacts/bundle.json` | `pytest -q` → **1187 passed, 1 xfailed, 99.7 s**; `ruff` clean; `verify_runtime_lock.py` → 38 exact pins | Evidence pack: 5 scenarios, all signatures valid and trusted. Legacy receipt verifies byte-for-byte. Wheel built, installed into a clean 3.11 venv and launched outside the repo: `/judge`, `/console`, `/lab`, `/privacy`, `/ui/i18n.js`, `/ui/i18n/ar.json`, `/readyz`, `/lab/bundle.json`, `/consent/complete` all 200, and a real verification returned DECLINE with swap-date timing and the disagreement flag. `graphify update .` run | **`make lint` not run** — the PyPI dependency-inventory rejection stands. The wheel needs `ISNAD_VAULT_TRUSTED_PUBLIC_KEYS` pinned or startup fails closed on the signed registry (correct behaviour, now documented) |
 | 14 Commit and private push | NOT STARTED | remote `private` → `AhmadShadeed32/isnad-private` | | | |
 | 15 Handover | NOT STARTED | | | | |
 
@@ -219,3 +219,31 @@ congestion subscription, no callback delivery.
 Next action: gate 12 — write `docs/TESTING_GUIDE.md` with one row per feature
 (status, setup, user action, expected result, test command, actual evidence,
 known limits), then gate 13's release checks, then the private push.
+
+### 2026-09-07 — gates 12 and 13
+
+A correction that changes a headline number. `scripts/independent_evaluation.py`
+counted **evidence links**, not provider operations, so it reported 34 calls
+where 49 were actually made: a swap date is a second billable call that adds no
+link. Counting both, Isnad spends **49 versus 78** — a 37% saving, not 56% — and
+15 of the 49 buy explanation rather than evidence. The evaluator now reports
+`enrichment_calls` per case and `docs/INDEPENDENT_EVALUATION.md` is corrected.
+
+The same change moved the other figures honestly: automatic decisions fell from
+8/13 to 7/13 and authored disagreements rose from three to four, because a unit
+spent on a date is a unit not available for another check. Neither the fixture
+labels nor the policy weights were touched to recover the old numbers.
+
+Lab artifacts were regenerated to a review location and diffed before replacing
+the committed bundle. The only change is the new `enrichment` event type in
+every case. The bundle records `dirty: true`, which is true.
+
+Wheel smoke found one real deployment fact: a fresh install fails closed on the
+signed registry unless `ISNAD_VAULT_TRUSTED_PUBLIC_KEYS` pins the shipped
+public key. That is the guard working, and it is now written down.
+
+Actually called: nothing external. Still no Gemini request, no live network, no
+congestion subscription, no callback delivery.
+
+Next action: gate 14 — stage the reviewed files, commit, push to `private`, and
+compare local HEAD with `git ls-remote private refs/heads/main`.

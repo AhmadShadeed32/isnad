@@ -153,7 +153,13 @@ class Dataset(BaseModel):
 
 class BaselineResult(BaseModel):
     decision: Decision
+    # Provider OPERATIONS, not evidence links. A swap date is a second billable
+    # call that adds no link, so counting links understated what Isnad actually
+    # spends and overstated the saving against a full-evidence baseline.
     calls: int
+    # How many of `calls` were date enrichments rather than evidence checks, so
+    # the two are separable rather than silently merged.
+    enrichment_calls: int = 0
     adverse_groups: list[str] = []
     unresolved_signals: list[str] = []
     confidence: float | None = None
@@ -235,9 +241,18 @@ async def _run_actual(case: EvaluationCase) -> BaselineResult:
     provider = MockProvider(scenarios={case.phone_number: case.provider_scenario()})
     request = VerificationRequest(phone_number=case.phone_number, context=case.context)
     verdict = await build_investigator(provider).investigate(request, parallel=False)
+    # An enrichment that never left the process (`unsupported`, or one the
+    # budget could not cover) is not a call and is not counted.
+    enrichments = sum(
+        1
+        for link in verdict.chain
+        if link.timing is not None
+        and link.timing.availability not in {"unsupported", "not_attempted"}
+    )
     return BaselineResult(
         decision=verdict.decision,
-        calls=len(verdict.chain),
+        calls=len(verdict.chain) + enrichments,
+        enrichment_calls=enrichments,
         unresolved_signals=sorted(
             {link.signal for link in verdict.chain if link.signal in UNRESOLVED_SIGNALS}
         ),
@@ -265,6 +280,7 @@ def _method_summary(
                 "matches_authored_expectation": result.decision
                 == case.expected_safe_decision,
                 "calls": result.calls,
+                "enrichment_calls": result.enrichment_calls,
                 "confidence": result.confidence,
                 "adverse_groups": result.adverse_groups,
                 "unresolved_signals": result.unresolved_signals,

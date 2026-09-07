@@ -51,23 +51,39 @@ and the shipped policy:
 
 | Method | Completion coverage | Automatic decisions | CHALLENGE | Authored-expectation disagreements | Execution errors | Evidence calls |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Isnad, sequential greedy | 13/13 | 8/13 (61.5%) | 5/13 (38.5%) | 3 | 0 | 38 total (2.92/case) |
+| Isnad, sequential greedy | 13/13 | 7/13 (53.8%) | 6/13 (46.2%) | 4 | 0 | **49 total** (3.77/case): 34 evidence checks + 15 swap-date enrichments |
 | Corroboration-aware rules | 13/13 | 5/13 (38.5%) | 8/13 (61.5%) | 0 | 0 | 78 total (6/case) |
 | Full-evidence same policy | 13/13 | 6/13 (46.2%) | 7/13 (53.8%) | 3 | 0 | 78 total (6/case) |
 
 Completion coverage means the method returned a result for every case.
 Automatic-decision coverage counts ALLOW plus DECLINE, so Isnad's 13/13
-completion and 8/13 automatic decisions describe different properties.
+completion and 7/13 automatic decisions describe different properties.
 
-The investigator disagreed with three conservative expectations, returning ALLOW:
-`location_could_not_resolve`, `single_number_mismatch`, and
-`travel_with_recent_sim_change`. These are synthetic expectation differences,
-not observed false negatives. Early stopping can still miss later evidence;
-the 38-versus-78 call result is inseparable from that tradeoff.
+Re-run on 7 September 2026 after swap-date enrichment was added. Two corrections
+to how this table must be read:
+
+**The call count is provider OPERATIONS, not evidence links.** A swap date is a
+second billable call that adds no link to the chain, so counting links reported
+34 where 49 operations were actually made — understating what Isnad spends and
+overstating the saving. `scripts/independent_evaluation.py` now counts both and
+reports `enrichment_calls` separately per case. Quote **49 versus 78**, and say
+that 15 of the 49 buy explanation rather than evidence.
+
+**The numbers moved because the agent now spends differently.** A unit spent on
+a date is a unit not available for another check, so early stopping happens on
+less corroboration: automatic decisions fell from 8/13 to 7/13 and authored
+disagreements rose from three to four. That is a real trade, not a regression to
+tune away, and neither the fixture labels nor the policy weights were adjusted
+to recover the old figures.
+
+The investigator disagreed with four conservative expectations by returning
+ALLOW. These are synthetic expectation differences, not observed false
+negatives. Early stopping can still miss later evidence; the 49-versus-78 call
+result is inseparable from that tradeoff.
 
 The relevance-aware ALLOW gate now requires supporting evidence that bears on
 the active hypothesis. Compared with the prior 28-call/six-disagreement run,
-this buys ten more checks and resolves three authored-expectation differences.
+this bought more checks and resolved authored-expectation differences.
 The fixture labels and policy weights were not tuned to recover old metrics.
 
 The first run exposed an empty-chain ALLOW path at a low prior. That violated

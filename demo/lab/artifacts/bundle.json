@@ -6,7 +6,7 @@
       "fault_profile": null,
       "removes_claimed_location": false,
       "run": {
-        "code_revision": "b6c35c10c1d9f458e8231770da9654195b3c90e7",
+        "code_revision": "0f7fb95de8e0f3ae7bffa18bf8f5bc387678cc1b",
         "dirty": true,
         "events": [
           {
@@ -22,7 +22,7 @@
             "phase": "start",
             "rationale": null,
             "result": null,
-            "run_id": "lab_0da94c97d769427c911b",
+            "run_id": "lab_ac45ffe572ff4b529101",
             "selection_source": null,
             "sequence": 1,
             "signal": null
@@ -40,7 +40,7 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_0da94c97d769427c911b",
+            "run_id": "lab_ac45ffe572ff4b529101",
             "selection_source": "greedy",
             "sequence": 2,
             "signal": null
@@ -58,7 +58,7 @@
             "phase": "evidence",
             "rationale": null,
             "result": "PASS",
-            "run_id": "lab_0da94c97d769427c911b",
+            "run_id": "lab_ac45ffe572ff4b529101",
             "selection_source": null,
             "sequence": 3,
             "signal": "NUMBER_MATCH"
@@ -76,9 +76,27 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_0da94c97d769427c911b",
+            "run_id": "lab_ac45ffe572ff4b529101",
             "selection_source": "greedy",
             "sequence": 4,
+            "signal": null
+          },
+          {
+            "action": null,
+            "api": "SIM Swap",
+            "belief_after": null,
+            "budget_after": null,
+            "budget_before": null,
+            "diagnostic": null,
+            "event_type": "enrichment",
+            "evidence_step_ref": 2,
+            "max_age_hours": null,
+            "phase": "enrichment",
+            "rationale": null,
+            "result": null,
+            "run_id": "lab_ac45ffe572ff4b529101",
+            "selection_source": null,
+            "sequence": 5,
             "signal": null
           },
           {
@@ -94,17 +112,17 @@
             "phase": "evidence",
             "rationale": null,
             "result": "FLAG",
-            "run_id": "lab_0da94c97d769427c911b",
+            "run_id": "lab_ac45ffe572ff4b529101",
             "selection_source": null,
-            "sequence": 5,
+            "sequence": 6,
             "signal": "SIM_SWAPPED"
           },
           {
             "action": "device_swap",
             "api": "Device Swap",
             "belief_after": null,
-            "budget_after": 7.0,
-            "budget_before": 9.0,
+            "budget_after": 6.0,
+            "budget_before": 8.0,
             "diagnostic": null,
             "event_type": "decision",
             "evidence_step_ref": null,
@@ -112,9 +130,27 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_0da94c97d769427c911b",
+            "run_id": "lab_ac45ffe572ff4b529101",
             "selection_source": "greedy",
-            "sequence": 6,
+            "sequence": 7,
+            "signal": null
+          },
+          {
+            "action": null,
+            "api": "Device Swap",
+            "belief_after": null,
+            "budget_after": null,
+            "budget_before": null,
+            "diagnostic": null,
+            "event_type": "enrichment",
+            "evidence_step_ref": 3,
+            "max_age_hours": null,
+            "phase": "enrichment",
+            "rationale": null,
+            "result": null,
+            "run_id": "lab_ac45ffe572ff4b529101",
+            "selection_source": null,
+            "sequence": 8,
             "signal": null
           },
           {
@@ -130,17 +166,17 @@
             "phase": "evidence",
             "rationale": null,
             "result": "PASS",
-            "run_id": "lab_0da94c97d769427c911b",
+            "run_id": "lab_ac45ffe572ff4b529101",
             "selection_source": null,
-            "sequence": 7,
+            "sequence": 9,
             "signal": "DEVICE_STABLE"
           },
           {
             "action": "location_verify",
             "api": "Location Verification",
             "belief_after": null,
-            "budget_after": 4.0,
-            "budget_before": 7.0,
+            "budget_after": 2.0,
+            "budget_before": 5.0,
             "diagnostic": null,
             "event_type": "decision",
             "evidence_step_ref": null,
@@ -148,9 +184,9 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_0da94c97d769427c911b",
+            "run_id": "lab_ac45ffe572ff4b529101",
             "selection_source": "greedy",
-            "sequence": 8,
+            "sequence": 10,
             "signal": null
           },
           {
@@ -166,17 +202,17 @@
             "phase": "evidence",
             "rationale": null,
             "result": "PASS",
-            "run_id": "lab_0da94c97d769427c911b",
+            "run_id": "lab_ac45ffe572ff4b529101",
             "selection_source": null,
-            "sequence": 9,
+            "sequence": 11,
             "signal": "AT_CLAIMED_LOCATION"
           },
           {
             "action": "roaming",
             "api": "Device Roaming Status",
             "belief_after": null,
-            "budget_after": 2.0,
-            "budget_before": 4.0,
+            "budget_after": 0.0,
+            "budget_before": 2.0,
             "diagnostic": null,
             "event_type": "decision",
             "evidence_step_ref": null,
@@ -184,9 +220,9 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_0da94c97d769427c911b",
+            "run_id": "lab_ac45ffe572ff4b529101",
             "selection_source": "greedy",
-            "sequence": 10,
+            "sequence": 12,
             "signal": null
           },
           {
@@ -202,46 +238,10 @@
             "phase": "evidence",
             "rationale": null,
             "result": "INFO",
-            "run_id": "lab_0da94c97d769427c911b",
-            "selection_source": null,
-            "sequence": 11,
-            "signal": "ROAMING_NETWORK"
-          },
-          {
-            "action": "reachability",
-            "api": "Device Reachability Status",
-            "belief_after": null,
-            "budget_after": 0.0,
-            "budget_before": 2.0,
-            "diagnostic": null,
-            "event_type": "decision",
-            "evidence_step_ref": null,
-            "max_age_hours": null,
-            "phase": "investigation",
-            "rationale": "greedy: highest information-per-cost option still affordable",
-            "result": null,
-            "run_id": "lab_0da94c97d769427c911b",
-            "selection_source": "greedy",
-            "sequence": 12,
-            "signal": null
-          },
-          {
-            "action": null,
-            "api": "Device Reachability Status",
-            "belief_after": 0.242,
-            "budget_after": null,
-            "budget_before": null,
-            "diagnostic": null,
-            "event_type": "evidence",
-            "evidence_step_ref": 6,
-            "max_age_hours": null,
-            "phase": "evidence",
-            "rationale": null,
-            "result": "PASS",
-            "run_id": "lab_0da94c97d769427c911b",
+            "run_id": "lab_ac45ffe572ff4b529101",
             "selection_source": null,
             "sequence": 13,
-            "signal": "REACHABLE_NORMAL"
+            "signal": "ROAMING_NETWORK"
           },
           {
             "action": null,
@@ -256,25 +256,25 @@
             "phase": "verdict",
             "rationale": null,
             "result": null,
-            "run_id": "lab_0da94c97d769427c911b",
+            "run_id": "lab_ac45ffe572ff4b529101",
             "selection_source": "greedy",
             "sequence": 14,
             "signal": null
           }
         ],
-        "fixture_digest": "f2ca8cd2858849e1",
-        "generated_at": "2026-09-06T15:00:54.293664+00:00",
+        "fixture_digest": "2ca345bf88319a3d",
+        "generated_at": "2026-09-07T00:01:37.382385+00:00",
         "outcome": {
           "chain_grade": "DEGRADED",
-          "confidence": 0.242,
+          "confidence": 0.322,
           "decision": "CHALLENGE",
           "evidence_cost": 12.0,
-          "evidence_steps": 6
+          "evidence_steps": 5
         },
         "planner_source": "greedy",
-        "policy_digest": "c2ce5440ce18e430",
+        "policy_digest": "e0ef1a19fb408c7f",
         "receipt_ref": null,
-        "run_id": "lab_0da94c97d769427c911b",
+        "run_id": "lab_ac45ffe572ff4b529101",
         "scenario_id": "replacement",
         "schema_version": 2,
         "timing_basis": "stage_pacing"
@@ -287,7 +287,7 @@
       "fault_profile": null,
       "removes_claimed_location": false,
       "run": {
-        "code_revision": "b6c35c10c1d9f458e8231770da9654195b3c90e7",
+        "code_revision": "0f7fb95de8e0f3ae7bffa18bf8f5bc387678cc1b",
         "dirty": true,
         "events": [
           {
@@ -303,7 +303,7 @@
             "phase": "start",
             "rationale": null,
             "result": null,
-            "run_id": "lab_f80eccd6a69744879377",
+            "run_id": "lab_c5375c45ca094f0ab7b0",
             "selection_source": null,
             "sequence": 1,
             "signal": null
@@ -321,7 +321,7 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_f80eccd6a69744879377",
+            "run_id": "lab_c5375c45ca094f0ab7b0",
             "selection_source": "greedy",
             "sequence": 2,
             "signal": null
@@ -339,7 +339,7 @@
             "phase": "evidence",
             "rationale": null,
             "result": "PASS",
-            "run_id": "lab_f80eccd6a69744879377",
+            "run_id": "lab_c5375c45ca094f0ab7b0",
             "selection_source": null,
             "sequence": 3,
             "signal": "NUMBER_MATCH"
@@ -357,9 +357,27 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_f80eccd6a69744879377",
+            "run_id": "lab_c5375c45ca094f0ab7b0",
             "selection_source": "greedy",
             "sequence": 4,
+            "signal": null
+          },
+          {
+            "action": null,
+            "api": "SIM Swap",
+            "belief_after": null,
+            "budget_after": null,
+            "budget_before": null,
+            "diagnostic": null,
+            "event_type": "enrichment",
+            "evidence_step_ref": 2,
+            "max_age_hours": null,
+            "phase": "enrichment",
+            "rationale": null,
+            "result": null,
+            "run_id": "lab_c5375c45ca094f0ab7b0",
+            "selection_source": null,
+            "sequence": 5,
             "signal": null
           },
           {
@@ -375,9 +393,9 @@
             "phase": "evidence",
             "rationale": null,
             "result": "PASS",
-            "run_id": "lab_f80eccd6a69744879377",
+            "run_id": "lab_c5375c45ca094f0ab7b0",
             "selection_source": null,
-            "sequence": 5,
+            "sequence": 6,
             "signal": "SIM_STABLE"
           },
           {
@@ -393,25 +411,25 @@
             "phase": "verdict",
             "rationale": null,
             "result": null,
-            "run_id": "lab_f80eccd6a69744879377",
+            "run_id": "lab_c5375c45ca094f0ab7b0",
             "selection_source": "greedy",
-            "sequence": 6,
+            "sequence": 7,
             "signal": null
           }
         ],
-        "fixture_digest": "257d0aae6f8f500f",
-        "generated_at": "2026-09-06T15:00:54.348555+00:00",
+        "fixture_digest": "00967283728e6034",
+        "generated_at": "2026-09-07T00:01:37.406792+00:00",
         "outcome": {
           "chain_grade": "ATTESTED_FULL",
           "confidence": 0.096,
           "decision": "ALLOW",
-          "evidence_cost": 3.0,
+          "evidence_cost": 4.0,
           "evidence_steps": 2
         },
         "planner_source": "greedy",
-        "policy_digest": "c2ce5440ce18e430",
+        "policy_digest": "e0ef1a19fb408c7f",
         "receipt_ref": null,
-        "run_id": "lab_f80eccd6a69744879377",
+        "run_id": "lab_c5375c45ca094f0ab7b0",
         "scenario_id": "clean",
         "schema_version": 2,
         "timing_basis": "stage_pacing"
@@ -424,7 +442,7 @@
       "fault_profile": null,
       "removes_claimed_location": false,
       "run": {
-        "code_revision": "b6c35c10c1d9f458e8231770da9654195b3c90e7",
+        "code_revision": "0f7fb95de8e0f3ae7bffa18bf8f5bc387678cc1b",
         "dirty": true,
         "events": [
           {
@@ -440,7 +458,7 @@
             "phase": "start",
             "rationale": null,
             "result": null,
-            "run_id": "lab_4ecbb1b0bac547b1a2c8",
+            "run_id": "lab_499c1f4a445a420484b4",
             "selection_source": null,
             "sequence": 1,
             "signal": null
@@ -458,7 +476,7 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_4ecbb1b0bac547b1a2c8",
+            "run_id": "lab_499c1f4a445a420484b4",
             "selection_source": "greedy",
             "sequence": 2,
             "signal": null
@@ -476,7 +494,7 @@
             "phase": "evidence",
             "rationale": null,
             "result": "PASS",
-            "run_id": "lab_4ecbb1b0bac547b1a2c8",
+            "run_id": "lab_499c1f4a445a420484b4",
             "selection_source": null,
             "sequence": 3,
             "signal": "NUMBER_MATCH"
@@ -494,9 +512,27 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_4ecbb1b0bac547b1a2c8",
+            "run_id": "lab_499c1f4a445a420484b4",
             "selection_source": "greedy",
             "sequence": 4,
+            "signal": null
+          },
+          {
+            "action": null,
+            "api": "SIM Swap",
+            "belief_after": null,
+            "budget_after": null,
+            "budget_before": null,
+            "diagnostic": null,
+            "event_type": "enrichment",
+            "evidence_step_ref": 2,
+            "max_age_hours": null,
+            "phase": "enrichment",
+            "rationale": null,
+            "result": null,
+            "run_id": "lab_499c1f4a445a420484b4",
+            "selection_source": null,
+            "sequence": 5,
             "signal": null
           },
           {
@@ -512,17 +548,17 @@
             "phase": "evidence",
             "rationale": null,
             "result": "FLAG",
-            "run_id": "lab_4ecbb1b0bac547b1a2c8",
+            "run_id": "lab_499c1f4a445a420484b4",
             "selection_source": null,
-            "sequence": 5,
+            "sequence": 6,
             "signal": "SIM_SWAPPED"
           },
           {
             "action": "device_swap",
             "api": "Device Swap",
             "belief_after": null,
-            "budget_after": 7.0,
-            "budget_before": 9.0,
+            "budget_after": 6.0,
+            "budget_before": 8.0,
             "diagnostic": null,
             "event_type": "decision",
             "evidence_step_ref": null,
@@ -530,9 +566,27 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_4ecbb1b0bac547b1a2c8",
+            "run_id": "lab_499c1f4a445a420484b4",
             "selection_source": "greedy",
-            "sequence": 6,
+            "sequence": 7,
+            "signal": null
+          },
+          {
+            "action": null,
+            "api": "Device Swap",
+            "belief_after": null,
+            "budget_after": null,
+            "budget_before": null,
+            "diagnostic": null,
+            "event_type": "enrichment",
+            "evidence_step_ref": 3,
+            "max_age_hours": null,
+            "phase": "enrichment",
+            "rationale": null,
+            "result": null,
+            "run_id": "lab_499c1f4a445a420484b4",
+            "selection_source": null,
+            "sequence": 8,
             "signal": null
           },
           {
@@ -548,17 +602,17 @@
             "phase": "evidence",
             "rationale": null,
             "result": "FLAG",
-            "run_id": "lab_4ecbb1b0bac547b1a2c8",
+            "run_id": "lab_499c1f4a445a420484b4",
             "selection_source": null,
-            "sequence": 7,
+            "sequence": 9,
             "signal": "DEVICE_SWAPPED"
           },
           {
             "action": "location_verify",
             "api": "Location Verification",
             "belief_after": null,
-            "budget_after": 4.0,
-            "budget_before": 7.0,
+            "budget_after": 2.0,
+            "budget_before": 5.0,
             "diagnostic": null,
             "event_type": "decision",
             "evidence_step_ref": null,
@@ -566,9 +620,9 @@
             "phase": "corroboration",
             "rationale": "policy: corroborate before this signal alone can decline",
             "result": null,
-            "run_id": "lab_4ecbb1b0bac547b1a2c8",
+            "run_id": "lab_499c1f4a445a420484b4",
             "selection_source": "policy",
-            "sequence": 8,
+            "sequence": 10,
             "signal": null
           },
           {
@@ -584,9 +638,9 @@
             "phase": "evidence",
             "rationale": null,
             "result": "FLAG",
-            "run_id": "lab_4ecbb1b0bac547b1a2c8",
+            "run_id": "lab_499c1f4a445a420484b4",
             "selection_source": null,
-            "sequence": 9,
+            "sequence": 11,
             "signal": "NOT_AT_CLAIMED_LOCATION"
           },
           {
@@ -602,25 +656,25 @@
             "phase": "verdict",
             "rationale": null,
             "result": null,
-            "run_id": "lab_4ecbb1b0bac547b1a2c8",
+            "run_id": "lab_499c1f4a445a420484b4",
             "selection_source": "greedy",
-            "sequence": 10,
+            "sequence": 12,
             "signal": null
           }
         ],
-        "fixture_digest": "9c4a78354679d712",
-        "generated_at": "2026-09-06T15:00:54.400264+00:00",
+        "fixture_digest": "a700e9ebf41c167e",
+        "generated_at": "2026-09-07T00:01:37.432452+00:00",
         "outcome": {
           "chain_grade": "REFUTED",
           "confidence": 0.981,
           "decision": "DECLINE",
-          "evidence_cost": 8.0,
+          "evidence_cost": 10.0,
           "evidence_steps": 4
         },
         "planner_source": "greedy",
-        "policy_digest": "c2ce5440ce18e430",
+        "policy_digest": "e0ef1a19fb408c7f",
         "receipt_ref": null,
-        "run_id": "lab_4ecbb1b0bac547b1a2c8",
+        "run_id": "lab_499c1f4a445a420484b4",
         "scenario_id": "ghost",
         "schema_version": 2,
         "timing_basis": "stage_pacing"
@@ -633,7 +687,7 @@
       "fault_profile": null,
       "removes_claimed_location": true,
       "run": {
-        "code_revision": "b6c35c10c1d9f458e8231770da9654195b3c90e7",
+        "code_revision": "0f7fb95de8e0f3ae7bffa18bf8f5bc387678cc1b",
         "dirty": true,
         "events": [
           {
@@ -649,7 +703,7 @@
             "phase": "start",
             "rationale": null,
             "result": null,
-            "run_id": "lab_91d8f53f9e334dc68212",
+            "run_id": "lab_1dd0b7d1261044929e07",
             "selection_source": null,
             "sequence": 1,
             "signal": null
@@ -667,7 +721,7 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_91d8f53f9e334dc68212",
+            "run_id": "lab_1dd0b7d1261044929e07",
             "selection_source": "greedy",
             "sequence": 2,
             "signal": null
@@ -685,7 +739,7 @@
             "phase": "evidence",
             "rationale": null,
             "result": "PASS",
-            "run_id": "lab_91d8f53f9e334dc68212",
+            "run_id": "lab_1dd0b7d1261044929e07",
             "selection_source": null,
             "sequence": 3,
             "signal": "NUMBER_MATCH"
@@ -703,9 +757,27 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_91d8f53f9e334dc68212",
+            "run_id": "lab_1dd0b7d1261044929e07",
             "selection_source": "greedy",
             "sequence": 4,
+            "signal": null
+          },
+          {
+            "action": null,
+            "api": "SIM Swap",
+            "belief_after": null,
+            "budget_after": null,
+            "budget_before": null,
+            "diagnostic": null,
+            "event_type": "enrichment",
+            "evidence_step_ref": 2,
+            "max_age_hours": null,
+            "phase": "enrichment",
+            "rationale": null,
+            "result": null,
+            "run_id": "lab_1dd0b7d1261044929e07",
+            "selection_source": null,
+            "sequence": 5,
             "signal": null
           },
           {
@@ -721,17 +793,17 @@
             "phase": "evidence",
             "rationale": null,
             "result": "FLAG",
-            "run_id": "lab_91d8f53f9e334dc68212",
+            "run_id": "lab_1dd0b7d1261044929e07",
             "selection_source": null,
-            "sequence": 5,
+            "sequence": 6,
             "signal": "SIM_SWAPPED"
           },
           {
             "action": "device_swap",
             "api": "Device Swap",
             "belief_after": null,
-            "budget_after": 7.0,
-            "budget_before": 9.0,
+            "budget_after": 6.0,
+            "budget_before": 8.0,
             "diagnostic": null,
             "event_type": "decision",
             "evidence_step_ref": null,
@@ -739,9 +811,27 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_91d8f53f9e334dc68212",
+            "run_id": "lab_1dd0b7d1261044929e07",
             "selection_source": "greedy",
-            "sequence": 6,
+            "sequence": 7,
+            "signal": null
+          },
+          {
+            "action": null,
+            "api": "Device Swap",
+            "belief_after": null,
+            "budget_after": null,
+            "budget_before": null,
+            "diagnostic": null,
+            "event_type": "enrichment",
+            "evidence_step_ref": 3,
+            "max_age_hours": null,
+            "phase": "enrichment",
+            "rationale": null,
+            "result": null,
+            "run_id": "lab_1dd0b7d1261044929e07",
+            "selection_source": null,
+            "sequence": 8,
             "signal": null
           },
           {
@@ -757,17 +847,17 @@
             "phase": "evidence",
             "rationale": null,
             "result": "PASS",
-            "run_id": "lab_91d8f53f9e334dc68212",
+            "run_id": "lab_1dd0b7d1261044929e07",
             "selection_source": null,
-            "sequence": 7,
+            "sequence": 9,
             "signal": "DEVICE_STABLE"
           },
           {
             "action": "location_verify",
             "api": "Location Verification",
             "belief_after": null,
-            "budget_after": 4.0,
-            "budget_before": 7.0,
+            "budget_after": 2.0,
+            "budget_before": 5.0,
             "diagnostic": null,
             "event_type": "decision",
             "evidence_step_ref": null,
@@ -775,9 +865,9 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_91d8f53f9e334dc68212",
+            "run_id": "lab_1dd0b7d1261044929e07",
             "selection_source": "greedy",
-            "sequence": 8,
+            "sequence": 10,
             "signal": null
           },
           {
@@ -793,17 +883,17 @@
             "phase": "evidence",
             "rationale": null,
             "result": "INFO",
-            "run_id": "lab_91d8f53f9e334dc68212",
+            "run_id": "lab_1dd0b7d1261044929e07",
             "selection_source": null,
-            "sequence": 9,
+            "sequence": 11,
             "signal": "EVIDENCE_UNAVAILABLE"
           },
           {
             "action": "roaming",
             "api": "Device Roaming Status",
             "belief_after": null,
-            "budget_after": 2.0,
-            "budget_before": 4.0,
+            "budget_after": 0.0,
+            "budget_before": 2.0,
             "diagnostic": null,
             "event_type": "decision",
             "evidence_step_ref": null,
@@ -811,9 +901,9 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_91d8f53f9e334dc68212",
+            "run_id": "lab_1dd0b7d1261044929e07",
             "selection_source": "greedy",
-            "sequence": 10,
+            "sequence": 12,
             "signal": null
           },
           {
@@ -829,46 +919,10 @@
             "phase": "evidence",
             "rationale": null,
             "result": "INFO",
-            "run_id": "lab_91d8f53f9e334dc68212",
-            "selection_source": null,
-            "sequence": 11,
-            "signal": "ROAMING_NETWORK"
-          },
-          {
-            "action": "reachability",
-            "api": "Device Reachability Status",
-            "belief_after": null,
-            "budget_after": 0.0,
-            "budget_before": 2.0,
-            "diagnostic": null,
-            "event_type": "decision",
-            "evidence_step_ref": null,
-            "max_age_hours": null,
-            "phase": "investigation",
-            "rationale": "greedy: highest information-per-cost option still affordable",
-            "result": null,
-            "run_id": "lab_91d8f53f9e334dc68212",
-            "selection_source": "greedy",
-            "sequence": 12,
-            "signal": null
-          },
-          {
-            "action": null,
-            "api": "Device Reachability Status",
-            "belief_after": 0.514,
-            "budget_after": null,
-            "budget_before": null,
-            "diagnostic": null,
-            "event_type": "evidence",
-            "evidence_step_ref": 6,
-            "max_age_hours": null,
-            "phase": "evidence",
-            "rationale": null,
-            "result": "PASS",
-            "run_id": "lab_91d8f53f9e334dc68212",
+            "run_id": "lab_1dd0b7d1261044929e07",
             "selection_source": null,
             "sequence": 13,
-            "signal": "REACHABLE_NORMAL"
+            "signal": "ROAMING_NETWORK"
           },
           {
             "action": null,
@@ -883,25 +937,25 @@
             "phase": "verdict",
             "rationale": null,
             "result": null,
-            "run_id": "lab_91d8f53f9e334dc68212",
+            "run_id": "lab_1dd0b7d1261044929e07",
             "selection_source": "greedy",
             "sequence": 14,
             "signal": null
           }
         ],
-        "fixture_digest": "8e92674a5ed0f308",
-        "generated_at": "2026-09-06T15:00:54.484895+00:00",
+        "fixture_digest": "82c5c67d2347fe45",
+        "generated_at": "2026-09-07T00:01:37.456623+00:00",
         "outcome": {
           "chain_grade": "UNRESOLVED",
-          "confidence": 0.514,
+          "confidence": 0.612,
           "decision": "CHALLENGE",
           "evidence_cost": 12.0,
-          "evidence_steps": 6
+          "evidence_steps": 5
         },
         "planner_source": "greedy",
-        "policy_digest": "c2ce5440ce18e430",
+        "policy_digest": "e0ef1a19fb408c7f",
         "receipt_ref": null,
-        "run_id": "lab_91d8f53f9e334dc68212",
+        "run_id": "lab_1dd0b7d1261044929e07",
         "scenario_id": "replacement",
         "schema_version": 2,
         "timing_basis": "stage_pacing"
@@ -914,7 +968,7 @@
       "fault_profile": "unavailable",
       "removes_claimed_location": false,
       "run": {
-        "code_revision": "b6c35c10c1d9f458e8231770da9654195b3c90e7",
+        "code_revision": "0f7fb95de8e0f3ae7bffa18bf8f5bc387678cc1b",
         "dirty": true,
         "events": [
           {
@@ -930,7 +984,7 @@
             "phase": "start",
             "rationale": null,
             "result": null,
-            "run_id": "lab_cf3e23fc1f4b4fe4a37a",
+            "run_id": "lab_4a76194397f245f3a3f7",
             "selection_source": null,
             "sequence": 1,
             "signal": null
@@ -948,7 +1002,7 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_cf3e23fc1f4b4fe4a37a",
+            "run_id": "lab_4a76194397f245f3a3f7",
             "selection_source": "greedy",
             "sequence": 2,
             "signal": null
@@ -966,7 +1020,7 @@
             "phase": "evidence",
             "rationale": null,
             "result": "INFO",
-            "run_id": "lab_cf3e23fc1f4b4fe4a37a",
+            "run_id": "lab_4a76194397f245f3a3f7",
             "selection_source": null,
             "sequence": 3,
             "signal": "EVIDENCE_UNAVAILABLE"
@@ -984,9 +1038,27 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_cf3e23fc1f4b4fe4a37a",
+            "run_id": "lab_4a76194397f245f3a3f7",
             "selection_source": "greedy",
             "sequence": 4,
+            "signal": null
+          },
+          {
+            "action": null,
+            "api": "SIM Swap",
+            "belief_after": null,
+            "budget_after": null,
+            "budget_before": null,
+            "diagnostic": null,
+            "event_type": "enrichment",
+            "evidence_step_ref": 2,
+            "max_age_hours": null,
+            "phase": "enrichment",
+            "rationale": null,
+            "result": null,
+            "run_id": "lab_4a76194397f245f3a3f7",
+            "selection_source": null,
+            "sequence": 5,
             "signal": null
           },
           {
@@ -1002,9 +1074,9 @@
             "phase": "evidence",
             "rationale": null,
             "result": "INFO",
-            "run_id": "lab_cf3e23fc1f4b4fe4a37a",
+            "run_id": "lab_4a76194397f245f3a3f7",
             "selection_source": null,
-            "sequence": 5,
+            "sequence": 6,
             "signal": "EVIDENCE_UNAVAILABLE"
           },
           {
@@ -1020,9 +1092,27 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_cf3e23fc1f4b4fe4a37a",
+            "run_id": "lab_4a76194397f245f3a3f7",
             "selection_source": "greedy",
-            "sequence": 6,
+            "sequence": 7,
+            "signal": null
+          },
+          {
+            "action": null,
+            "api": "Device Swap",
+            "belief_after": null,
+            "budget_after": null,
+            "budget_before": null,
+            "diagnostic": null,
+            "event_type": "enrichment",
+            "evidence_step_ref": 3,
+            "max_age_hours": null,
+            "phase": "enrichment",
+            "rationale": null,
+            "result": null,
+            "run_id": "lab_4a76194397f245f3a3f7",
+            "selection_source": null,
+            "sequence": 8,
             "signal": null
           },
           {
@@ -1038,9 +1128,9 @@
             "phase": "evidence",
             "rationale": null,
             "result": "INFO",
-            "run_id": "lab_cf3e23fc1f4b4fe4a37a",
+            "run_id": "lab_4a76194397f245f3a3f7",
             "selection_source": null,
-            "sequence": 7,
+            "sequence": 9,
             "signal": "EVIDENCE_UNAVAILABLE"
           },
           {
@@ -1056,9 +1146,9 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_cf3e23fc1f4b4fe4a37a",
+            "run_id": "lab_4a76194397f245f3a3f7",
             "selection_source": "greedy",
-            "sequence": 8,
+            "sequence": 10,
             "signal": null
           },
           {
@@ -1074,9 +1164,9 @@
             "phase": "evidence",
             "rationale": null,
             "result": "INFO",
-            "run_id": "lab_cf3e23fc1f4b4fe4a37a",
+            "run_id": "lab_4a76194397f245f3a3f7",
             "selection_source": null,
-            "sequence": 9,
+            "sequence": 11,
             "signal": "EVIDENCE_UNAVAILABLE"
           },
           {
@@ -1092,9 +1182,9 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_cf3e23fc1f4b4fe4a37a",
+            "run_id": "lab_4a76194397f245f3a3f7",
             "selection_source": "greedy",
-            "sequence": 10,
+            "sequence": 12,
             "signal": null
           },
           {
@@ -1110,9 +1200,9 @@
             "phase": "evidence",
             "rationale": null,
             "result": "INFO",
-            "run_id": "lab_cf3e23fc1f4b4fe4a37a",
+            "run_id": "lab_4a76194397f245f3a3f7",
             "selection_source": null,
-            "sequence": 11,
+            "sequence": 13,
             "signal": "EVIDENCE_UNAVAILABLE"
           },
           {
@@ -1128,9 +1218,9 @@
             "phase": "investigation",
             "rationale": "greedy: highest information-per-cost option still affordable",
             "result": null,
-            "run_id": "lab_cf3e23fc1f4b4fe4a37a",
+            "run_id": "lab_4a76194397f245f3a3f7",
             "selection_source": "greedy",
-            "sequence": 12,
+            "sequence": 14,
             "signal": null
           },
           {
@@ -1146,9 +1236,9 @@
             "phase": "evidence",
             "rationale": null,
             "result": "INFO",
-            "run_id": "lab_cf3e23fc1f4b4fe4a37a",
+            "run_id": "lab_4a76194397f245f3a3f7",
             "selection_source": null,
-            "sequence": 13,
+            "sequence": 15,
             "signal": "EVIDENCE_UNAVAILABLE"
           },
           {
@@ -1164,14 +1254,14 @@
             "phase": "verdict",
             "rationale": null,
             "result": null,
-            "run_id": "lab_cf3e23fc1f4b4fe4a37a",
+            "run_id": "lab_4a76194397f245f3a3f7",
             "selection_source": "greedy",
-            "sequence": 14,
+            "sequence": 16,
             "signal": null
           }
         ],
-        "fixture_digest": "f2ca8cd2858849e1",
-        "generated_at": "2026-09-06T15:00:54.573938+00:00",
+        "fixture_digest": "2ca345bf88319a3d",
+        "generated_at": "2026-09-07T00:01:37.480698+00:00",
         "outcome": {
           "chain_grade": "UNRESOLVED",
           "confidence": 0.44,
@@ -1180,9 +1270,9 @@
           "evidence_steps": 6
         },
         "planner_source": "greedy",
-        "policy_digest": "c2ce5440ce18e430",
+        "policy_digest": "e0ef1a19fb408c7f",
         "receipt_ref": null,
-        "run_id": "lab_cf3e23fc1f4b4fe4a37a",
+        "run_id": "lab_4a76194397f245f3a3f7",
         "scenario_id": "replacement",
         "schema_version": 2,
         "timing_basis": "stage_pacing"
@@ -1190,33 +1280,33 @@
       "scenario_id": "replacement"
     }
   ],
-  "code_revision": "b6c35c10c1d9f458e8231770da9654195b3c90e7",
+  "code_revision": "0f7fb95de8e0f3ae7bffa18bf8f5bc387678cc1b",
   "comparison": {
     "after_value": null,
     "base_outcome": {
       "chain_grade": "DEGRADED",
-      "confidence": 0.242,
+      "confidence": 0.322,
       "decision": "CHALLENGE",
       "evidence_cost": 12.0,
-      "evidence_steps": 6
+      "evidence_steps": 5
     },
-    "base_run_id": "lab_abff3735cefa4c8aa8eb",
+    "base_run_id": "lab_6364bdb9d5d94994afc9",
     "before_value": "present",
     "changed_field": "context.claimed_location",
     "effect": "changed",
-    "policy_digest": "c2ce5440ce18e430",
+    "policy_digest": "e0ef1a19fb408c7f",
     "variant_outcome": {
       "chain_grade": "UNRESOLVED",
-      "confidence": 0.514,
+      "confidence": 0.612,
       "decision": "CHALLENGE",
       "evidence_cost": 12.0,
-      "evidence_steps": 6
+      "evidence_steps": 5
     },
-    "variant_run_id": "lab_b0bf6d9531f94522abd3"
+    "variant_run_id": "lab_8a9c26d4a8de4fe49787"
   },
   "dirty": true,
   "evidence_report": {
-    "code_revision": "b6c35c10c1d9f458e8231770da9654195b3c90e7",
+    "code_revision": "0f7fb95de8e0f3ae7bffa18bf8f5bc387678cc1b",
     "false_decline_baseline": {
       "case_count": 17,
       "false_declines": {
@@ -1232,7 +1322,7 @@
         "single-signal": 0
       }
     },
-    "generated_at": "2026-09-06T15:00:55.111111+00:00",
+    "generated_at": "2026-09-07T00:01:37.567658+00:00",
     "independent_evaluation": {
       "case_count": 13,
       "dataset_digest": "ead266305ec0a8f5",
@@ -1258,6 +1348,7 @@
               "category": "clean",
               "confidence": null,
               "decision": "ALLOW",
+              "enrichment_calls": 0,
               "expected_safe_decision": "ALLOW",
               "matches_authored_expectation": true,
               "unresolved_signals": []
@@ -1269,6 +1360,7 @@
               "category": "clean",
               "confidence": null,
               "decision": "ALLOW",
+              "enrichment_calls": 0,
               "expected_safe_decision": "ALLOW",
               "matches_authored_expectation": true,
               "unresolved_signals": []
@@ -1282,6 +1374,7 @@
               "category": "legitimate_change",
               "confidence": null,
               "decision": "CHALLENGE",
+              "enrichment_calls": 0,
               "expected_safe_decision": "CHALLENGE",
               "matches_authored_expectation": true,
               "unresolved_signals": []
@@ -1293,6 +1386,7 @@
               "category": "unavailable_evidence",
               "confidence": null,
               "decision": "CHALLENGE",
+              "enrichment_calls": 0,
               "expected_safe_decision": "CHALLENGE",
               "matches_authored_expectation": true,
               "unresolved_signals": [
@@ -1306,6 +1400,7 @@
               "category": "unavailable_evidence",
               "confidence": null,
               "decision": "CHALLENGE",
+              "enrichment_calls": 0,
               "expected_safe_decision": "CHALLENGE",
               "matches_authored_expectation": true,
               "unresolved_signals": [
@@ -1319,6 +1414,7 @@
               "category": "unavailable_evidence",
               "confidence": null,
               "decision": "CHALLENGE",
+              "enrichment_calls": 0,
               "expected_safe_decision": "CHALLENGE",
               "matches_authored_expectation": true,
               "unresolved_signals": [
@@ -1334,6 +1430,7 @@
               "category": "single_adverse",
               "confidence": null,
               "decision": "CHALLENGE",
+              "enrichment_calls": 0,
               "expected_safe_decision": "CHALLENGE",
               "matches_authored_expectation": true,
               "unresolved_signals": []
@@ -1347,6 +1444,7 @@
               "category": "correlated_adverse",
               "confidence": null,
               "decision": "CHALLENGE",
+              "enrichment_calls": 0,
               "expected_safe_decision": "CHALLENGE",
               "matches_authored_expectation": true,
               "unresolved_signals": []
@@ -1361,6 +1459,7 @@
               "category": "independent_adverse",
               "confidence": null,
               "decision": "DECLINE",
+              "enrichment_calls": 0,
               "expected_safe_decision": "DECLINE",
               "matches_authored_expectation": true,
               "unresolved_signals": []
@@ -1375,6 +1474,7 @@
               "category": "independent_adverse",
               "confidence": null,
               "decision": "DECLINE",
+              "enrichment_calls": 0,
               "expected_safe_decision": "DECLINE",
               "matches_authored_expectation": true,
               "unresolved_signals": []
@@ -1388,6 +1488,7 @@
               "category": "legitimate_change",
               "confidence": null,
               "decision": "CHALLENGE",
+              "enrichment_calls": 0,
               "expected_safe_decision": "CHALLENGE",
               "matches_authored_expectation": true,
               "unresolved_signals": []
@@ -1404,6 +1505,7 @@
               "category": "independent_adverse",
               "confidence": null,
               "decision": "DECLINE",
+              "enrichment_calls": 0,
               "expected_safe_decision": "DECLINE",
               "matches_authored_expectation": true,
               "unresolved_signals": []
@@ -1415,6 +1517,7 @@
               "category": "unavailable_evidence",
               "confidence": null,
               "decision": "CHALLENGE",
+              "enrichment_calls": 0,
               "expected_safe_decision": "CHALLENGE",
               "matches_authored_expectation": true,
               "unresolved_signals": [
@@ -1462,6 +1565,7 @@
               "category": "clean",
               "confidence": 0.001,
               "decision": "ALLOW",
+              "enrichment_calls": 0,
               "expected_safe_decision": "ALLOW",
               "matches_authored_expectation": true,
               "unresolved_signals": []
@@ -1473,6 +1577,7 @@
               "category": "clean",
               "confidence": 0.003,
               "decision": "ALLOW",
+              "enrichment_calls": 0,
               "expected_safe_decision": "ALLOW",
               "matches_authored_expectation": true,
               "unresolved_signals": []
@@ -1486,6 +1591,7 @@
               "category": "legitimate_change",
               "confidence": 0.242,
               "decision": "CHALLENGE",
+              "enrichment_calls": 0,
               "expected_safe_decision": "CHALLENGE",
               "matches_authored_expectation": true,
               "unresolved_signals": []
@@ -1497,6 +1603,7 @@
               "category": "unavailable_evidence",
               "confidence": 0.004,
               "decision": "CHALLENGE",
+              "enrichment_calls": 0,
               "expected_safe_decision": "CHALLENGE",
               "matches_authored_expectation": true,
               "unresolved_signals": [
@@ -1510,6 +1617,7 @@
               "category": "unavailable_evidence",
               "confidence": 0.004,
               "decision": "CHALLENGE",
+              "enrichment_calls": 0,
               "expected_safe_decision": "CHALLENGE",
               "matches_authored_expectation": true,
               "unresolved_signals": [
@@ -1523,6 +1631,7 @@
               "category": "unavailable_evidence",
               "confidence": 0.006,
               "decision": "CHALLENGE",
+              "enrichment_calls": 0,
               "expected_safe_decision": "CHALLENGE",
               "matches_authored_expectation": true,
               "unresolved_signals": [
@@ -1538,6 +1647,7 @@
               "category": "single_adverse",
               "confidence": 0.016,
               "decision": "ALLOW",
+              "enrichment_calls": 0,
               "expected_safe_decision": "CHALLENGE",
               "matches_authored_expectation": false,
               "unresolved_signals": []
@@ -1551,6 +1661,7 @@
               "category": "correlated_adverse",
               "confidence": 0.224,
               "decision": "CHALLENGE",
+              "enrichment_calls": 0,
               "expected_safe_decision": "CHALLENGE",
               "matches_authored_expectation": true,
               "unresolved_signals": []
@@ -1565,6 +1676,7 @@
               "category": "independent_adverse",
               "confidence": 0.826,
               "decision": "DECLINE",
+              "enrichment_calls": 0,
               "expected_safe_decision": "DECLINE",
               "matches_authored_expectation": true,
               "unresolved_signals": []
@@ -1579,6 +1691,7 @@
               "category": "independent_adverse",
               "confidence": 0.702,
               "decision": "CHALLENGE",
+              "enrichment_calls": 0,
               "expected_safe_decision": "DECLINE",
               "matches_authored_expectation": false,
               "unresolved_signals": []
@@ -1592,6 +1705,7 @@
               "category": "legitimate_change",
               "confidence": 0.034,
               "decision": "ALLOW",
+              "enrichment_calls": 0,
               "expected_safe_decision": "CHALLENGE",
               "matches_authored_expectation": false,
               "unresolved_signals": []
@@ -1608,6 +1722,7 @@
               "category": "independent_adverse",
               "confidence": 1.0,
               "decision": "DECLINE",
+              "enrichment_calls": 0,
               "expected_safe_decision": "DECLINE",
               "matches_authored_expectation": true,
               "unresolved_signals": []
@@ -1619,6 +1734,7 @@
               "category": "unavailable_evidence",
               "confidence": 0.28,
               "decision": "CHALLENGE",
+              "enrichment_calls": 0,
               "expected_safe_decision": "CHALLENGE",
               "matches_authored_expectation": true,
               "unresolved_signals": [
@@ -1645,18 +1761,19 @@
           "authored_expectation_disagreements": [
             "location_could_not_resolve",
             "single_number_mismatch",
+            "replacement_plus_location_mismatch",
             "travel_with_recent_sim_change"
           ],
           "automatic_decision_rate": {
-            "count": 8,
-            "percent": 61.5,
+            "count": 7,
+            "percent": 53.8,
             "total": 13
           },
           "calls": {
-            "max": 6,
-            "mean": 2.92,
+            "max": 7,
+            "mean": 3.77,
             "min": 1,
-            "total": 38
+            "total": 49
           },
           "cases": [
             {
@@ -1666,6 +1783,7 @@
               "category": "clean",
               "confidence": 0.026,
               "decision": "ALLOW",
+              "enrichment_calls": 0,
               "expected_safe_decision": "ALLOW",
               "matches_authored_expectation": true,
               "unresolved_signals": []
@@ -1677,28 +1795,31 @@
               "category": "clean",
               "confidence": 0.041,
               "decision": "ALLOW",
+              "enrichment_calls": 0,
               "expected_safe_decision": "ALLOW",
               "matches_authored_expectation": true,
               "unresolved_signals": []
             },
             {
               "adverse_groups": [],
-              "calls": 6,
+              "calls": 7,
               "case_id": "legitimate_sim_replacement",
               "category": "legitimate_change",
-              "confidence": 0.242,
+              "confidence": 0.322,
               "decision": "CHALLENGE",
+              "enrichment_calls": 2,
               "expected_safe_decision": "CHALLENGE",
               "matches_authored_expectation": true,
               "unresolved_signals": []
             },
             {
               "adverse_groups": [],
-              "calls": 2,
+              "calls": 3,
               "case_id": "number_consent_unavailable",
               "category": "unavailable_evidence",
               "confidence": 0.038,
               "decision": "CHALLENGE",
+              "enrichment_calls": 1,
               "expected_safe_decision": "CHALLENGE",
               "matches_authored_expectation": true,
               "unresolved_signals": [
@@ -1707,11 +1828,12 @@
             },
             {
               "adverse_groups": [],
-              "calls": 3,
+              "calls": 5,
               "case_id": "sim_provider_unavailable",
               "category": "unavailable_evidence",
               "confidence": 0.026,
               "decision": "CHALLENGE",
+              "enrichment_calls": 2,
               "expected_safe_decision": "CHALLENGE",
               "matches_authored_expectation": true,
               "unresolved_signals": [
@@ -1720,55 +1842,60 @@
             },
             {
               "adverse_groups": [],
-              "calls": 2,
+              "calls": 3,
               "case_id": "location_could_not_resolve",
               "category": "unavailable_evidence",
               "confidence": 0.019,
               "decision": "ALLOW",
+              "enrichment_calls": 1,
               "expected_safe_decision": "CHALLENGE",
               "matches_authored_expectation": false,
               "unresolved_signals": []
             },
             {
               "adverse_groups": [],
-              "calls": 2,
+              "calls": 3,
               "case_id": "single_number_mismatch",
               "category": "single_adverse",
               "confidence": 0.149,
               "decision": "ALLOW",
+              "enrichment_calls": 1,
               "expected_safe_decision": "CHALLENGE",
               "matches_authored_expectation": false,
               "unresolved_signals": []
             },
             {
               "adverse_groups": [],
-              "calls": 4,
+              "calls": 5,
               "case_id": "correlated_sim_and_device_change",
               "category": "correlated_adverse",
-              "confidence": 0.368,
+              "confidence": 0.659,
               "decision": "CHALLENGE",
+              "enrichment_calls": 2,
               "expected_safe_decision": "CHALLENGE",
               "matches_authored_expectation": true,
               "unresolved_signals": []
             },
             {
               "adverse_groups": [],
-              "calls": 4,
+              "calls": 5,
               "case_id": "replacement_plus_location_mismatch",
               "category": "independent_adverse",
-              "confidence": 0.905,
-              "decision": "DECLINE",
+              "confidence": 0.659,
+              "decision": "CHALLENGE",
+              "enrichment_calls": 2,
               "expected_safe_decision": "DECLINE",
-              "matches_authored_expectation": true,
+              "matches_authored_expectation": false,
               "unresolved_signals": []
             },
             {
               "adverse_groups": [],
-              "calls": 4,
+              "calls": 6,
               "case_id": "number_and_location_mismatch",
               "category": "independent_adverse",
               "confidence": 0.826,
               "decision": "DECLINE",
+              "enrichment_calls": 2,
               "expected_safe_decision": "DECLINE",
               "matches_authored_expectation": true,
               "unresolved_signals": []
@@ -1780,6 +1907,7 @@
               "category": "legitimate_change",
               "confidence": 0.026,
               "decision": "ALLOW",
+              "enrichment_calls": 0,
               "expected_safe_decision": "CHALLENGE",
               "matches_authored_expectation": false,
               "unresolved_signals": []
@@ -1791,17 +1919,19 @@
               "category": "independent_adverse",
               "confidence": 0.853,
               "decision": "DECLINE",
+              "enrichment_calls": 0,
               "expected_safe_decision": "DECLINE",
               "matches_authored_expectation": true,
               "unresolved_signals": []
             },
             {
               "adverse_groups": [],
-              "calls": 6,
+              "calls": 7,
               "case_id": "multiple_provider_gaps",
               "category": "unavailable_evidence",
-              "confidence": 0.28,
+              "confidence": 0.368,
               "decision": "CHALLENGE",
+              "enrichment_calls": 2,
               "expected_safe_decision": "CHALLENGE",
               "matches_authored_expectation": true,
               "unresolved_signals": [
@@ -1813,8 +1943,8 @@
             }
           ],
           "challenge_rate": {
-            "count": 5,
-            "percent": 38.5,
+            "count": 6,
+            "percent": 46.2,
             "total": 13
           },
           "coverage": {
@@ -1845,6 +1975,15 @@
           "expected_safe_decision": "CHALLENGE"
         },
         {
+          "case_id": "replacement_plus_location_mismatch",
+          "decisions": {
+            "corroboration-aware-rules": "DECLINE",
+            "full-evidence-same-policy": "DECLINE",
+            "isnad-greedy": "CHALLENGE"
+          },
+          "expected_safe_decision": "DECLINE"
+        },
+        {
           "case_id": "number_and_location_mismatch",
           "decisions": {
             "corroboration-aware-rules": "DECLINE",
@@ -1870,9 +2009,9 @@
       "A lower call count alone is not proof that AI helped -- see each source's own denominator.",
       "Every USD/cost figure, if displayed elsewhere, is a configured unit, not a contracted price."
     ],
-    "policy_digest": "c2ce5440ce18e430"
+    "policy_digest": "e0ef1a19fb408c7f"
   },
-  "generated_at": "2026-09-06T15:00:54.204663+00:00",
+  "generated_at": "2026-09-07T00:01:37.348060+00:00",
   "limits": [
     "Every case here is an authored synthetic fixture. Authored data is not independent ground truth, and a case that did not appear in the lead recording is still not a statistically held-out test.",
     "These are recordings, not live runs. Selecting a case replays what this generator captured; nothing on the page calls a provider or a model.",
@@ -1880,7 +2019,7 @@
     "Timings are not measured. The 650ms pacing in the judge demo is a presentation choice; these recordings carry ordering, not duration.",
     "Counterfactual branches are unsigned hypothetical fixtures. They are not merchant decisions, and no real-world change follows from one."
   ],
-  "policy_digest": "c2ce5440ce18e430",
+  "policy_digest": "e0ef1a19fb408c7f",
   "schema_version": 1,
   "shuffle_seed": 20260906,
   "shuffled_order": [
