@@ -1,0 +1,41 @@
+# Render blueprint for the reviewer demo.
+#
+# Deliberately the offline demo and nothing else: mock provider, greedy
+# planner, no Nokia key, no Gemini key. A public URL carrying either would let
+# anyone spend the team's operator or model quota, and the judge flow needs
+# neither — a reviewer who wants the model lends their own key through the
+# panel on /judge, which holds it for exactly one request.
+#
+# Deploy: push this repo, then New → Blueprint on render.com and point it here.
+services:
+  - type: web
+    name: isnad
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: frankfurt          # nearest of Render's regions to MENA
+    healthCheckPath: /readyz
+    # One instance, always. Sessions, consent, the SSE bus, the idempotency
+    # cache and the vault are all in-process; a second replica breaks them.
+    numInstances: 1
+    envVars:
+      - key: ISNAD_DEMO_MODE
+        value: "true"
+      - key: ISNAD_PROVIDER
+        value: mock
+      - key: ISNAD_PLANNER
+        value: greedy
+      - key: ISNAD_MERCHANT_API_KEYS
+        value: demo-merchant-key
+      # The PUBLIC half of the key that signed the bundled caller registry.
+      # Not a credential: it lets this container, which mints its own signing
+      # key on boot, still trust that committed file.
+      - key: ISNAD_VAULT_TRUSTED_PUBLIC_KEYS
+        value: 4034e169495122a893d8fe6738c2b0f54655fdfb6ec3c6d0eeb938d1330e7f9f
+      # The free plan has an ephemeral filesystem, so a receipt lives as long
+      # as the instance does. That is the right lifetime for a demo, and the
+      # page says so rather than implying a receipt link is permanent.
+      - key: ISNAD_DATABASE_URL
+        value: sqlite:////tmp/isnad-demo.db
+      - key: ISNAD_VAULT_KEY_PATH
+        value: /tmp/isnad-vault-key.pem
