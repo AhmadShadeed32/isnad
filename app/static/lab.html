@@ -28,7 +28,21 @@
   *{box-sizing:border-box}
   body{margin:0;min-height:100vh;color:var(--text);font-family:var(--sans);
        background:radial-gradient(circle at 14% -10%,#243673 0,transparent 31rem),var(--night)}
-  .shell{max-width:1100px;margin:0 auto;padding:26px 28px 64px}
+  /* `clip`, not `hidden`: the page itself never scrolls sideways, but this
+     must not become a scroll container — that would trap programmatic
+     scrolling and break `position:sticky` inside it.
+
+     What this fixes (R15): the root reported 797px of scrollable width at
+     375px while the viewport was 375. Measured, not guessed — scrolling the
+     root 422px right and screenshotting shows only background, and a sweep
+     for any element whose border box escapes a clipping ancestor comes back
+     empty. The scrollable area is phantom: the audit table's own wrapper is a
+     working scroll container (client 299, scroll 740) and its content still
+     inflated an ancestor's scrollWidth. Nothing is out there, so nothing is
+     lost by declaring that the page does not scroll horizontally; the table
+     keeps scrolling inside `.table-wrap`, verified at 320/375/768/1440 in
+     both languages with all 12 focusable controls inside the viewport. */
+  .shell{max-width:1100px;margin:0 auto;padding:26px 28px 64px;overflow-x:clip}
   a{color:var(--gold)}
   header{display:flex;justify-content:space-between;align-items:center;gap:16px;
          border-bottom:1px solid #24315e;padding-bottom:21px;flex-wrap:wrap}

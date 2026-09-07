@@ -128,32 +128,25 @@ def open_page(page, server, path, locale, width, height):
     page.wait_for_timeout(250)
 
 
-# OPEN DEFECT, kept visible rather than hidden.
+# FIXED (R15). `/lab` at 375px used to drag sideways by 422px.
 #
-# `/lab` at 375px really does drag sideways by 422px — measured by scrolling the
-# window, not by reading scrollWidth. What is NOT the cause, each ruled out by
-# measurement: the audit table is inside a `.table-wrap` that is itself 299px
-# with `overflow-x: auto` and `min-width: 0`, so it scrolls correctly on its
-# own; and a sweep for any element wider than the viewport whose ancestors are
-# all `overflow-x: visible` returns empty. Something is contributing to the
-# root's scrollable area that this sweep does not see. Strict xfail so the day
-# it is fixed, this test fails until the marker is removed.
-LAB_MOBILE_OVERFLOW = ("lab", "/lab", "en", "375")
+# The cause was never an element escaping its container: scrolling the root
+# 422px right and screenshotting shows only background, and a sweep for a
+# border box escaping a clipping ancestor comes back empty. The audit table's
+# own `.table-wrap` was working the whole time (client 299, scroll 740) and its
+# content still inflated an ancestor's scrollWidth — a phantom scrollable area
+# with nothing painted in it. `.shell` now declares `overflow-x: clip`; see the
+# comment on that rule in `app/static/lab.html`.
+#
+# The parametrisation below covers this case like any other, with no marker.
 
 
 @pytest.mark.parametrize("name,path", PAGES)
 @pytest.mark.parametrize("locale", LOCALES)
 @pytest.mark.parametrize("width,height,label", SIZES)
 def test_a_surface_renders_without_overflow_or_console_errors(
-    request, page, server, problems, name, path, locale, width, height, label
+    page, server, problems, name, path, locale, width, height, label
 ):
-    if (name, path, locale, label) == LAB_MOBILE_OVERFLOW:
-        request.node.add_marker(
-            pytest.mark.xfail(
-                strict=True,
-                reason="known: /lab drags sideways 422px at 375px; see the comment above",
-            )
-        )
     open_page(page, server, path, locale, width, height)
 
     # Whether the PAGE can be dragged sideways, not whether some descendant is
