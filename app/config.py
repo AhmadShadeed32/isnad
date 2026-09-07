@@ -283,6 +283,11 @@ class Settings(BaseSettings):
     # Upper bound on rows any one retention sweep deletes, so a long-idle
     # process cannot open a single enormous transaction on its first tick.
     purge_batch_size: int = 500
+    # How long a settled network-condition subscription and its events are kept
+    # after expiry, so a slow client can still read the terminal status.
+    # `unknown` rows are exempt: they are the only record that a subscription
+    # may still be running at the operator (R07).
+    network_condition_retention_seconds: int = 86400
 
     @property
     def api_keys(self) -> set[str]:

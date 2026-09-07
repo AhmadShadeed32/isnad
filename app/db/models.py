@@ -379,6 +379,20 @@ class NetworkConditionSubscriptionRow(Base):
     callback_token_digest: Mapped[str] = mapped_column(String(64))
     last_error: Mapped[str] = mapped_column(String(120), default="")
 
+    # Serves the quota check on the create path, which asks exactly this
+    # question — this owner's non-terminal, unexpired rows, optionally narrowed
+    # to one device. Without it that check read every row the owner had ever
+    # created, so taking out a subscription got slower the more had ever been
+    # taken out (R07).
+    __table_args__ = (
+        Index(
+            "ix_network_condition_subscriptions_live",
+            "owner_hash",
+            "status",
+            "expires_at",
+        ),
+    )
+
 
 class NetworkConditionEventRow(Base):
     """One congestion notification delivered to our callback.

@@ -28,7 +28,9 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import select
+# Aliased: this module has its own public `delete` (the subscription one).
+from sqlalchemy import delete as sql_delete
+from sqlalchemy import func, select
 
 from app.chain.subject import subject_hash
 from app.config import settings
@@ -186,20 +188,113 @@ def _effective_status(row: NetworkConditionSubscriptionRow, now: datetime) -> st
 
 
 def _active_counts(session, owner_hash: str, device_hash: str, now: datetime):
-    rows = session.execute(
-        select(NetworkConditionSubscriptionRow).where(
-            NetworkConditionSubscriptionRow.owner_hash == owner_hash
+    """How many live subscriptions this owner has, and how many on this device.
+
+    The predicate is in the query, not in Python. This used to load every row
+    an owner had ever created — including the terminal ones nothing was
+    deleting (R07) — and discard almost all of them, so the cost of taking out
+    a subscription grew with the number of subscriptions ever taken out. The
+    (owner_hash, status, expires_at) index serves exactly this shape.
+
+    `status NOT IN terminal AND expires_at > now` is `_effective_status` in SQL:
+    expiry is a fact about the clock, so a row whose sweep has not run yet must
+    not be counted as live here either.
+    """
+    live = (
+        NetworkConditionSubscriptionRow.status.notin_(tuple(TERMINAL))
+    ) & (NetworkConditionSubscriptionRow.expires_at > now)
+    per_owner = session.execute(
+        select(func.count())
+        .select_from(NetworkConditionSubscriptionRow)
+        .where(NetworkConditionSubscriptionRow.owner_hash == owner_hash, live)
+    ).scalar_one()
+    per_device = session.execute(
+        select(func.count())
+        .select_from(NetworkConditionSubscriptionRow)
+        .where(
+            NetworkConditionSubscriptionRow.owner_hash == owner_hash,
+            NetworkConditionSubscriptionRow.device_hash == device_hash,
+            live,
         )
-    ).scalars()
-    per_owner = 0
-    per_device = 0
-    for row in rows:
-        if _effective_status(row, now) in TERMINAL:
-            continue
-        per_owner += 1
-        if row.device_hash == device_hash:
-            per_device += 1
+    ).scalar_one()
     return per_owner, per_device
+
+
+def purge_terminal(now: datetime | None = None) -> int:
+    """Reclaim settled subscriptions and their events, in bounded batches.
+
+    Nothing ever deleted these rows. Events were capped per subscription, so a
+    repeated create/delete cycle grew the subscription table without limit and
+    the event table with it — one bounded set of events per subscription, times
+    an unbounded number of subscriptions (R07).
+
+    Two rules shape what is *kept*:
+
+      - a row is eligible only once it is settled AND older than the retention
+        window, so a client that polls slowly can still read the terminal
+        status it was waiting for;
+      - `unknown` is never eligible. It means a create or delete may have left
+        a subscription running at the operator that we failed to confirm, and
+        that row is the only record anyone has that reconciliation is owed.
+        Deleting it converts a known problem into a silent one, and into a
+        subscription nobody will ever cancel.
+    """
+    now = now or _now()
+    cutoff = now - timedelta(seconds=settings.network_condition_retention_seconds)
+    with SessionLocal() as session:
+        rows = (
+            session.execute(
+                select(NetworkConditionSubscriptionRow)
+                .where(
+                    NetworkConditionSubscriptionRow.status.in_(tuple(TERMINAL)),
+                    NetworkConditionSubscriptionRow.expires_at < cutoff,
+                )
+                .limit(settings.purge_batch_size)
+            )
+            .scalars()
+            .all()
+        )
+        removed = 0
+        for row in rows:
+            session.execute(
+                sql_delete(NetworkConditionEventRow).where(
+                    NetworkConditionEventRow.subscription_id == row.subscription_id
+                )
+            )
+            session.delete(row)
+            removed += 1
+        session.commit()
+        return removed
+
+
+def expire_due(now: datetime | None = None) -> int:
+    """Write down the expiries the clock has already made true.
+
+    `_effective_status` reports an expired subscription correctly without this,
+    but the stored status is what the retention sweep and the indexed active
+    count filter on. Without a job that settles them, a row that expired and
+    was never read again would stay `active` in the table forever and never
+    become eligible for retention.
+    """
+    now = now or _now()
+    with SessionLocal() as session:
+        rows = (
+            session.execute(
+                select(NetworkConditionSubscriptionRow)
+                .where(
+                    NetworkConditionSubscriptionRow.status.notin_(tuple(TERMINAL)),
+                    NetworkConditionSubscriptionRow.status != "unknown",
+                    NetworkConditionSubscriptionRow.expires_at <= now,
+                )
+                .limit(settings.purge_batch_size)
+            )
+            .scalars()
+            .all()
+        )
+        for row in rows:
+            row.status = "expired"
+        session.commit()
+        return len(rows)
 
 
 def as_public(row: NetworkConditionSubscriptionRow, now: datetime | None = None) -> dict:

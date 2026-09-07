@@ -17,7 +17,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from app import announce, velocity
+from app import announce, network_conditions, velocity
 from app.config import settings
 from app.consent import consents
 from app.db import challenges, operations, outcomes, proof_shares, run_events
@@ -48,6 +48,11 @@ def purge_once() -> dict[str, int]:
         # R13: durable /v1/verify reservations. `uncertain` rows are kept far
         # longer than settled ones — see `operations.purge_expired`.
         "verification_operations": operations.purge_expired(),
+        # R07: settled subscriptions and their events were never reclaimed at
+        # all. Expiry is settled first, because the sweep filters on the
+        # stored status and the clock alone never wrote it down.
+        "expired_network_conditions": network_conditions.expire_due(),
+        "network_condition_subscriptions": network_conditions.purge_terminal(),
     }
 
 
