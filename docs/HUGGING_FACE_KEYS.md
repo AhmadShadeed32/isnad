@@ -8,8 +8,9 @@ never public Variables, frontend code, Dockerfile values, or Git.
 
 Add the Secret `ISNAD_GEMINI_API_KEY` with your Google AI Studio key.
 Keep `ISNAD_PROVIDER=mock` and `ISNAD_DEMO_MODE=true` as Variables.
-Optionally set `ISNAD_PLANNER=llm` for API requests that do not explicitly select
-another planner; the website's selector controls each interactive run.
+Keep `ISNAD_PLANNER=llm` so API requests without an explicit planner use Gemini;
+the website opens with Gemini selected when the server key is available. Visitors
+can still choose Greedy for a deterministic run.
 
 After the Space restarts, refresh the website. It will report that a site key
 is available. Select **Gemini · LLM**. Checkout, Console, and the Lab's

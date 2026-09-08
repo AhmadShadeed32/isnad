@@ -6,7 +6,15 @@ window.IsnadKey = (() => {
   let serverGemini = false;
   let feedback = '';
   const read = () => { try { return sessionStorage.getItem(store) || ''; } catch { return ''; } };
-  const choice = () => { try { return sessionStorage.getItem(plannerStore) === 'greedy' ? 'greedy' : (sessionStorage.getItem(plannerStore) === 'llm' && serverGemini || read() ? 'llm' : 'greedy'); } catch { return 'greedy'; } };
+  const choice = () => {
+    try {
+      const saved = sessionStorage.getItem(plannerStore);
+      if (saved === 'greedy') return 'greedy';
+      // A configured site key makes Gemini the default for a new tab. An
+      // explicit Greedy choice remains sticky for that tab.
+      return (serverGemini || saved === 'llm' || read()) ? 'llm' : 'greedy';
+    } catch { return serverGemini ? 'llm' : 'greedy'; }
+  };
   const mount = document.getElementById('sharedGemini');
   const text = (key, fallback) => window.Isnad ? window.Isnad.t('ui.' + key, fallback) : fallback;
   // Built from DOM nodes, never by assigning markup (S10). This template is
