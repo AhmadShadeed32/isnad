@@ -13,7 +13,7 @@ Built on GSMA Open Gateway CAMARA APIs via the Nokia Network-as-Code platform.
 | **Run it now** | `make setup && make judge` → <http://127.0.0.1:8010/judge> |
 | **CAMARA APIs integrated** | 8 on Nokia Network-as-Code — 4 exercised against Nokia's hosted simulator, the rest against the sandbox, all recorded |
 | **AI agent layer** | Gemini chooses which network check to buy next; policy decides what the answer means |
-| **Verification** | 1,329 automated tests pass in 153 s, browser tests included |
+| **Verification** | 1,306 non-browser checks and 71 browser checks passed on 8 September 2026 |
 | **Demo video** | [`submission/isnad-demo.mp4`](submission/isnad-demo.mp4) — 3:39, real application footage |
 
 ---
@@ -289,7 +289,7 @@ Every number below comes from a command in this repository, run on 7 September
 2026 against this commit.
 
 ```bash
-make test                                   # 1,329 passed in 153 s
+make test                                   # includes backend and browser checks
 .venv311/bin/python scripts/evidence_pack.py --output-dir /tmp/isnad-evidence
 .venv311/bin/python scripts/independent_evaluation.py
 ```

@@ -57,11 +57,11 @@ os.environ.setdefault("ISNAD_MERCHANT_API_KEYS", "demo-merchant-key")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.agent.investigator import build_investigator
+from app.agent.planner import GreedyPlanner
 from app.config import settings
 from app.domain.enums import Action, Decision, Result
 from app.domain.schemas import Area, Money, RequestContext, VerificationRequest
 from app.policy.engine import get_engine
-from app.providers import mock as mock_mod
 from app.providers.mock import MockProvider
 
 # The clean baseline every generated case is a single mutation of.
@@ -209,14 +209,15 @@ def population(signal_deltas: dict[str, float]) -> list[dict]:
 async def run(cases: list[dict], engine) -> list[dict]:
     rows = []
     for case in cases:
-        mock_mod.SCENARIOS[case["number"]] = case["scenario"]
         request = VerificationRequest(phone_number=case["number"], context=CONTEXT)
 
         # What a run-everything stack would hold: every check, always.
-        provider = MockProvider()
+        provider = MockProvider(scenarios={case["number"]: case["scenario"]})
         full = [await provider.gather(action, request) for action in CLEAN]
 
-        verdict = await build_investigator(MockProvider()).investigate(request)
+        verdict = await build_investigator(
+            provider, engine=engine, planner=GreedyPlanner(engine)
+        ).investigate(request, parallel=False)
         rows.append(
             {
                 **{k: case[k] for k in ("name", "group", "deserves_decline")},

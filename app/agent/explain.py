@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from app.agent.gemini import GeminiClient
+from app.agent.gemini import GeminiBudgetExhausted, GeminiClient
 from app.chain.models import Verdict
 from app.config import settings
 from app.domain.enums import GRADE_MEANING
@@ -90,35 +90,25 @@ def answer(verdict: Verdict, question: str, client=None) -> str:
         # and so the boundary is obvious to anyone reading the prompt on stage.
         "question_from_the_public": trimmed,
     }
-    _note_if_deployment_pays()
-    text = client.generate_text(
-        system=SYSTEM_PROMPT,
-        prompt=json.dumps(payload, sort_keys=True),
-        max_tokens=600,
-    ).strip()
+    try:
+        text = client.generate_text(
+            system=SYSTEM_PROMPT,
+            prompt=json.dumps(payload, sort_keys=True),
+            max_tokens=600,
+        ).strip()
+    except GeminiBudgetExhausted as exc:
+        raise ExplainUnavailable("The shared Gemini hourly quota is exhausted") from exc
     if not text:
         raise ExplainUnavailable("the model returned no answer")
     return text
 
 
 def _maybe_client() -> object | None:
-    if not effective_gemini_key():
+    api_key = effective_gemini_key()
+    if not api_key:
         return None
     return GeminiClient(
-        api_key=effective_gemini_key(),
+        api_key=api_key,
         model=settings.llm_model,
         timeout_seconds=settings.llm_timeout_seconds,
     )
-
-
-def _note_if_deployment_pays() -> None:
-    """Charge this call against the hourly ceiling when it spends OUR key.
-
-    A key supplied on the request belongs to the reviewer who sent it and is
-    deliberately not rationed.
-    """
-    from app.model_budget import note_model_call
-    from app.runtime_keys import uses_server_key
-
-    if uses_server_key():
-        note_model_call()

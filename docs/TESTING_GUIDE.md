@@ -1,6 +1,6 @@
 # Isnad user test guide
 
-**Written 7 September 2026 against commit `261ff64`.** One row per feature.
+**Updated 8 September 2026; originally written against commit `261ff64`.** One row per feature.
 Each says what state it is actually in, how to set it up, exactly what to do,
 what you should see, which command proves it automatically, what evidence
 exists that it was really validated, and what it does not do.
@@ -33,11 +33,15 @@ with a live provider and a real model key makes the demo bill someone.
 The whole suite is one command:
 
 ```sh
-.venv311/bin/python -m pytest -q      # 1187 passed, 1 xfailed
+.venv311/bin/python -m pytest -q
 ```
 
-The one expected failure is the `/lab` mobile overflow defect below. It is a
-strict xfail, so the day it is fixed the suite fails until the marker is removed.
+Use the command's current result rather than a historical test count. The Lab
+mobile overflow fix is covered by regular browser assertions, with no xfail.
+Shared-key quota and server responsiveness regressions run without real model
+calls in `tests/test_model_budget_transport.py` and
+`tests/test_model_responsiveness.py`. The recorded Lab benchmark is compared
+with a fresh evaluation by `tests/test_lab_reproducibility.py`.
 
 ---
 
@@ -92,9 +96,9 @@ strict xfail, so the day it is fixed the suite fails until the marker is removed
 | Backward compatibility | Works offline | — | A receipt signed before swap dates still verifies byte-for-byte | `pytest -q tests/test_swap_timestamps.py -k before_this_extension` | `tests/fixtures/legacy_receipt_pre_swap_dates.json` | Never reserialize a stored payload to verify it |
 | Unavailable receipt | Works offline | Open `/r/chn_00000000000000000000` | A readable "not found", not a blank page | `pytest -q tests/browser/test_journeys.py -k unknown_receipt` | `receipt-en-unavailable-1440.png` | — |
 | Shared proof link | Works offline | Create a share, open it | A separately signed attestation, never the original bytes | `pytest -q tests/test_proof_shares.py` | — | Expiry and revocation disable that link only |
-| Trust session and revocation | Works offline | `/judge` → **Continue trust**, then **Simulate SIM swap** | The session is revoked and order release is blocked | `pytest -q tests/test_session.py` | — | **Open (R05):** a session can read as ACTIVE after its TTL while the monitor sleeps. Not fixed in this release |
+| Trust session and revocation | Works offline | `/judge` → **Continue trust**, then **Simulate SIM swap** | The session is revoked and order release is blocked | `pytest -q tests/test_session.py tests/test_r05_r09_session_lifetime.py` | — | Expiry is checked on access as well as by the monitor |
 | Outcome correction | Works offline | Report a merchant outcome | The correction is recorded without rewriting history | `pytest -q tests/test_outcomes_contract.py` | — | — |
-| Idempotency and trace replay | Works offline | Repeat a request with the same `Idempotency-Key` | The same chain, no second billed investigation | `pytest -q tests/test_run_replay.py tests/test_planner_and_cache.py` | — | **Open (R13):** the mapping is written after the chain commits, so a crash in that window can permit a second investigation |
+| Idempotency and trace replay | Works offline | Repeat a request with the same `Idempotency-Key` | The same chain, no second billed investigation | `pytest -q tests/test_run_replay.py tests/test_r13_durable_idempotency.py` | — | Durable claims and stored completion are tested across crashes and retries |
 
 ## Consent, merchant journey and the rest
 
@@ -104,29 +108,28 @@ strict xfail, so the day it is fixed the suite fails until the marker is removed
 | Consent completion landing | Works offline | `/consent/complete` | A generic page carrying no code, state or phone number | `pytest -q tests/test_consent_html_redirect.py` | `consent-complete-en-initial-1440.png` | — |
 | Merchant login / checkout / flow | Works offline | Start `demo/merchant_pilot` per the P4A record | Login errors, validation, consent QR, terminal states, recovery | `pytest -q tests/test_merchant_pilot.py tests/test_pilot_polling.py tests/test_pilot_retention.py` | **Not visited in a browser this release** | The three-service journey was not driven end-to-end in a browser here |
 | Verified Caller announcements | Works offline | `/console` → reverse check | Pre-announcement rows, Tier 1 screen, velocity | `pytest -q tests/test_verified_caller.py tests/test_velocity.py` | — | An announcement cannot outvote a contradicting network fact |
-| Lab comparisons and faults | Works offline | `/lab` → pick a case | Step-through, shuffle, reset, fault states, artifact provenance | `pytest -q tests/test_lab_page.py tests/test_lab_faults.py` | `lab-en-case-1440.png` | **Open defect:** `/lab` drags sideways 422px at 375px. Cause not found; strict xfail |
-| Privacy and retention | Works offline | `/privacy` | The actual posture, readable retention values | `pytest -q tests/test_privacy.py tests/test_retention.py` | `privacy-en-initial-1440.png` | **Open (R09):** an ended session keeps a raw phone number until another session is created |
+| Lab comparisons and faults | Works offline | `/lab` → pick a case | Step-through, shuffle, reset, fault states, artifact provenance | `pytest -q tests/test_lab_page.py tests/test_lab_faults.py tests/test_lab_reproducibility.py` | `lab-en-case-1440.png` | Playback is offline; the separate Gemini button uses model quota. Mobile overflow is covered in `tests/browser/test_i18n_dom.py` |
+| Privacy and retention | Works offline | `/privacy` | The actual posture, readable retention values | `pytest -q tests/test_privacy.py tests/test_retention.py tests/test_r05_r09_session_lifetime.py` | `privacy-en-initial-1440.png` | Ended-session phone cleanup no longer depends on creating another session |
 | Arabic / English on every surface | **Draft** | Use the language control on any page | Full RTL, isolated identifiers, no clipped text | `pytest -q tests/test_i18n.py tests/browser/` (61 browser tests) | 35 screenshots, both languages | Arabic is a **draft awaiting human review** — the page says so. The deterministic explanation paragraph is generated server-side and marked English |
 | Offline receipt verifier | Works offline | `scripts/evidence_pack.py --output-dir /tmp/pack` | Every signature verifies without the service | `pytest -q tests/test_evidence_pack.py` | — | — |
 | Bounded Nokia probe | **Works, hosted-observed** | `scripts/nac_demo_probe.py` (plan), then `--execute` | A plan and zero requests; then one call and one sanitized record | `pytest -q tests/test_nac_demo_probe.py` (38) | `docs/nac/observations/` | `+9999` numbers only. One operation per invocation, one attempt, no retries |
 
 ## What this release does not do
 
-- **Gemini was called exactly twice**, in one bounded run over mock network
-  data (`docs/nac/observations/2026-09-07-gemini-rehearsal.json`). That proves
-  the live request/response contract on one fixture. Everything else about the
-  planner — the fallback reason labels, degraded-model behaviour, the call
-  ceiling — is still stub-tested only.
-- **No live network, no physical handset, no congestion subscription, and no
-  callback has ever been delivered.**
-- **The Docker image was not built or started.** No Docker daemon was
-  available. The runtime file layout is asserted against the Dockerfile and
-  `.dockerignore`; running the built image is outstanding.
-- **`make lint` was not run.** It invokes a dependency audit that sends the
-  dependency inventory to PyPI, and an earlier review rejected that.
+- **Real Gemini observations cover mock network evidence**, including the
+  rehearsal and judge run under `docs/nac/observations/`. Quota exhaustion,
+  concurrency and degraded-model behavior are tested with a fake HTTP transport.
+- **No physical-handset operator consent or measured merchant fraud outcomes
+  have been established.** The local consent contract passes. Follow
+  [HANDSET_VALIDATION.md](HANDSET_VALIDATION.md) for the deployment preflight and
+  separately armed live procedure.
+- **Deployment evidence and CI are distinct.** Hugging Face runs a Docker
+  deployment. CI is configured to build the repository image and run dependency
+  audit; consult the relevant CI run for its result rather than treating this
+  guide as a record of every build.
 - **Not browser-verified:** 320px and tablet widths, 200% zoom, keyboard-only
   critical paths, the merchant three-service journey, and the shared proof
   page's expired and revoked states.
-- **Open defects carried forward:** the `/lab` mobile overflow, and R05, R07,
-  R09, R10, R12 and R13 from the September 2026 code review. Each has a
-  written fix and acceptance test there.
+- **Earlier R05/R07/R09/R10/R12/R13 defects have regression coverage** in the
+  corresponding `tests/test_r*.py` files; the old list of open defects is
+  superseded. Passing synthetic tests does not establish live operator behavior.

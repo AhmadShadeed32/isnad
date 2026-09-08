@@ -58,24 +58,23 @@ def _code_revision() -> str:
         return "unknown"
 
 
-def _policy_digest() -> str:
-    from app.config import settings
-
-    return hashlib.sha256(Path(settings.policy_path).read_bytes()).hexdigest()[:16]
+def _policy_digest(policy_path: Path) -> str:
+    return hashlib.sha256(policy_path.read_bytes()).hexdigest()[:16]
 
 
-async def build_report() -> dict:
+async def build_report(*, policy_path: Path | None = None) -> dict:
     independent_evaluation = _load("independent_evaluation", REPO_ROOT / "scripts" / "independent_evaluation.py")
     false_decline_baseline = _load("false_decline_baseline", REPO_ROOT / "scripts" / "false_decline_baseline.py")
 
     dataset = independent_evaluation.load_dataset()
     dataset_digest = hashlib.sha256(independent_evaluation.FIXTURE_PATH.read_bytes()).hexdigest()[:16]
-    ie_report = await independent_evaluation.evaluate(dataset)
+    from app.policy.engine import PolicyEngine
 
-    from app.config import settings
-    from app.policy.engine import get_engine
-
-    engine = get_engine(str(settings.policy_path))
+    # The standalone report and bundled report share an explicit policy and
+    # planner. Cached deployment settings must not relabel an LLM run as greedy.
+    policy_path = policy_path or independent_evaluation.POLICY_PATH
+    engine = PolicyEngine(policy_path)
+    ie_report = await independent_evaluation.evaluate(dataset, engine=engine)
     fdb_rows = await false_decline_baseline.run(
         false_decline_baseline.population(engine.cfg.get("signals", {})), engine
     )
@@ -88,7 +87,7 @@ async def build_report() -> dict:
     return {
         "generated_at": datetime.now(UTC).isoformat(),
         "code_revision": _code_revision(),
-        "policy_digest": _policy_digest(),
+        "policy_digest": _policy_digest(policy_path),
         "independent_evaluation": {
             "dataset_digest": dataset_digest,
             "case_count": len(dataset.cases) if hasattr(dataset, "cases") else None,

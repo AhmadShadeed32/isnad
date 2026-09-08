@@ -18,7 +18,12 @@ from app.api import demo_token
 from app.api.deps import require_api_key
 from app.api.rate_limit import limit_per_ip
 from app.config import settings
-from app.runtime_keys import accepts_request_key, effective_gemini_key
+from app.runtime_keys import (
+    accepts_request_key,
+    effective_gemini_key,
+    requested_planner,
+    uses_server_key,
+)
 from app.ui import page_path
 
 router = APIRouter(tags=["lab"])
@@ -87,6 +92,16 @@ async def lab_model_run(case_id: str, request: Request, _key: str = Depends(requ
     if case_id not in CASES:
         raise HTTPException(404, detail="Unknown Lab case")
     if not effective_gemini_key():
+        from app.model_budget import budget_exhausted
+
+        if requested_planner() == "llm" and uses_server_key() and budget_exhausted():
+            raise HTTPException(
+                429,
+                detail=(
+                    "The site's Gemini allowance is used up for now. Replay the recorded "
+                    "Greedy run, try later, or use your own Gemini key."
+                ),
+            )
         raise HTTPException(400, detail="Select Gemini and configure a server or personal key first")
     if _model_slots.locked():
         raise HTTPException(429, detail="Lab model runs are busy; try again shortly")

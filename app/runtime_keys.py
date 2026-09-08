@@ -22,6 +22,7 @@ billable network calls, and no public page should be able to trigger those.
 
 from __future__ import annotations
 
+import hmac
 from contextvars import ContextVar, Token
 
 from app.config import settings
@@ -69,9 +70,17 @@ def request_gemini_key() -> str | None:
     return _request_gemini_key.get()
 
 
-def uses_server_key() -> bool:
-    """Whether a model call right now would be charged to the deployment."""
-    return request_gemini_key() is None and bool(settings.gemini_api_key)
+def uses_server_key(api_key: str | None = None) -> bool:
+    """Whether the actual key, or current selection, spends deployment quota.
+
+    A request header can carry the server's own credential. Its location does
+    not change who pays, so compare the value instead of the header's presence.
+    The transport supplies its cached client's key explicitly.
+    """
+    selected = api_key if api_key is not None else request_gemini_key() or settings.gemini_api_key
+    return bool(selected and settings.gemini_api_key) and hmac.compare_digest(
+        selected.encode("utf-8"), settings.gemini_api_key.encode("utf-8")
+    )
 
 
 def effective_gemini_key() -> str | None:
@@ -88,14 +97,14 @@ def effective_gemini_key() -> str | None:
     """
     if _request_planner.get() == "greedy":
         return None
-    supplied = request_gemini_key()
-    if supplied:
-        return supplied
-    if not settings.gemini_api_key:
+    selected = request_gemini_key() or settings.gemini_api_key
+    if not selected:
         return None
     from app.model_budget import budget_exhausted
 
-    return None if budget_exhausted() else settings.gemini_api_key
+    # Advisory availability only. The transport still reserves each call
+    # atomically, including calls from an already-created client.
+    return None if uses_server_key(selected) and budget_exhausted() else selected
 
 
 def accepts_request_key() -> bool:

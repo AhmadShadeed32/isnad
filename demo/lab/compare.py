@@ -19,6 +19,7 @@ answers under an unchanged phone number.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from pathlib import Path
 
 from app.api.routes_console import DEMO_ACTS
 from demo.lab.runner import SCENARIO_IDS, run_scenario
@@ -46,7 +47,9 @@ class Comparison:
         return asdict(self)
 
 
-async def compare_missing_location_claim(scenario_id: str) -> Comparison:
+async def compare_missing_location_claim(
+    scenario_id: str, *, policy_path: Path | None = None
+) -> Comparison:
     if scenario_id not in SCENARIO_IDS:
         from demo.lab.runner import UnknownScenario
 
@@ -56,11 +59,13 @@ async def compare_missing_location_claim(scenario_id: str) -> Comparison:
     if base_request.context.claimed_location is None:
         raise NoClaimedLocation(scenario_id)
 
-    base = await run_scenario(scenario_id)
+    base = await run_scenario(scenario_id, policy_path=policy_path)
 
     variant_request = base_request.model_copy(deep=True)
     variant_request.context.claimed_location = None
-    variant = await run_scenario(scenario_id, request_override=variant_request)
+    variant = await run_scenario(
+        scenario_id, request_override=variant_request, policy_path=policy_path
+    )
 
     effect = "no_observed_effect" if base.outcome == variant.outcome else "changed"
     return Comparison(

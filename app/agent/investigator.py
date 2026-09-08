@@ -272,8 +272,14 @@ class Investigator:
                 choreographed = True
             else:
                 phase = "investigation"
-                choice = self.planner.choose(
-                    hypothesis, used, budget_left, belief.p_fraud, observations
+                # Model selection can make a synchronous network request. Keep
+                # it off the event loop so a slow model does not stall other
+                # investigations, health checks or SSE delivery. to_thread
+                # preserves the request's ContextVars (including its model key)
+                # and uses the event loop's bounded worker pool.
+                choice = await asyncio.to_thread(
+                    self.planner.choose,
+                    hypothesis, used, budget_left, belief.p_fraud, observations,
                 )
                 planner_sources.add(choice.source)
             if choice.stops:

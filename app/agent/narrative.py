@@ -91,7 +91,6 @@ def narrate(verdict: Verdict, client=None) -> str:
         return deterministic(verdict)
 
     try:
-        _note_if_deployment_pays()
         text = client.generate_text(
             system=SYSTEM_PROMPT,
             prompt=json.dumps(_facts(verdict), sort_keys=True),
@@ -103,23 +102,11 @@ def narrate(verdict: Verdict, client=None) -> str:
 
 
 def _maybe_client() -> object | None:
-    if not effective_gemini_key() or settings.planner != "llm":
+    api_key = effective_gemini_key()
+    if not api_key or settings.planner != "llm":
         return None
     return GeminiClient(
-        api_key=effective_gemini_key(),
+        api_key=api_key,
         model=settings.llm_model,
         timeout_seconds=settings.llm_timeout_seconds,
     )
-
-
-def _note_if_deployment_pays() -> None:
-    """Charge this call against the hourly ceiling when it spends OUR key.
-
-    A key supplied on the request belongs to the reviewer who sent it and is
-    deliberately not rationed.
-    """
-    from app.model_budget import note_model_call
-    from app.runtime_keys import uses_server_key
-
-    if uses_server_key():
-        note_model_call()

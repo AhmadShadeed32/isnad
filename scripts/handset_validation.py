@@ -3,6 +3,9 @@
 ``contract`` is fully local and deterministic. It exercises the HTTP routes with
 a fake provider and makes no network, model, or billable call.
 
+``preflight`` uses read-only deployment HTTP checks. It does not initiate OAuth
+or call an operator/model, and does not require a phone number or live arming.
+
 ``live`` targets an already-deployed Isnad service. It is separately armed
 because completing the flow calls the configured provider. The authorization
 URL is shown as a terminal QR code and is never written to the evidence report.
@@ -31,6 +34,7 @@ ARM_VALUE = "i-understand-this-may-call-a-billable-provider"
 CONTRACT_PHONE = "+99999991000"
 DEFAULT_CONTRACT_OUTPUT = Path("/tmp/isnad-consent-contract.json")
 DEFAULT_LIVE_OUTPUT = Path("/tmp/isnad-handset-validation.json")
+DEFAULT_PREFLIGHT_OUTPUT = Path("/tmp/isnad-handset-preflight.json")
 
 
 class ValidationFailure(RuntimeError):
@@ -327,6 +331,88 @@ def run_contract(output: Path) -> dict[str, Any]:
     return report
 
 
+def _deployment_origin(value: str) -> str:
+    base = value.rstrip("/")
+    try:
+        parsed = urlsplit(base)
+        valid = (
+            parsed.scheme == "https"
+            and bool(parsed.hostname)
+            and not parsed.username
+            and not parsed.password
+            and not parsed.path
+            and not parsed.query
+            and not parsed.fragment
+            and parsed.port != 0
+        )
+    except ValueError:
+        valid = False
+    if not valid:
+        raise ValidationFailure("--base-url must be an HTTPS origin without credentials, path, or query")
+    return base
+
+
+def _preflight_checks(client: httpx.Client, api_key: str) -> dict[str, bool]:
+    """Use only existing metadata endpoints, never a consent/provider route."""
+    readiness = client.get("/readyz")
+    anonymous = client.get("/v1/console/mode")
+    authenticated = client.get(
+        "/v1/console/mode", headers={"Authorization": f"Bearer {api_key}"}
+    )
+    try:
+        ready_payload = readiness.json()
+    except ValueError:
+        ready_payload = None
+    try:
+        mode = authenticated.json()
+    except ValueError:
+        mode = None
+    mode = mode if isinstance(mode, dict) else {}
+    return {
+        "database_ready": readiness.status_code == 200 and ready_payload == {"status": "ready"},
+        "anonymous_access_rejected": anonymous.status_code in {401, 403},
+        "merchant_authenticated": authenticated.status_code == 200,
+        "nac_provider_selected": authenticated.status_code == 200 and mode.get("provider") == "nac",
+        "demo_disabled": authenticated.status_code == 200 and mode.get("demo_mode") is False,
+    }
+
+
+def run_preflight(args: argparse.Namespace) -> dict[str, Any]:
+    base = _deployment_origin(str(args.base_url))
+    api_key = (os.environ.get("ISNAD_HANDSET_API_KEY") or "").strip()
+    if not api_key:
+        raise ValidationFailure("ISNAD_HANDSET_API_KEY is not set")
+    with httpx.Client(
+        base_url=base, timeout=args.request_timeout, follow_redirects=False
+    ) as client:
+        checks = _preflight_checks(client, api_key)
+    report = {
+        "schema": "isnad_handset_preflight/v1",
+        "generated_at": _now(),
+        "scope": {
+            "mode": "deployment_preflight",
+            "network_calls": True,
+            "operator_calls": False,
+            "model_calls": False,
+            "oauth_initiated": False,
+            "physical_handset_reported": False,
+            "claim": "Read-only Isnad HTTP boundary checks; no live operator or handset proof.",
+        },
+        "http_checks_passed": all(checks.values()),
+        "checks": checks,
+        "blockers": [name for name, passed in checks.items() if not passed],
+        "manual_checks_remaining": [
+            "Registered OAuth callback exactly matches the deployment configuration.",
+            "Operator enables Number Verification for this application and subscriber.",
+            "One application worker, durable database and vault key, and stable subject pepper.",
+            "Supported physical handset, subscriber consent, and provider-spend authorization.",
+        ],
+        "redaction": {"api_key_saved": False, "phone_number_saved": False, "response_bodies_saved": False},
+    }
+    _write_report(args.output, report)
+    return report
+
+
 def run_live(args: argparse.Namespace) -> dict[str, Any]:
     if os.environ.get("ISNAD_HANDSET_ARM") != ARM_VALUE:
         raise ValidationFailure(f"refusing live run: set ISNAD_HANDSET_ARM={ARM_VALUE}")
@@ -336,10 +422,15 @@ def run_live(args: argparse.Namespace) -> dict[str, Any]:
         raise ValidationFailure("ISNAD_HANDSET_API_KEY is not set")
     if not re.fullmatch(r"\+[1-9]\d{7,14}", phone):
         raise ValidationFailure("ISNAD_HANDSET_PHONE must be an E.164 mobile number")
-    base = str(args.base_url).rstrip("/")
-    parsed_base = urlsplit(base)
-    if parsed_base.scheme != "https" or not parsed_base.hostname:
-        raise ValidationFailure("--base-url must be an absolute HTTPS deployment URL")
+    base = _deployment_origin(str(args.base_url))
+
+    with httpx.Client(
+        base_url=base, timeout=args.request_timeout, follow_redirects=False
+    ) as client:
+        checks = _preflight_checks(client, api_key)
+    if not all(checks.values()):
+        failed = ", ".join(name for name, passed in checks.items() if not passed)
+        raise ValidationFailure(f"deployment preflight failed: {failed}; no consent initiated")
 
     auth = {"Authorization": f"Bearer {api_key}"}
     with httpx.Client(base_url=base, headers=auth, timeout=args.request_timeout) as client:
@@ -413,6 +504,7 @@ def run_live(args: argparse.Namespace) -> dict[str, Any]:
         verification=completed,
         number_link=number_link,
         checks={
+            "deployment_http_preflight_passed": True,
             "oauth_state_single_use": "not_replayed_live; covered by contract mode",
             "authorization_code_exchanged_once": "not observable outside deployment",
             "completion_idempotent": True,
@@ -433,6 +525,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     subparsers = parser.add_subparsers(dest="command", required=True)
     contract = subparsers.add_parser("contract", help="run the offline route-contract smoke")
     contract.add_argument("--output", type=Path, default=DEFAULT_CONTRACT_OUTPUT)
+
+    preflight = subparsers.add_parser("preflight", help="check deployment without OAuth or provider calls")
+    preflight.add_argument("--base-url", required=True)
+    preflight.add_argument("--output", type=Path, default=DEFAULT_PREFLIGHT_OUTPUT)
+    preflight.add_argument("--request-timeout", type=float, default=15.0)
 
     live = subparsers.add_parser("live", help="run the separately armed handset flow")
     live.add_argument("--base-url", required=True)
@@ -460,11 +557,20 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "contract":
             report = run_contract(args.output)
             output = args.output
+        elif args.command == "preflight":
+            report = run_preflight(args)
+            state = "PASS" if report["http_checks_passed"] else "BLOCKED"
+            print(f"{state} deployment_preflight: HTTP boundary checks only; report={args.output}")
+            return 0 if report["http_checks_passed"] else 2
         else:
             report = run_live(args)
             output = args.output
-    except (ValidationFailure, httpx.HTTPError) as exc:
+    except ValidationFailure as exc:
         print(f"validation failed: {exc}", file=sys.stderr)
+        return 2
+    except httpx.HTTPError:
+        # Remote URLs and response bodies can contain credentials or identifiers.
+        print("validation failed: deployment HTTP request failed", file=sys.stderr)
         return 2
     print(
         f"PASS {report['scope']['mode']}: Number Verification "

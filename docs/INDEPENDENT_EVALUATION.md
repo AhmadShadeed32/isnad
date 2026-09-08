@@ -76,10 +76,20 @@ disagreements rose from three to four. That is a real trade, not a regression to
 tune away, and neither the fixture labels nor the policy weights were adjusted
 to recover the old figures.
 
-The investigator disagreed with four conservative expectations by returning
-ALLOW. These are synthetic expectation differences, not observed false
-negatives. Early stopping can still miss later evidence; the 49-versus-78 call
-result is inseparable from that tradeoff.
+The investigator disagreed with four authored expectations: three ALLOW results
+where CHALLENGE was expected, and one CHALLENGE where DECLINE was expected.
+These are synthetic expectation differences, not observed false negatives.
+Early stopping can still miss later evidence; the 49-versus-78 call result is
+inseparable from that tradeoff.
+
+On 8 September 2026, the Lab's recorded table was found to disagree with the
+standalone evaluator: it showed six automatic decisions and three disagreements.
+Report generation inherited a planner from already-loaded deployment settings.
+Both evaluators now explicitly construct GreedyPlanner with the same policy,
+and generated scenarios stay local to each provider. Regression tests compare
+the standalone result with bundle generation under conflicting host settings
+and compare the committed table with a fresh evaluation. No fixture expectations
+or policy weights were changed to reconcile the results.
 
 The relevance-aware ALLOW gate now requires supporting evidence that bears on
 the active hypothesis. Compared with the prior 28-call/six-disagreement run,

@@ -23,6 +23,16 @@ Authentication, rate limits, and model quotas control who can spend that
 quota; keeping a key secret alone does not restrict usage. The Lab uses fixed
 synthetic cases, an IP rate limiter, and at most two concurrent model runs.
 
+Set `ISNAD_LLM_MAX_CALLS_PER_HOUR` to a positive value to cap shared-key model
+requests per rolling hour (the Space uses 120; zero disables the cap).
+Every attempted Gemini HTTP call reserves a slot atomically, including calls
+from cached clients and concurrent runs. Failed requests keep their slot because
+they may have reached Google. A distinct visitor key uses that visitor's quota.
+Once exhausted, ongoing investigations fall back to Greedy with a quota reason;
+new Lab model runs report that the allowance is exhausted. The counter is
+in-memory and resets on restart: keep one worker and one replica, and use provider
+account limits for a durable spending boundary. This limits calls, not currency.
+
 The Lab's recorded Greedy runs remain available without a model call. Fresh
 Gemini simulations stay in the browser's current page memory, are unsigned,
 and use mock network evidence. They never replace the committed recordings.

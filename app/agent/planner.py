@@ -8,11 +8,12 @@ from typing import Protocol
 import httpx
 from pydantic import BaseModel, Field
 
-from app.agent.gemini import GeminiClient, GeminiNoResponse
+from app.agent.gemini import GeminiBudgetExhausted, GeminiClient, GeminiNoResponse
 from app.config import settings
 from app.domain.enums import Action, Hypothesis
+from app.model_budget import budget_exhausted
 from app.policy.engine import PolicyEngine
-from app.runtime_keys import effective_gemini_key, requested_planner
+from app.runtime_keys import effective_gemini_key, requested_planner, uses_server_key
 
 # Actions the agent may take to gather low-friction evidence. step_up_otp is excluded
 # here — it is reserved for the CHALLENGE step-up path (adds user friction).
@@ -57,6 +58,7 @@ GREEDY_RATIONALE = "greedy: highest information-per-cost option still affordable
 # and when it does the run says which no-answer condition allowed it. A returned
 # answer that was rejected is a different outcome and stops selection instead.
 NO_MODEL_REASON = "Gemini unavailable: no model key configured"
+SHARED_BUDGET_REASON = "Gemini unavailable: shared hourly model quota exhausted"
 NO_ANSWER_REASON = "Gemini gave no answer"
 NO_ANSWER_TRANSPORT = "Gemini gave no answer: request did not complete"
 
@@ -252,7 +254,10 @@ class LLMPlanner:
         if not affordable:
             return Choice(None, "nothing affordable remains", self.source)
         if self._client is None:
-            return self._no_answer(NO_MODEL_REASON, hypothesis, used, budget_left)
+            reason = (
+                SHARED_BUDGET_REASON if uses_server_key() and budget_exhausted() else NO_MODEL_REASON
+            )
+            return self._no_answer(reason, hypothesis, used, budget_left)
         if self._calls >= settings.llm_max_calls_per_investigation:
             return Choice(None, "Gemini selection stopped: model call limit reached", self.source)
         return self._ask(hypothesis, used, affordable, budget_left, p_fraud, observations)
@@ -267,7 +272,6 @@ class LLMPlanner:
         observations: Sequence[Observation],
     ) -> Choice:
         self._calls += 1
-        _note_if_deployment_pays()
         prompt = self._render(hypothesis, affordable, budget_left, p_fraud, observations)
         try:
             response = self._client.generate_json(
@@ -276,6 +280,8 @@ class LLMPlanner:
             if response is None:
                 raise GeminiNoResponse("No model answer")
             decision = PlannerResponse.model_validate(response)
+        except GeminiBudgetExhausted:
+            return self._no_answer(SHARED_BUDGET_REASON, hypothesis, used, budget_left)
         except GeminiNoResponse:
             # The model was reached and produced nothing usable to select from.
             return self._no_answer(NO_ANSWER_REASON, hypothesis, used, budget_left)
@@ -419,16 +425,3 @@ def effective_planner() -> str:
     if asked_for_llm and LLMPlanner._maybe_client() is not None:
         return LLMPlanner.source
     return GreedyPlanner.source
-
-
-def _note_if_deployment_pays() -> None:
-    """Charge this call against the hourly ceiling when it spends OUR key.
-
-    A key supplied on the request belongs to the reviewer who sent it and is
-    deliberately not rationed.
-    """
-    from app.model_budget import note_model_call
-    from app.runtime_keys import uses_server_key
-
-    if uses_server_key():
-        note_model_call()

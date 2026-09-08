@@ -43,12 +43,14 @@ sys.path.insert(0, str(ROOT))
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from app.agent.investigator import build_investigator
+from app.agent.planner import GreedyPlanner
 from app.domain.enums import Action, Decision, Result
 from app.domain.schemas import RequestContext, VerificationRequest
 from app.policy.engine import PolicyEngine, logodds_to_p
 from app.providers.mock import MockProvider
 
 FIXTURE_PATH = ROOT / "tests" / "fixtures" / "independent_evaluation.json"
+POLICY_PATH = ROOT / "app" / "policy" / "policy.yaml"
 
 # These are the provider-backed actions the current investigator can buy. Device
 # Intelligence and OTP are intentionally absent because no provider serves them;
@@ -237,10 +239,16 @@ def full_evidence_same_policy(case: EvaluationCase, engine: PolicyEngine) -> Bas
     )
 
 
-async def _run_actual(case: EvaluationCase) -> BaselineResult:
+async def _run_actual(case: EvaluationCase, engine: PolicyEngine) -> BaselineResult:
     provider = MockProvider(scenarios={case.phone_number: case.provider_scenario()})
     request = VerificationRequest(phone_number=case.phone_number, context=case.context)
-    verdict = await build_investigator(provider).investigate(request, parallel=False)
+    # The Lab imports this module after application settings already exist.
+    # Environment assignments above cannot change that cached configuration:
+    # construct the advertised planner and policy here instead of asking the
+    # ambient factory, which may otherwise choose a paid model.
+    verdict = await build_investigator(
+        provider, engine=engine, planner=GreedyPlanner(engine)
+    ).investigate(request, parallel=False)
     # An enrichment that never left the process (`unsupported`, or one the
     # budget could not cover) is not a call and is not counted.
     enrichments = sum(
@@ -315,8 +323,9 @@ def _method_summary(
     }
 
 
-async def evaluate(dataset: Dataset) -> dict:
-    engine = PolicyEngine(Path(os.environ.get("ISNAD_POLICY_PATH", ROOT / "app/policy/policy.yaml")))
+async def evaluate(dataset: Dataset, *, engine: PolicyEngine | None = None) -> dict:
+    # One fresh policy for all three methods, independent of cached settings.
+    engine = engine or PolicyEngine(POLICY_PATH)
     names = (
         "isnad-greedy",
         "corroboration-aware-rules",
@@ -329,7 +338,7 @@ async def evaluate(dataset: Dataset) -> dict:
         for name in names:
             try:
                 if name == "isnad-greedy":
-                    value = await _run_actual(case)
+                    value = await _run_actual(case, engine)
                 elif name == "corroboration-aware-rules":
                     value = corroboration_aware(case)
                 else:

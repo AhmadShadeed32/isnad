@@ -1,6 +1,6 @@
 # Number Verification handset validation
 
-Status on 5 September 2026: **the local consent contract is automated; the
+Status on 8 September 2026: **the local consent contract passes; the
 operator-hosted consent page has not been exercised on a physical handset.** A
 mock pass is integration evidence about Isnad's routes. It is not live consent
 evidence and must never be labelled as such.
@@ -42,6 +42,32 @@ This exercises the real HTTP route sequence with a deterministic fake provider:
 It writes `/tmp/isnad-consent-contract.json` with mode `mock_contract`,
 `network_calls: false`, and `physical_handset_reported: false`. The report stores
 no phone, authorization URL, OAuth state, code, token, or API key.
+
+The contract was rerun on 8 September 2026. It completed the consent lifecycle,
+rejected callback reuse, reused the completed verification, and verified the
+receipt signature. This is still an offline result, not a physical-handset result.
+
+## Check the deployment before requesting consent
+
+Enter the merchant credential using the hidden prompt shown below, then run:
+
+```bash
+.venv311/bin/python scripts/handset_validation.py preflight \
+  --base-url https://<public-host> \
+  --output /tmp/isnad-handset-preflight.json
+```
+
+This uses only GET requests to readiness and authenticated mode endpoints.
+It checks database readiness, rejection of anonymous access, merchant access,
+`provider=nac`, and demo mode disabled. It sends no phone number, starts no OAuth
+flow, and makes no model or operator call. Failed checks exit with code 2 and
+are named in a redacted report. Passing checks still require the manual operator,
+callback, storage and handset checks listed below; the script cannot establish
+those from HTTP metadata. Live mode repeats these checks before initiating consent.
+
+The public Hugging Face demo uses mock network evidence and is not the live
+handset target. A supported handset and a separately authenticated deployment
+with its operator callback registered are still required.
 
 ## Inputs still needed for a live handset proof
 

@@ -35,7 +35,7 @@ def test_the_deployment_key_stops_being_handed_out_once_the_hour_is_spent(monkey
 
     assert runtime_keys.effective_gemini_key() == "SERVER-KEY"
     for _ in range(3):
-        model_budget.note_model_call()
+        assert model_budget.reserve_model_call("SERVER-KEY")
 
     assert model_budget.budget_exhausted() is True
     assert runtime_keys.effective_gemini_key() is None
@@ -50,8 +50,8 @@ def test_a_stranger_forcing_the_model_planner_cannot_outlast_the_ceiling(monkeyp
     token = runtime_keys.set_request_planner("llm")
     try:
         assert runtime_keys.effective_gemini_key() == "SERVER-KEY"
-        model_budget.note_model_call()
-        model_budget.note_model_call()
+        assert model_budget.reserve_model_call("SERVER-KEY")
+        assert model_budget.reserve_model_call("SERVER-KEY")
         # Same header, same caller, and now they get nothing.
         assert runtime_keys.effective_gemini_key() is None
     finally:
@@ -67,7 +67,7 @@ def test_an_exhausted_budget_reports_greedy_rather_than_claiming_an_agent(monkey
     monkeypatch.setattr(settings, "planner", "llm", False)
 
     assert effective_planner() == "llm"
-    model_budget.note_model_call()
+    assert model_budget.reserve_model_call("SERVER-KEY")
     assert effective_planner() == "greedy"
 
 
@@ -92,7 +92,7 @@ def test_a_reviewer_key_still_works_after_the_deployment_is_exhausted(monkeypatc
     """Their quota, their run. Our ceiling must not lock them out."""
     monkeypatch.setattr(settings, "gemini_api_key", "SERVER-KEY", False)
     monkeypatch.setattr(settings, "llm_max_calls_per_hour", 1, False)
-    model_budget.note_model_call()
+    assert model_budget.reserve_model_call("SERVER-KEY")
     assert runtime_keys.effective_gemini_key() is None
 
     token = runtime_keys.set_request_gemini_key("REVIEWER-KEY")
@@ -110,7 +110,7 @@ def test_zero_means_unlimited_so_a_local_run_is_untouched(monkeypatch):
     monkeypatch.setattr(settings, "llm_max_calls_per_hour", 0, False)
 
     for _ in range(50):
-        model_budget.note_model_call()
+        assert model_budget.reserve_model_call("SERVER-KEY")
 
     assert model_budget.budget_exhausted() is False
     assert runtime_keys.effective_gemini_key() == "SERVER-KEY"

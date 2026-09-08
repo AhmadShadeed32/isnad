@@ -19,6 +19,8 @@ from urllib.parse import quote
 
 import httpx
 
+from app.model_budget import reserve_model_call
+
 
 class GeminiError(RuntimeError):
     """The provider did not return usable candidate text."""
@@ -26,6 +28,10 @@ class GeminiError(RuntimeError):
 
 class GeminiNoResponse(GeminiError):
     """No model answer arrived, as distinct from a returned invalid answer."""
+
+
+class GeminiBudgetExhausted(GeminiNoResponse):
+    """The deployment's hourly ceiling prevented any upstream request."""
 
 
 class GeminiClient:
@@ -88,6 +94,8 @@ class GeminiClient:
         if response_mime_type:
             body["generationConfig"]["responseMimeType"] = response_mime_type
 
+        if not reserve_model_call(self._api_key):
+            raise GeminiBudgetExhausted("The shared Gemini hourly quota is exhausted")
         response = httpx.post(
             f"{self._BASE_URL}/{model}:generateContent",
             headers={"x-goog-api-key": self._api_key},

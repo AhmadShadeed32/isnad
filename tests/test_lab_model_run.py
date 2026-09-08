@@ -50,3 +50,17 @@ def test_public_configuration_reports_presence_never_secret(model):
         response = client.get('/ui/settings.json')
     assert response.json()['server_gemini_available'] is True
     assert 'server-secret-test' not in response.text
+
+
+def test_exhausted_site_budget_explains_quota_instead_of_asking_for_configuration(model, monkeypatch):
+    from app import model_budget
+
+    monkeypatch.setattr(model_budget, 'budget_exhausted', lambda: True)
+    with TestClient(app) as client:
+        response = client.post(PATH, headers=AUTH)
+        assert response.status_code == 429
+        assert 'allowance is used up' in response.json()['detail']
+        assert model == []
+        own_key = client.post(PATH, headers={**AUTH, 'X-Isnad-Gemini-Key': 'reviewer-test'})
+        assert own_key.status_code == 200
+        assert model == ['reviewer-test']

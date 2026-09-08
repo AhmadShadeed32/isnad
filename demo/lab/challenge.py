@@ -10,6 +10,7 @@ not independent ground truth or a statistically held-out test.
 from __future__ import annotations
 
 import random
+from pathlib import Path
 
 from app.domain.schemas import RequestContext, VerificationRequest
 from demo.lab.faults import FaultInjectingProvider
@@ -46,7 +47,7 @@ class UnknownCase(ValueError):
     any work, the same as an unknown scenario id."""
 
 
-async def run_case(case_id: str, *, planner=None) -> LabRun:
+async def run_case(case_id: str, *, planner=None, policy_path: Path | None = None) -> LabRun:
     if case_id not in CASES:
         raise UnknownCase(case_id)
     case = CASES[case_id]
@@ -71,6 +72,7 @@ async def run_case(case_id: str, *, planner=None) -> LabRun:
     return await run_scenario(
         scenario_id, request_override=request_override, provider_override=provider_override,
         planner=planner,
+        policy_path=policy_path,
     )
 
 

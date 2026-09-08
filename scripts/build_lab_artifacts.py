@@ -1,11 +1,9 @@
 """Build the versioned artifact bundle the /lab page serves (I1/I2/I3/I4/I9).
 
-The lab page renders *recordings*. It does not run an investigation, and
-there is no endpoint behind it that will: every case a judge can select was
-run here, offline, against a fixed authored fixture, and the page replays
-what was recorded. That is what makes "replay controls scrub the recorded
-timeline without resending requests" (I1 step 4) and "cannot incur additional
-model spend" true by construction rather than by promise.
+The Lab's recorded cases and comparison tables are generated here offline.
+Replaying them makes no model or operator requests. The page also offers an
+explicit "Run this case with Gemini" action: that separate POST can spend model
+quota using mock network evidence and never replaces these saved recordings.
 
 Everything is produced through the shared `demo/lab` runner, which pins its
 own MockProvider and GreedyPlanner (see the handoff's F3) — so this bundle is
@@ -38,6 +36,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 DEFAULT_OUT = REPO_ROOT / "demo" / "lab" / "artifacts" / "bundle.json"
+POLICY_PATH = REPO_ROOT / "app" / "policy" / "policy.yaml"
 
 BUNDLE_SCHEMA_VERSION = 1
 
@@ -51,8 +50,9 @@ LIMITS = [
         "recording is still not a statistically held-out test."
     ),
     (
-        "These are recordings, not live runs. Selecting a case replays what this "
-        "generator captured; nothing on the page calls a provider or a model."
+        "Selecting a case or using playback replays a saved Greedy recording "
+        "without model or operator calls. The separate Run this case with Gemini "
+        "button spends model quota on a fresh simulation using mock network evidence."
     ),
     (
         "The same policy file and the same deterministic greedy planner ran every "
@@ -74,7 +74,7 @@ async def _build_cases() -> list[dict]:
 
     cases = []
     for case_id, case in CASES.items():
-        run = await run_case(case_id)
+        run = await run_case(case_id, policy_path=POLICY_PATH)
         cases.append(
             {
                 "case_id": case_id,
@@ -97,7 +97,7 @@ async def _build_comparison() -> dict | None:
     from demo.lab.compare import NoClaimedLocation, compare_missing_location_claim
 
     try:
-        comparison = await compare_missing_location_claim("replacement")
+        comparison = await compare_missing_location_claim("replacement", policy_path=POLICY_PATH)
     except NoClaimedLocation:
         return None
     return comparison.to_dict()
@@ -122,14 +122,14 @@ async def build_bundle() -> dict:
         "generated_at": datetime.now(UTC).isoformat(),
         "code_revision": revision,
         "dirty": dirty,
-        "policy_digest": _policy_digest(),
+        "policy_digest": _policy_digest(POLICY_PATH),
         "cases": await _build_cases(),
         # A fixed seed, recorded, so "shuffled" is reproducible rather than a
         # different order every time a judge reloads (I9 step 5).
         "shuffle_seed": 20260906,
         "shuffled_order": seeded_order(20260906),
         "comparison": await _build_comparison(),
-        "evidence_report": await build_evidence_comparison.build_report(),
+        "evidence_report": await build_evidence_comparison.build_report(policy_path=POLICY_PATH),
         "limits": LIMITS,
     }
 

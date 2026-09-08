@@ -44,8 +44,8 @@ def _fixture_digest(request) -> str:
     return hashlib.sha256(request.model_dump_json().encode("utf-8")).hexdigest()[:16]
 
 
-def _policy_digest() -> str:
-    return hashlib.sha256(Path(settings.policy_path).read_bytes()).hexdigest()[:16]
+def _policy_digest(policy_path: Path | None = None) -> str:
+    return hashlib.sha256(Path(policy_path or settings.policy_path).read_bytes()).hexdigest()[:16]
 
 
 def _code_revision() -> tuple[str, bool]:
@@ -90,7 +90,8 @@ def _planner_source(events: list[TraceEvent]) -> str:
 
 
 async def run_scenario(
-    scenario_id: str, *, planner=None, request_override=None, provider_override=None
+    scenario_id: str, *, planner=None, request_override=None, provider_override=None,
+    policy_path: Path | None = None,
 ) -> LabRun:
     """Run the named scenario's fixture, or `request_override` (a full
     VerificationRequest already derived from it) when a caller — I2's
@@ -139,7 +140,8 @@ async def run_scenario(
             )
         )
 
-    engine = get_engine(str(settings.policy_path))
+    policy_path = policy_path or settings.policy_path
+    engine = get_engine(str(policy_path))
     provider = provider_override or MockProvider()
     # The lab's offline, deterministic guarantee is constructed here, not
     # inherited from process configuration. Passing planner=None on to the
@@ -163,7 +165,7 @@ async def run_scenario(
         run_id=run_id,
         scenario_id=scenario_id,
         fixture_digest=_fixture_digest(request),
-        policy_digest=_policy_digest(),
+        policy_digest=_policy_digest(policy_path),
         code_revision=revision,
         dirty=dirty,
         generated_at=datetime.now(UTC).isoformat(),
