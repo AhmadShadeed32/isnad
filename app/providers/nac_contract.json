@@ -1,0 +1,203 @@
+{
+  "contract_version": "2026-09-09.1",
+  "sdk": "network_as_code==10.0.0",
+  "generated_note": "Hand-compiled from the sources below. Nothing here is produced by Isnad's own normalizer, adapter or policy: the response bodies are the shapes Nokia documents (and, where noted, the shapes this project actually received), so a parity test that compares them against Isnad's output is comparing two independent things.",
+  "sources": [
+    {
+      "id": "nokia-sim-swap",
+      "url": "https://networkascode.nokia.io/_docs/sim-swap/sim-swap",
+      "accessed": "2026-09-09",
+      "establishes": "check/retrieve-date split, max_age in hours (1-2400), swapped boolean, simulator table (+99999991000 swapped, +99999991001 not)"
+    },
+    {
+      "id": "nokia-device-swap",
+      "url": "https://networkascode.nokia.io/_docs/device-swap/device-swap",
+      "accessed": "2026-09-09",
+      "establishes": "check/retrieve-date split, max_age 1-2400 hours default 240, swapped boolean, latest_device_change nullable, simulator table, documented 422 when the number was never installed in a device or no data is available"
+    },
+    {
+      "id": "nokia-error-handling",
+      "url": "https://networkascode.nokia.io/_docs/general-concepts/error-handling",
+      "accessed": "2026-09-09",
+      "establishes": "400/401/403/404/406/422/500/502/503 statuses and their meanings. The JSON error body field names are NOT documented on that page; the bodies below are therefore marked authored_fault_injection, not documented examples."
+    },
+    {
+      "id": "isnad-wire-contract",
+      "url": "tests/test_nac_wire_contract.py",
+      "accessed": "2026-09-09",
+      "establishes": "the method, path and JSON body SDK 10.0.0 actually serializes, driven through httpx.MockTransport with zero external requests"
+    },
+    {
+      "id": "isnad-hosted-observation",
+      "url": "docs/nac/observations/2026-09-06-hosted-simulator.jsonl",
+      "accessed": "2026-09-06",
+      "establishes": "responses this project actually received from https://network-as-code.p-eu.apihub.nokia.io for both paired numbers on both swap checks"
+    }
+  ],
+  "operations": {
+    "sim_swap_check": {
+      "method": "POST",
+      "path": "/passthrough/camara/v1/sim-swap/sim-swap/v0/check",
+      "request_fields": {
+        "phoneNumber": {
+          "type": "string",
+          "required": true,
+          "format": "E.164 with leading +"
+        },
+        "maxAge": {
+          "type": "integer",
+          "required": false,
+          "units": "hours",
+          "minimum": 1,
+          "maximum": 2400
+        }
+      },
+      "response_fields": {
+        "swapped": {
+          "type": "boolean",
+          "nullable": false
+        }
+      },
+      "sources": [
+        "nokia-sim-swap",
+        "isnad-wire-contract",
+        "isnad-hosted-observation"
+      ]
+    },
+    "device_swap_check": {
+      "method": "POST",
+      "path": "/passthrough/camara/v1/device-swap/device-swap/v1/check",
+      "request_fields": {
+        "phoneNumber": {
+          "type": "string",
+          "required": true,
+          "format": "E.164 with leading +"
+        },
+        "maxAge": {
+          "type": "integer",
+          "required": false,
+          "units": "hours",
+          "minimum": 1,
+          "maximum": 2400
+        }
+      },
+      "response_fields": {
+        "swapped": {
+          "type": "boolean",
+          "nullable": false
+        }
+      },
+      "sources": [
+        "nokia-device-swap",
+        "isnad-wire-contract",
+        "isnad-hosted-observation"
+      ],
+      "note": "The path carries v1 while SIM Swap carries v0. The v1.0.0 API-group label is not a per-path version."
+    }
+  },
+  "scenarios": {
+    "swapped_subscriber": {
+      "phone_number": "+99999991000",
+      "paired": true,
+      "label_en": "Both swaps occurred",
+      "label_ar": "حدث تغيير الشريحة والجهاز",
+      "responses": {
+        "sim_swap_check": {
+          "status": 200,
+          "body": {
+            "swapped": true
+          },
+          "coverage": "documented_example",
+          "also_observed": "2026-09-06 hosted simulator, HTTP 200, {\"swapped\": true}"
+        },
+        "device_swap_check": {
+          "status": 200,
+          "body": {
+            "swapped": true
+          },
+          "coverage": "documented_example",
+          "also_observed": "2026-09-06 hosted simulator, HTTP 200, {\"swapped\": true}"
+        }
+      }
+    },
+    "stable_subscriber": {
+      "phone_number": "+99999991001",
+      "paired": true,
+      "label_en": "Neither swap occurred",
+      "label_ar": "لم يحدث أي تغيير",
+      "responses": {
+        "sim_swap_check": {
+          "status": 200,
+          "body": {
+            "swapped": false
+          },
+          "coverage": "documented_example",
+          "also_observed": "2026-09-06 hosted simulator, HTTP 200, {\"swapped\": false}"
+        },
+        "device_swap_check": {
+          "status": 200,
+          "body": {
+            "swapped": false
+          },
+          "coverage": "documented_example",
+          "also_observed": "2026-09-06 hosted simulator, HTTP 200, {\"swapped\": false}"
+        }
+      }
+    }
+  },
+  "fault_cases": {
+    "device_swap_no_data": {
+      "operation": "device_swap_check",
+      "status": 422,
+      "body": {
+        "status": 422,
+        "code": "IDENTIFIER_NOT_FOUND",
+        "message": "Device identifier not found"
+      },
+      "coverage": "authored_fault_injection",
+      "documented": "The 422 status and its meaning are documented on the Device Swap page. The body field names are NOT documented; they are authored here so a parser has something to reject, and they are not evidence that Nokia returns this body.",
+      "sources": [
+        "nokia-device-swap",
+        "nokia-error-handling"
+      ]
+    },
+    "sim_swap_unauthorized": {
+      "operation": "sim_swap_check",
+      "status": 403,
+      "body": {
+        "status": 403,
+        "code": "PERMISSION_DENIED",
+        "message": "Client does not have sufficient permission"
+      },
+      "coverage": "authored_fault_injection",
+      "documented": "403 is a documented status. The body is authored.",
+      "sources": [
+        "nokia-error-handling"
+      ]
+    },
+    "sim_swap_unavailable": {
+      "operation": "sim_swap_check",
+      "status": 503,
+      "body": {
+        "status": 503,
+        "code": "UNAVAILABLE",
+        "message": "Service unavailable"
+      },
+      "coverage": "authored_fault_injection",
+      "documented": "503 is a documented status. The body is authored.",
+      "sources": [
+        "nokia-error-handling"
+      ]
+    },
+    "sim_swap_missing_boolean": {
+      "operation": "sim_swap_check",
+      "status": 200,
+      "body": {},
+      "coverage": "authored_fault_injection",
+      "documented": "A malformed success: the required boolean is absent. Authored to prove Isnad reads it as unknown rather than as false.",
+      "sources": [
+        "isnad-wire-contract"
+      ]
+    }
+  }
+}

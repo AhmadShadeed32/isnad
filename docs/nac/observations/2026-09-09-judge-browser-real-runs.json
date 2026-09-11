@@ -1,0 +1,131 @@
+{
+  "recorded_at_utc": "2026-09-09T12:05:19.239838+00:00",
+  "evidence_level": "hosted_simulator",
+  "what_this_is": "The three browser-driven runs of the judge-selected REAL evidence source, made during the Step 13 walkthrough on the same local instance as 2026-09-09-judge-paired-rehearsal.json. Together with the two CLI runs in that file, this is the complete set of real Nokia runs this work produced: five runs, ten outbound attempts.",
+  "how_this_was_reconstructed": "Read back from the signed verdicts the runs themselves produced, in the rehearsal instance's database, after the fact. The per-attempt transport records were not captured for these three at the time, so every duration and timestamp here is the investigator's own measurement inside the signed chain — a slightly wider interval than the transport figure, because it includes normalization. Nothing here is estimated: each value is a field of a signed verdict. Where a transport figure was captured, it is named in the run's own `context` line and is not mixed into the step measurements.",
+  "http_status": "Not recorded per attempt for these three runs. What is recorded is stronger on the point at issue and weaker on the point of HTTP detail: each step carries a normalized signal with source `nac`, which this pipeline only produces from a 2xx response whose body parsed into the SDK's model. A non-200 would have produced PROVIDER_UNAVAILABLE or EVIDENCE_UNAVAILABLE instead. So all six attempts returned usable responses; the exact status line is asserted only for the run whose panel was captured.",
+  "application_revision": "working tree at 4b8fc6a plus the judge paired-source change",
+  "host": "https://network-as-code.p-eu.apihub.nokia.io",
+  "sdk": "network_as_code==10.0.0",
+  "runs": [
+    {
+      "scenario": "stable_subscriber",
+      "device": "+9999…1001",
+      "chain_id": "chn_22ea4ac639044cbd8a84",
+      "driven_from": "the /judge page in Chromium, evidence source set to Real NaC",
+      "context": "Earliest of the three, 11:10 UTC. Which walkthrough attempt it belongs to is not reconstructed — the run exists and is signed; the narrative around it is not recoverable from the record and is not invented here.",
+      "evidence_source": "nac",
+      "evidence_environment": "nokia_hosted_simulator",
+      "contract_version": "2026-09-09.1",
+      "planner_requested": "greedy",
+      "planner_that_ran": "greedy",
+      "decision": "CHALLENGE",
+      "chain_grade": "DEGRADED",
+      "operations_charged": 2,
+      "outbound_attempts": 2,
+      "signed_at_utc": "2026-09-09T11:10:08.420817+00:00",
+      "steps": [
+        {
+          "step": 1,
+          "action": "sim_swap",
+          "result": "PASS",
+          "signal": "SIM_STABLE",
+          "source": "nac",
+          "chain_latency_ms": 379,
+          "chain_step_at_utc": "2026-09-09T11:10:08.212201Z"
+        },
+        {
+          "step": 2,
+          "action": "device_swap",
+          "result": "PASS",
+          "signal": "DEVICE_STABLE",
+          "source": "nac",
+          "chain_latency_ms": 198,
+          "chain_step_at_utc": "2026-09-09T11:10:08.413464Z"
+        }
+      ]
+    },
+    {
+      "scenario": "stable_subscriber",
+      "device": "+9999…1001",
+      "chain_id": "chn_ba95c1361a304534a4b0",
+      "driven_from": "the /judge page in Chromium, evidence source set to Real NaC",
+      "context": "11:12 UTC, two minutes after the first. Same scenario, same planner, same result.",
+      "evidence_source": "nac",
+      "evidence_environment": "nokia_hosted_simulator",
+      "contract_version": "2026-09-09.1",
+      "planner_requested": "greedy",
+      "planner_that_ran": "greedy",
+      "decision": "CHALLENGE",
+      "chain_grade": "DEGRADED",
+      "operations_charged": 2,
+      "outbound_attempts": 2,
+      "signed_at_utc": "2026-09-09T11:12:07.836809+00:00",
+      "steps": [
+        {
+          "step": 1,
+          "action": "sim_swap",
+          "result": "PASS",
+          "signal": "SIM_STABLE",
+          "source": "nac",
+          "chain_latency_ms": 393,
+          "chain_step_at_utc": "2026-09-09T11:12:07.626599Z"
+        },
+        {
+          "step": 2,
+          "action": "device_swap",
+          "result": "PASS",
+          "signal": "DEVICE_STABLE",
+          "source": "nac",
+          "chain_latency_ms": 190,
+          "chain_step_at_utc": "2026-09-09T11:12:07.825947Z"
+        }
+      ]
+    },
+    {
+      "scenario": "stable_subscriber",
+      "device": "+9999…1001",
+      "chain_id": "chn_c7acd8d29ece47fd9f70",
+      "driven_from": "the /judge page in Chromium, evidence source set to Real NaC",
+      "context": "11:25 UTC, the run captured in docs/ui/walkthrough/04-real-result.png (written one minute later). Its on-screen request/response panel showed 200 (414 ms) and 200 (172 ms) at the transport, which is the only per-attempt HTTP status this file asserts directly.",
+      "evidence_source": "nac",
+      "evidence_environment": "nokia_hosted_simulator",
+      "contract_version": "2026-09-09.1",
+      "planner_requested": "greedy",
+      "planner_that_ran": "greedy",
+      "decision": "CHALLENGE",
+      "chain_grade": "DEGRADED",
+      "operations_charged": 2,
+      "outbound_attempts": 2,
+      "signed_at_utc": "2026-09-09T11:25:17.076058+00:00",
+      "steps": [
+        {
+          "step": 1,
+          "action": "sim_swap",
+          "result": "PASS",
+          "signal": "SIM_STABLE",
+          "source": "nac",
+          "chain_latency_ms": 416,
+          "chain_step_at_utc": "2026-09-09T11:25:16.886845Z"
+        },
+        {
+          "step": 2,
+          "action": "device_swap",
+          "result": "PASS",
+          "signal": "DEVICE_STABLE",
+          "source": "nac",
+          "chain_latency_ms": 174,
+          "chain_step_at_utc": "2026-09-09T11:25:17.066600Z"
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "Local application rehearsal driven from a browser. Not evidence of deployed judge access.",
+    "Nokia account is in Simulator mode. No live-network subscriber was contacted.",
+    "Only the two boolean swap checks were exposed and attempted. retrieve-date was disabled in both modes.",
+    "All three used the greedy planner; the model-planned runs are the two CLI runs in the paired-rehearsal file.",
+    "Per-attempt HTTP status and transport duration were not captured for these runs; see `http_status` above for exactly what is and is not claimed."
+  ],
+  "completeness_check": "The rehearsal instance's own stores were checked for a real run that reached Nokia and then failed before it could be saved, which would leave no chain: every run with journal events has a verdict event, and all 17 idempotency operations are 'done' — no reserved and no uncertain row, which is the state a run interrupted after provider work would have left. So five is the complete count for that instance, not merely the count that survived."
+}

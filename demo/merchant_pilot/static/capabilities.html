@@ -1,0 +1,99 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Isnad merchant pilot — provider readiness</title>
+<style>
+  body{font-family:system-ui,sans-serif;max-width:760px;margin:2.5rem auto;padding:0 1rem}
+  h1{font-size:1.3rem}
+  .lead{color:#444;font-size:.9rem;line-height:1.55}
+  .warn{border-left:3px solid #b45309;background:#fffbeb;padding:.6rem .8rem;margin:1rem 0;font-size:.83rem;line-height:1.5}
+  .cap{border:1px solid #ddd;border-radius:6px;padding:.8rem .9rem;margin:.7rem 0}
+  .cap h2{font-size:1rem;margin:0 0 .2rem}
+  .status{display:inline-block;font:11px ui-monospace,Menlo,monospace;border-radius:999px;padding:2px 8px;margin-left:.4rem;vertical-align:middle}
+  .status.verified{background:#dafbe1;color:#116329;border:1px solid #4ac26b}
+  .status.unverified{background:#fff8c5;color:#7d4e00;border:1px solid #d4a72c}
+  .status.unavailable{background:#ffebe9;color:#a40e26;border:1px solid #ff8182}
+  .meta{font-size:.78rem;color:#555;margin:.35rem 0}
+  .meta b{color:#222;font-weight:600}
+  .caveat{font-size:.8rem;color:#444;line-height:1.5;margin-top:.4rem;border-top:1px dashed #ddd;padding-top:.4rem}
+  .nav{margin-top:1.5rem;font-size:.85rem}
+  .err{color:#b91c1c}
+</style>
+<h1>Provider readiness</h1>
+<p class="lead">What this Isnad deployment's Network-as-Code integration has and has
+not been shown to do, per action.</p>
+
+<!-- I10 step 2: static configuration, historical test success and current
+     per-request result are three different things, and collapsing them is
+     exactly how a readiness page starts lying. This page shows only the first
+     two, and says so. -->
+<div class="warn">
+  <strong>This is recorded history, not a live probe.</strong> Every row below comes
+  from a capture recorded on the stated date — it is not an uptime check, an
+  entitlement guarantee, or a claim about nationwide operator coverage. Nothing on
+  this page contacts a provider, and no phone number is probed to build it. The
+  result of <em>your</em> next verification is a separate thing again, reported by
+  the adapter at the time you make it.
+</div>
+
+<div id="caps"></div>
+<p class="err" id="error"></p>
+<p class="nav"><a href="/">&larr; Back to the checkout form</a></p>
+<script>
+const STATUSES = { verified: "verified", unverified: "unverified", unavailable: "unavailable" };
+
+function row(cap) {
+  const wrap = document.createElement("div");
+  wrap.className = "cap";
+
+  const h = document.createElement("h2");
+  h.textContent = cap.api;
+  const badge = document.createElement("span");
+  badge.className = "status " + (STATUSES[cap.status] || "unverified");
+  badge.textContent = cap.status;
+  h.appendChild(badge);
+  wrap.appendChild(h);
+
+  const meta = document.createElement("p");
+  meta.className = "meta";
+  // textContent throughout: this page renders a file an operator edits, and
+  // markup in it must never become markup here.
+  meta.textContent =
+    `action ${cap.action} · adapter ${cap.adapter} ${cap.adapter_version} · ` +
+    `scope ${cap.environment_scope} · recorded ${cap.checked_at}`;
+  wrap.appendChild(meta);
+
+  const consent = document.createElement("p");
+  consent.className = "meta";
+  consent.textContent = cap.consent_required
+    ? "Requires end-user consent before it can answer."
+    : "Application-level authorization only; no separate end-user consent step.";
+  wrap.appendChild(consent);
+
+  if (cap.coverage_caveat) {
+    const caveat = document.createElement("p");
+    caveat.className = "caveat";
+    caveat.textContent = cap.coverage_caveat;
+    wrap.appendChild(caveat);
+  }
+  return wrap;
+}
+
+(async function main() {
+  try {
+    const response = await fetch("/api/capabilities");
+    if (!response.ok) {
+      document.getElementById("error").textContent =
+        "Could not load the capability manifest: " + response.status;
+      return;
+    }
+    const data = await response.json();
+    const container = document.getElementById("caps");
+    for (const cap of data.capabilities) container.appendChild(row(cap));
+  } catch (err) {
+    document.getElementById("error").textContent = "Request failed: " + err;
+  }
+})();
+</script>
+
+<script src="/ui/i18n.js" defer></script>

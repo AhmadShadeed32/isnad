@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Isnad — API keys</title>
+<!--
+  Where a judge mints a merchant key and is shown the exact calls to make with
+  it. Nothing on this page is a credential: the key is issued by an
+  authenticated request after the organizer's access code is entered, shown
+  once, and never rendered into markup. Zero external origins, like the rest.
+-->
+<link rel="stylesheet" href="/ui/pages/api_keys.css">
+<link rel="stylesheet" href="/ui/shared.css">
+</head>
+<body class="site-page"><main class="site-shell">
+  <header class="site-header">
+    <a class="site-brand" href="/judge" aria-label="Isnad home"><span lang="ar">إسناد</span><span>Isnad<small data-i18n="ui.site_tagline">Network-verified trust</small></span></a>
+    <div class="site-language-slot"></div>
+  </header>
+  <nav class="site-nav" aria-label="Main navigation">
+    <a href="/judge" data-i18n="ui.nav_demo">Checkout demo</a>
+    <a href="/api-keys" data-i18n="ui.nav_api_keys" aria-current="page">API keys</a>
+    <a href="/console" data-i18n="ui.nav_console">Console</a>
+    <a href="/lab" data-i18n="ui.nav_lab">Lab</a>
+    <a href="/privacy" data-i18n="ui.nav_privacy">Privacy</a>
+  </nav>
+
+  <h1 data-i18n="ui.ak_title">Call the API the way a merchant would</h1>
+  <p class="sub" data-i18n="ui.ak_sub">Mint a merchant key behind the organizer's access code, then send the judge guide's /v1/verify request to this deployment instead of to a local server.</p>
+
+  <h2 data-i18n="ui.ak_h_facts">What a key from this page does</h2>
+  <div class="card" id="facts" aria-live="polite">
+    <div class="kv"><span class="k" data-i18n="ui.ak_k_provider">evidence</span><span id="factProvider">…</span></div>
+    <div class="kv"><span class="k" data-i18n="ui.ak_k_planner">default planner</span><span id="factPlanner">…</span></div>
+    <div class="kv"><span class="k" data-i18n="ui.ak_k_ttl">valid for</span><span id="factTtl">…</span></div>
+    <div class="kv"><span class="k" data-i18n="ui.ak_k_tenant">tenant</span><span data-i18n="ui.ak_v_tenant">your own. Chains you create from a terminal are readable back from this tab, and from no other judge's.</span></div>
+    <div class="kv"><span class="k" data-i18n="ui.ak_k_where">kept</span><span data-i18n="ui.ak_v_where">in this process's memory only. A restart of the deployment forgets every key; mint another.</span></div>
+    <p class="why" id="factNote" hidden></p>
+  </div>
+
+  <h2 data-i18n="ui.ak_h_mint">Mint a key</h2>
+  <div class="card">
+    <form id="mintForm" class="mint-form">
+      <label for="accessCode" data-i18n="ui.ak_code_label">Organizer access code</label>
+      <div class="row">
+        <input id="accessCode" type="password" autocomplete="off" spellcheck="false" maxlength="128" placeholder="access code" aria-describedby="mintNote">
+        <button id="mintButton" type="submit" data-i18n="ui.ak_mint">Generate key</button>
+      </div>
+      <p id="mintNote" class="why" role="status" data-i18n="ui.ak_code_note">The code is checked by the server and never stored. It is the same code that unlocks Real NaC on the checkout page; mock evidence there needs no code at all.</p>
+    </form>
+  </div>
+
+  <section id="issued" hidden>
+    <h2 data-i18n="ui.ak_h_key">Your key</h2>
+    <div class="card key-card">
+      <p class="why" data-i18n="ui.ak_key_once">Shown once. Copy it now; reloading this page will not show it again.</p>
+      <div class="row">
+        <code id="apiKey" class="secret" data-no-translate></code>
+        <button id="copyKey" type="button" data-i18n="ui.ak_copy">Copy</button>
+      </div>
+      <p class="why"><span data-i18n="ui.ak_expires">Expires in</span> <span id="keyExpires" data-no-translate></span></p>
+    </div>
+
+    <h2 data-i18n="ui.ak_h_try">Try it</h2>
+    <div class="card">
+      <p class="why" data-i18n="ui.ak_try_intro">Three commands, in order. Each is filled in with your key and this deployment's address. The first one is the judge guide's step 6, sent here instead of to a local server; the planner header pins the deterministic planner so the numbers match the guide.</p>
+
+      <h3><span class="n">1</span> <span data-i18n="ui.ak_step_verify">Ask for a decision</span></h3>
+      <div class="cmd"><pre id="cmdVerify" data-no-translate></pre><button type="button" class="copy" data-for="cmdVerify" data-i18n="ui.ak_copy">Copy</button></div>
+      <p class="why" data-i18n="ui.ak_expect_verify">Expect "decision": "CHALLENGE", "chain_grade": "DEGRADED", "confidence": 0.322 and a chain of five links, each naming its API, result, source and consent basis. Note the chain_id.</p>
+
+      <h3><span class="n">2</span> <span data-i18n="ui.ak_step_chain">Read the chain back</span></h3>
+      <div class="cmd"><pre id="cmdChain" data-no-translate></pre><button type="button" class="copy" data-for="cmdChain" data-i18n="ui.ak_copy">Copy</button></div>
+      <p class="why" data-i18n="ui.ak_expect_chain">Replace CHAIN_ID with the value from step 1. Expect the same verdict; reads are scoped to the key's tenant, so another judge's chain_id returns 404.</p>
+
+      <h3><span class="n">3</span> <span data-i18n="ui.ak_step_signature">Check the signature</span></h3>
+      <div class="cmd"><pre id="cmdSignature" data-no-translate></pre><button type="button" class="copy" data-for="cmdSignature" data-i18n="ui.ak_copy">Copy</button></div>
+      <p class="why" data-i18n="ui.ak_expect_signature">Expect "valid": true. The receipt page does the same check in the browser and lets you flip one byte to watch it fail.</p>
+
+      <p class="why" data-i18n="ui.ak_idempotency">Run step 1 twice with the same Idempotency-Key and the second answer replays the first, same chain_id, without a second investigation. Change the amount and keep the key: 409.</p>
+    </div>
+  </section>
+
+  <h2 data-i18n="ui.ak_h_list">Keys minted from this tab</h2>
+  <div class="card" id="keyList"><p class="why" data-i18n="ui.ak_list_empty">None yet.</p></div>
+
+  <h2 data-i18n="ui.ak_h_not">What this page is not</h2>
+  <div class="card"><ul>
+    <li data-i18n="ui.ak_not_nokia">A key to Nokia. On this deployment the merchant API runs against the Nokia-compatible mock, so a call with this key sends nothing to an operator. Real Nokia calls are made only from the checkout page's bounded Real NaC path, which the same access code unlocks.</li>
+    <li data-i18n="ui.ak_not_prod">A production credential. It lives for a fixed time in memory and is minted from a web page; a deployment whose default provider bills refuses to issue one at all.</li>
+    <li data-i18n="ui.ak_not_shared">Shared. Each key belongs to the tab that minted it. Two judges holding keys from this page cannot read each other's chains, receipts or journals.</li>
+  </ul></div>
+</main>
+
+<script src="/ui/shared.js"></script>
+<script src="/ui/pages/api_keys.js"></script>
+<script src="/ui/i18n.js" defer></script>
+</body>
+</html>

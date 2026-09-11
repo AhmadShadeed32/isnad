@@ -1,0 +1,243 @@
+:root{
+    --night:#070b20; --surface:#111834; --surface2:#182247; --line:#2d3b70;
+    --text:#eef2ff; --muted:#aab5d4; --gold:#e5bb59; --green:#56d3a0;
+    --red:#ff7979; --amber:#ffc35c; --sans:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    --mono:"SFMono-Regular",Consolas,"Liberation Mono",monospace;
+  }
+  
+  body{margin:0;min-height:100vh;background:radial-gradient(circle at 14% -10%,#243673 0,transparent 31rem),var(--night);color:var(--text);font-family:var(--sans)}
+  .shell{max-width:1240px;margin:0 auto;padding:26px 28px 48px}
+  header{display:flex;justify-content:space-between;align-items:center;gap:16px;border-bottom:1px solid #24315e;padding-bottom:21px}
+  .brand{display:flex;align-items:center;gap:12px;font-weight:700;letter-spacing:.02em}.brand .arabic{font-size:23px;color:var(--gold);font-weight:500}.brand small{font-size:12px;color:var(--muted);font-weight:500;display:block;letter-spacing:0;margin-top:2px}
+  .mode{font:11px var(--mono);border:1px solid var(--line);border-radius:999px;padding:8px 10px;color:var(--muted);white-space:nowrap}.mode.live{border-color:var(--green);color:var(--green)}.mode.sim{border-color:var(--amber);color:var(--amber)}
+  .lead{display:flex;align-items:end;justify-content:space-between;gap:28px;padding:14px 0 14px}.eyebrow{color:var(--gold);font:700 11px var(--mono);letter-spacing:.13em;text-transform:uppercase}.lead h1{font-size:clamp(24px,2.9vw,32px);letter-spacing:-.03em;line-height:1.12;max-width:700px;margin:0 0 8px}.lead p{max-width:610px;color:var(--muted);font-size:14px;line-height:1.5;margin:0}.trust-note{max-width:275px;border-left:2px solid var(--gold);padding:4px 0 4px 14px;font-size:12px;color:var(--muted);line-height:1.5}
+  .grid{display:grid;grid-template-columns:minmax(290px,.82fr) minmax(430px,1.4fr);gap:20px;align-items:stretch}.card{background:linear-gradient(145deg,rgba(24,34,71,.96),rgba(13,19,45,.96));border:1px solid var(--line);border-radius:18px;box-shadow:0 18px 48px rgba(0,0,0,.18)}
+  .checkout{padding:22px;display:flex;flex-direction:column}.merchant{display:flex;justify-content:space-between;gap:12px;align-items:center}.merchant-badge{width:34px;height:34px;border-radius:12px;background:linear-gradient(135deg,var(--gold),#a26c21);display:grid;place-items:center;color:#15162d;font-weight:900}.merchant-name{font-weight:700}.merchant-meta{color:var(--muted);font-size:12px;margin-top:3px}.checkout h2{font-size:21px;letter-spacing:-.03em;margin:12px 0 7px}.checkout p{color:var(--muted);font-size:13px;line-height:1.5;margin:0}.summary{border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin:13px 0 12px;padding:9px 0}.summary-line{display:flex;justify-content:space-between;align-items:center;font-size:13px;margin:5px 0}.summary-line.total{font-weight:700;font-size:16px;margin-top:9px}.subdued{color:var(--muted)}
+  button{font:inherit}.primary{border:0;border-radius:10px;padding:14px 16px;color:#17162b;background:linear-gradient(110deg,#f4cf71,var(--gold));font-weight:800;cursor:pointer;box-shadow:0 8px 20px rgba(229,187,89,.18);transition:transform .16s,opacity .16s}.primary:hover:not(:disabled){transform:translateY(-1px)}button:disabled{opacity:.5;cursor:not-allowed}.checkout-foot{margin-top:13px;font-size:11px;line-height:1.45;color:var(--muted)}.checkout-foot strong{color:var(--text)}
+  .journey{padding:22px 24px 20px;min-height:525px;display:flex;flex-direction:column}.journey-head{display:flex;justify-content:space-between;align-items:start;gap:14px}.journey h2{font-size:15px;margin:0;letter-spacing:.01em}.journey .caption{font-size:12px;color:var(--muted);margin:5px 0 0}.statusline{font:11px var(--mono);color:var(--muted);padding:8px 0 14px;border-bottom:1px solid var(--line);min-height:38px}.steps{display:flex;gap:5px;margin:17px 0}.step{height:5px;flex:1;background:#26325b;border-radius:8px;transition:.25s}.step.active{background:var(--gold)}.step.good{background:var(--green)}.step.bad{background:var(--red)}
+  .trace{flex:1;display:flex;flex-direction:column;gap:8px;overflow:auto;max-height:275px;padding-right:2px}.empty{margin:auto;color:var(--muted);font-size:13px;text-align:center;line-height:1.55;max-width:350px}.trace-row{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:10px;align-items:start;border:1px solid #26325b;background:#0c1230;border-radius:10px;padding:10px 12px;font-size:12px}.trace-row .mark{font-weight:800;text-align:center}.trace-row.pass .mark{color:var(--green)}.trace-row.flag .mark{color:var(--red)}.trace-row.info .mark{color:var(--amber)}.trace-title{font-weight:700}.trace-detail{margin-top:3px;color:var(--muted);line-height:1.4}.trace-meta{font:10px var(--mono);color:var(--muted);text-align:right;white-space:nowrap}.provenance{display:inline-block;margin-top:4px;border:1px solid #43527f;border-radius:999px;padding:2px 5px;font:9px var(--mono);letter-spacing:.02em;color:var(--muted)}.provenance.sim{border-color:#946f2e;color:var(--amber)}.provenance.live{border-color:#317b61;color:var(--green)}
+  .outcome{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:start;border-top:1px solid var(--line);margin-top:15px;padding-top:15px}.decision{font:800 23px var(--mono);letter-spacing:.04em}.decision.ALLOW{color:var(--green)}.decision.CHALLENGE{color:var(--amber)}.decision.DECLINE{color:var(--red)}.reason{font-size:12px;color:var(--muted);line-height:1.4;max-width:520px}.grade{font:10px var(--mono);color:var(--muted);margin-top:6px}.receipt{display:none;text-align:right}.receipt.visible{display:block}.receipt a{display:inline-block;border:1px solid var(--gold);color:var(--gold);padding:8px 10px;border-radius:8px;font-size:11px;text-decoration:none;font-weight:700}.receipt button{display:block;margin:7px 0 0 auto;border:0;background:none;color:var(--muted);font-size:10px;text-decoration:underline;cursor:pointer}.vault{font:10px var(--mono);color:var(--green);margin-top:5px;min-height:12px}
+  .presentation-summary{font-size:13px;color:var(--text);line-height:1.5;margin:6px 0 0;max-width:560px}.fact-group{margin-top:10px}.fact-label{font:10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}.facts{list-style:none;margin:0;padding:0;max-width:560px}.facts li{font-size:12px;line-height:1.5;color:var(--muted);padding:4px 0 4px 16px;position:relative}.facts li::before{content:"";position:absolute;left:2px;top:11px;width:6px;height:6px;border-radius:50%;background:var(--line)}.facts.adverse li::before{background:var(--red)}.facts.supporting li::before{background:var(--green)}.facts.unresolved li::before{background:var(--amber)}.next-action{font-size:13px;color:var(--text);font-weight:600;margin-top:12px;max-width:520px;line-height:1.45}.audit{margin-top:16px;border-top:1px dashed var(--line);padding-top:12px}.audit summary{cursor:pointer;font:10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}.audit summary:focus-visible{outline:2px solid var(--gold);outline-offset:2px}.audit .decision.small{font-size:14px;margin-top:8px}
+  .session-beat{display:none;margin-top:14px;border:1px solid #38556d;background:#0c1832;border-radius:11px;padding:12px}.session-beat.visible{display:block}.session-title{display:flex;gap:8px;align-items:center;font-size:12px;font-weight:700}.session-title .provenance{margin:0}.session-copy{font-size:11px;line-height:1.45;color:var(--muted);margin:6px 0 10px}.session-actions{display:flex;gap:8px;flex-wrap:wrap}.session-actions button{border:1px solid #526695;border-radius:7px;background:#152448;color:var(--text);font-size:11px;font-weight:700;padding:8px 9px;cursor:pointer}.session-actions button:hover:not(:disabled){border-color:var(--gold);color:var(--gold)}.session-state{font:10px var(--mono);color:var(--muted);margin-top:9px;min-height:14px}.session-state.ok{color:var(--green)}.session-state.flag{color:var(--red)}
+  .proof{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:20px}.proof .card{padding:17px}.proof h3{font-size:12px;margin:0 0 7px;color:var(--gold);letter-spacing:.04em}.proof p{font-size:12px;line-height:1.48;color:var(--muted);margin:0}.proof b{color:var(--text)}
+  .fallback{display:none;margin-top:18px;border:1px solid #70404b;border-radius:11px;color:#ffc4c4;background:#321d2a;padding:12px;font-size:12px;line-height:1.45}.fallback.visible{display:block}.technical{margin-top:20px;text-align:center;color:var(--muted);font-size:11px}.technical a{color:var(--gold)}
+  .header-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .header-controls select{background:var(--surface2);border:1px solid var(--line);color:var(--text);font:inherit;font-size:12px;padding:7px 9px;border-radius:8px}
+  .header-controls select:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+  .visually-hidden{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  .locale-note{margin:12px 0 0;font-size:11px;line-height:1.5;color:var(--amber);border-inline-start:2px solid var(--amber);padding-inline-start:11px}
+  /* I6: an English string surviving inside an Arabic page is a missing
+     translation, not an editorial choice, so it is marked rather than left to
+     look deliberate. */
+  [dir="rtl"] [data-i18n][lang="en"]{border-block-end:1px dotted var(--muted)}
+  /* Identifiers, hashes and signed numbers keep LTR order whatever the page
+     direction: the bidi algorithm would otherwise reorder them at their
+     neutral edges, and a reordered hash is not the one being compared. */
+  
+  @media(max-width:820px){.shell{padding:20px 15px 32px}.lead{display:block;padding:33px 0 25px}.trust-note{margin-top:22px}.grid{grid-template-columns:1fr}.journey{min-height:480px}.proof{grid-template-columns:1fr}.trace{max-height:250px}.outcome{grid-template-columns:1fr}.receipt{text-align:left}.receipt button{margin-left:0}.mode{white-space:normal;text-align:right}}
+/* The network-conditions rules that used to sit here moved to
+   app/static/pages/console.css with the panel itself. They are not kept as
+   dead rules: this page's tokens and the console's differ, and a stale copy is
+   how the panel ended up authored against the wrong ground in the first
+   place. */
+
+/* Bring-your-own-key, rendered by shared.js into #sharedGemini — which now
+   sits inside the collapsed "Demo settings" disclosure. An optional control
+   that sits outside the decision, and reads like one. */
+.byok{margin-block:1.5rem;padding:1rem 1.25rem;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.byok h2{margin:0 0 .35rem;font-size:.95rem;letter-spacing:.04em;text-transform:uppercase;color:var(--text)}
+.byok-scope{margin:0 0 .75rem;max-width:70ch;color:var(--muted);font-size:.85rem;line-height:1.55}
+.byok-scope a{color:var(--gold)}
+.byok-scope code{font:inherit;font-family:var(--mono);color:var(--text)}
+.byok-actions{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-block-end:.75rem}
+.byok-actions input{flex:1 1 22rem;min-width:0;padding:.5rem .7rem;border:1px solid var(--line);border-radius:8px;
+  background:#0c1230;color:var(--text);font:inherit;font-family:var(--mono);font-size:.85rem}
+.byok-actions input:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.byok-actions button{padding:.5rem .85rem;border:1px solid #526695;border-radius:8px;background:var(--surface2);
+  color:var(--text);cursor:pointer;font:inherit;font-size:.85rem;font-weight:600}
+.byok-actions button:hover:not(:disabled){border-color:var(--gold);color:var(--gold)}
+.byok-actions button:disabled{opacity:.45;cursor:not-allowed}
+.byok-actions button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.byok-promise{margin:0 0 .6rem;max-width:70ch;color:var(--muted);font-size:.78rem;line-height:1.55;
+  border-inline-start:2px solid var(--gold);padding-inline-start:11px}
+.byok-state{font-size:.85rem;color:var(--muted);font-family:var(--mono)}
+.byok-state.on{color:var(--green)}
+
+/* --- Step 4: the first screen ------------------------------------------- */
+
+/* Planner and key entry live behind this. Collapsed it is one line, so the
+   controls stay one click away without spending a third of the first screen
+   on them. The planner and provider are still named in the header, so nobody
+   has to open this to find out what is actually running. */
+.demo-settings{margin-top:14px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.demo-settings > summary{cursor:pointer;padding:9px 14px;font:11px var(--mono);letter-spacing:.06em;
+  text-transform:uppercase;color:var(--muted);list-style-position:inside}
+.demo-settings > summary:hover{color:var(--text)}
+.demo-settings > summary:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.demo-settings[open] > summary{border-bottom:1px solid var(--line);color:var(--text)}
+.demo-settings #sharedGemini{padding:6px 14px 12px}
+
+/* The planner pill sits beside the provider pill so "what is actually
+   running" is one glance, in both directions of text. */
+.planner-pill{font-variant-numeric:tabular-nums}
+
+/* The lead case keeps the gold primary button; the other two are plainly
+   secondary rather than three buttons of equal weight. */
+.alt-cases{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}
+.alt-label{font:10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+button.secondary{border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--muted);
+  font:inherit;font-size:12px;font-weight:600;padding:7px 10px;cursor:pointer}
+button.secondary:hover:not(:disabled){border-color:var(--gold);color:var(--gold)}
+button.secondary:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+/* The merchant's next action reads immediately after the result and its one
+   short reason, before the evidence lists. */
+.next-action{margin-top:10px}
+
+/* --- the judge's evidence source ------------------------------------------
+   The choice sits with the run controls, never inside a technical details
+   panel: a judge must not have to go looking for the thing the whole
+   demonstration turns on. */
+.evidence-source{margin-top:14px;border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:12px 13px;min-width:0}
+.checkout,.journey{min-width:0}
+.es-choices,.es-run,.es-access,.es-head{min-width:0}
+.es-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px}
+.es-label{font:10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--text)}
+.es-status{font:10px var(--mono);color:var(--muted);text-align:end}
+.es-choices{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px}
+.es-choice{display:flex;align-items:center;gap:7px;min-width:0;border:1px solid var(--line);border-radius:9px;
+  padding:7px 9px;font-size:12px;line-height:1.35;cursor:pointer;background:var(--surface2)}
+.es-choice:has(input:checked){border-color:var(--gold);color:var(--text)}
+.es-choice:has(input:disabled){opacity:.55;cursor:not-allowed}
+.es-choice:focus-within{outline:2px solid var(--gold);outline-offset:2px}
+.es-explain{font-size:12px;color:var(--muted);line-height:1.5;margin:9px 0 0}
+/* `display:flex` is an author rule and beats the UA stylesheet's
+   `[hidden]{display:none}`. Without this line the access exchange stayed on
+   screen — and took 87px of the first screen — on every deployment where real
+   NaC is not even enabled. */
+.es-access{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px}
+.es-access[hidden]{display:none}
+.es-access label{font:10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.es-access input{flex:1 1 10rem;min-width:0;padding:.5rem .6rem;border:1px solid var(--line);border-radius:8px;
+  background:var(--night);color:var(--text);font:inherit;font-size:12px}
+/* A grid, not wrapping flex: the two selects sit on one row with their labels,
+   and the action gets its own full-width row. Wrapping flex put each label and
+   each control on a line of its own and cost the first screen 40px. */
+/* Two rows, not four columns. Four columns fitted in the layout and truncated
+   the scenario name to "Si…", which is not a choice a judge can make. The
+   scenario select — the one with the long text — gets the full width, and the
+   planner and the action share the row below it. */
+/* Narrow layouts stack: label, control, label, control, action. */
+.es-run{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;
+  gap:7px 8px;margin-top:11px}
+.es-run .primary{grid-column:1 / -1}
+/* On a judging laptop the whole control has to end above the fold, and three
+   stacked rows do not. The two selects and the action share one row, and their
+   labels stay in the accessibility tree rather than on screen — the same
+   pattern the language switch in the header already uses. The selects are wide
+   enough to read the scenario name, which is the thing being chosen. */
+@media(min-width:821px){
+  .es-run{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr) auto}
+  .es-run .primary{grid-column:auto;padding:9px 14px;white-space:nowrap}
+  .es-run-label{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;
+    clip-path:inset(50%);white-space:nowrap;border:0}
+}
+.es-run label{font:10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+/* `min-width:0` is load-bearing, not tidiness. A <select>'s min-content width
+   is its LONGEST OPTION, and this card is a grid item whose track is sized
+   from its content — so a scenario label wider than a phone made the whole
+   page scroll sideways. Capped here, at every level between the option and
+   the track. */
+.es-run select{background:var(--surface2);border:1px solid var(--line);color:var(--text);font:inherit;
+  font-size:12px;padding:7px 9px;border-radius:8px;min-width:0;width:100%;max-width:100%;
+  text-overflow:ellipsis}
+.es-note{font-size:11.5px;color:var(--muted);line-height:1.45;margin:8px 0 0}
+/* Bound to the completed run, so it sits with the result and not with the
+   selector that may since have moved. */
+.result-source{font:10px var(--mono);color:var(--muted);line-height:1.5;margin-top:6px;max-width:560px}
+/* The merchant's follow-up. Visually a distinct block from the decision above
+   it, because the two are different facts and the panel's whole job is not to
+   let them blur into one. */
+.review-panel{margin-top:14px;border:1px solid var(--line);border-radius:12px;background:var(--surface);
+  padding:11px 12px;min-width:0}
+.review-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}
+.review-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.review-actions button{flex:0 1 auto}
+@media(max-width:820px){
+  .review-actions{flex-direction:column;align-items:stretch}
+}
+
+/* Styled like `.audit` but deliberately NOT that class: a browser test locates
+   the audit disclosure by class, and two matches is a strict-mode failure. */
+.wire-details{margin-top:16px;border-top:1px dashed var(--line);padding-top:12px}
+.wire-details summary{cursor:pointer;font:10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.wire-details summary:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.wire-body{font:10.5px var(--mono);color:var(--muted);white-space:pre-wrap;word-break:break-word;
+  margin:8px 0 0;max-width:100%;overflow-x:auto}
+
+@media(max-width:820px){
+  .lead h1{font-size:clamp(24px,6vw,30px)}
+  .alt-cases{flex-direction:column;align-items:stretch}
+  .alt-label{margin-bottom:2px}
+  /* One column below the tablet break: two radio cards side by side stop
+     being readable long before they stop fitting. */
+  .es-choices{grid-template-columns:1fr}
+  .es-run{grid-template-columns:1fr}
+  .es-run label{margin-top:2px}
+  .es-access{flex-direction:column;align-items:stretch}
+  .es-status{text-align:start}
+}
+/* 320px: nothing may overflow the page horizontally. */
+@media(max-width:360px){
+  .shell{padding:16px 12px 28px}
+  .header-controls{gap:6px}
+  .mode{font-size:10px;padding:6px 8px}
+}
+
+/* A 1280x720 or 1366x768 laptop is the common judging screen, and the first
+   screen there has to end with the primary action on it. Keyed on viewport
+   HEIGHT, not on language: Arabic wraps the hero and the merchant copy to more
+   lines than English, so a rule that only fitted English would fit only
+   English. Taller screens keep the roomier type. */
+/* The evidence source is the control this page exists for, so it stays on the
+   first screen of a judging laptop. These are the pixels that buy that: the
+   hero gives some back, and the panel is tight without being cramped. */
+@media (min-width:821px){
+  .lead{padding:18px 0 14px}
+  .lead h1{font-size:clamp(22px,2.5vw,28px)}
+  .lead p{font-size:13px;line-height:1.5}
+  .checkout h2{margin:10px 0 6px}
+  .evidence-source{margin-top:12px;padding:11px 12px}
+  .es-choices{margin-top:8px}
+  .es-explain{margin-top:7px}
+  .es-run{margin-top:9px}
+  .summary{margin:12px 0 10px}
+}
+@media (min-width:821px) and (max-height:820px){
+  /* A judging laptop is 720-768px tall and the control has to be on the first
+     screen. The hero and the merchant story give the pixels back; they are the
+     parts a reader can still follow at one size smaller. */
+  .lead h1{font-size:19px;margin-bottom:5px}
+  .lead p{font-size:12px;line-height:1.4}
+  .checkout p{font-size:12px;line-height:1.4}
+  .es-head{margin-bottom:2px}
+  .es-status{font-size:9.5px}
+  .es-choice{padding:6px 9px;font-size:11.5px}
+  .es-explain{font-size:11.5px;line-height:1.4;margin-top:5px}
+  .evidence-source{margin-top:9px;padding:8px 11px}
+  .es-choices{margin-top:6px}
+  .es-run{margin-top:6px;gap:5px 8px}
+  .summary{margin:10px 0 8px}
+  .lead{padding:4px 0 6px}
+  .lead h1{font-size:clamp(21px,2.3vw,26px);margin-bottom:6px}
+  .lead p{font-size:13px;line-height:1.45}
+  .trust-note{font-size:11px}
+  .checkout{padding:15px}
+  .checkout h2{font-size:19px;margin:7px 0 5px}
+  .checkout p{font-size:12.5px}
+  .summary{margin:10px 0 10px;padding:7px 0}
+  .summary-line{margin:4px 0}
+  .summary-line.total{margin-top:7px}
+  .primary{padding:11px 16px}
+  .demo-settings > summary{padding:7px 14px}
+}

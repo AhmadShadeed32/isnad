@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Isnad — Verified Checkout</title>
+<meta name="isnad-demo-token" content="__ISNAD_JUDGE_TOKEN__">
+<link rel="stylesheet" href="/ui/pages/judge.css">
+<link rel="stylesheet" href="/ui/shared.css">
+</head>
+<body class="site-page">
+<main class="shell site-shell">
+  <header class="site-header">
+    <a class="site-brand" href="/judge" aria-label="Isnad home"><span lang="ar">إسناد</span><span>Isnad<small data-i18n="ui.site_tagline">Network-verified trust</small></span></a>
+        <div class="header-controls">
+      <label for="locale" class="visually-hidden">Language / اللغة</label>
+      <select id="locale">
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+      </select>
+      <span id="mode" class="mode">checking environment…</span>
+      <span id="planner" class="mode planner-pill">planner: —</span>
+    </div>
+  </header>
+  <nav class="site-nav" aria-label="Main navigation">
+    <a href="/judge" data-i18n="ui.nav_demo" aria-current="page">Checkout demo</a>
+    <a href="/api-keys" data-i18n="ui.nav_api_keys">API keys</a>
+    <a href="/console" data-i18n="ui.nav_console">Console</a>
+    <a href="/lab" data-i18n="ui.nav_lab">Lab</a>
+    <a href="/privacy" data-i18n="ui.nav_privacy">Privacy</a>
+  </nav>
+  <details class="demo-settings" id="demoSettings">
+    <summary data-i18n="ui.demo_settings">Demo settings — planner and your own Gemini key</summary>
+    <div id="sharedGemini"></div>
+  </details>
+  <p id="localeNote" class="locale-note" hidden></p>
+
+  <section class="lead">
+    <div><h1>A replaced SIM should start a check, not end a customer relationship.</h1><p>Isnad investigates the checkout below, gathers corroborating network evidence, and returns a decision with a signed receipt.</p></div>
+    <div class="trust-note">Every evidence row carries its own provenance. Nothing scripted is presented as live network evidence.</div>
+  </section>
+
+  <section class="grid" aria-label="Isnad customer checkout demonstration">
+    <article class="card checkout">
+      <div class="merchant"><div style="display:flex;align-items:center;gap:10px"><span class="merchant-badge">N</span><div><div class="merchant-name">Noura Market</div><div class="merchant-meta">Cross-border COD checkout</div></div></div><span class="provenance">merchant demo</span></div>
+      <h2 id="customerTitle">New SIM. Same customer.</h2>
+      <p id="customerStory">Her SIM was replaced, but her handset is unchanged. A rule that declines every SIM change loses her order. Isnad checks the surrounding evidence before deciding.</p>
+      <section class="evidence-source" id="evidenceSource" aria-labelledby="esLabel">
+        <div class="es-head">
+          <span class="es-label" id="esLabel" data-i18n="ui.evidence_source">Evidence source</span>
+          <span id="esStatus" class="es-status">Checking what this deployment offers…</span>
+        </div>
+        <div class="es-choices" role="radiogroup" aria-labelledby="esLabel">
+          <label class="es-choice"><input type="radio" name="evidenceSource" id="esMock" value="mock_nokia" checked><span data-i18n="ui.es_mock">Mock — Nokia-compatible demo</span></label>
+          <label class="es-choice"><input type="radio" name="evidenceSource" id="esReal" value="nokia_simulator"><span data-i18n="ui.es_real">Real NaC — Nokia hosted simulator</span></label>
+        </div>
+        <p id="esExplain" class="es-explain" data-i18n="ui.es_mock_explain">Nokia-compatible responses simulated locally for demonstration. No requests are sent to Nokia. Gemini may still be used if selected.</p>
+        <div id="esAccess" class="es-access" hidden>
+          <label for="accessCode" data-i18n="ui.es_access_label">Organizer access code</label>
+          <input id="accessCode" type="password" autocomplete="off" spellcheck="false" maxlength="128">
+          <button id="accessSubmit" class="secondary" type="button" data-i18n="ui.es_access_submit">Unlock real NaC</button>
+        </div>
+        <p id="esAccessNote" class="es-note" hidden></p>
+        <div class="es-run">
+          <label class="es-run-label" for="scenario" data-i18n="ui.es_scenario">Nokia simulator scenario</label>
+          <select id="scenario"></select>
+          <label class="es-run-label" for="judgePlanner" data-i18n="ui.es_planner">Planner</label>
+          <select id="judgePlanner">
+            <option value="greedy" data-i18n="ui.planner_greedy">Greedy · deterministic</option>
+            <option value="gemini" data-i18n="ui.planner_llm">Gemini · LLM</option>
+          </select>
+          <button id="runPaired" class="primary" type="button" data-i18n="ui.es_run" aria-label="Run this evidence source">Run</button>
+        </div>
+        <p id="esApplies" class="es-note" hidden data-i18n="ui.es_applies_next">Applies to the next run. The result below keeps the source it was produced with.</p>
+        <p id="esAllowance" class="es-note"></p>
+      </section>
+
+      <div class="summary"><div class="summary-line"><span class="subdued">Basket</span><span>Home essentials</span></div><div class="summary-line"><span class="subdued">Payment</span><span>Cash on delivery</span></div><div class="summary-line total"><span>Total</span><span>1,500 USD</span></div></div>
+      <div class="alt-cases">
+        <span class="alt-label" data-i18n="ui.custom_mock_cases">Custom mock scenarios</span>
+        <p class="es-note" data-i18n="ui.custom_mock_note">Authored teaching fixtures, not Nokia contracts. They have no Nokia simulator scenario and are available in mock only.</p>
+        <button id="checkout" class="secondary" type="button">Investigate the SIM change</button>
+        <button id="cleanCheckout" class="secondary" type="button">A clean checkout</button>
+        <button id="gapCheckout" class="secondary" type="button">Unresolved evidence</button>
+      </div>
+      <div id="checkoutFoot" class="checkout-foot"><strong>Expected: CHALLENGE.</strong> Ask for the merchant’s step-up instead of automatically declining. All three examples use simulated operator answers.</div>
+    </article>
+
+    <article class="card journey">
+      <div class="journey-head"><div><h2>Evidence decision trace</h2><p class="caption">The selected checks, their sources, and the evidence behind the decision.</p></div></div>
+      <div id="statusline" class="statusline">Ready for checkout.</div>
+      <div class="steps" aria-hidden="true"><span id="s1" class="step"></span><span id="s2" class="step"></span><span id="s3" class="step"></span><span id="s4" class="step"></span></div>
+      <div id="trace" class="trace"><p class="empty">Start the checkout to see exactly what the agent considers, what it asks the network, and why it stops.</p></div>
+      <div class="outcome">
+        <div>
+          <div id="presentationTitle" class="decision">—</div>
+          <div id="resultSource" class="result-source" hidden></div>
+          <p id="presentationSummary" class="presentation-summary">Start a checkout to see the plain-language result here.</p>
+          <div id="presentationAction" class="next-action"></div>
+          <div id="supportingGroup" class="fact-group" hidden><div class="fact-label" dir="auto" data-i18n="ui.supporting_evidence">Supporting evidence</div><ul id="supportingFacts" class="facts supporting"></ul></div>
+          <div id="adverseGroup" class="fact-group" hidden><div class="fact-label" dir="auto" data-i18n="ui.adverse_evidence">Adverse evidence</div><ul id="adverseFacts" class="facts adverse"></ul></div>
+          <div id="unresolvedGroup" class="fact-group" hidden><div class="fact-label" dir="auto" data-i18n="ui.unresolved_checks">Could not be checked</div><ul id="unresolvedFacts" class="facts unresolved"></ul></div>
+          <div id="uncorroboratedGroup" class="fact-group" hidden><div class="fact-label" dir="auto" data-i18n="ui.unmet_corroboration">Not corroborated</div><ul id="uncorroboratedFacts" class="facts unresolved"></ul></div>
+          <section id="reviewPanel" class="review-panel" hidden aria-labelledby="reviewTitle">
+            <div class="review-head">
+              <span id="reviewTitle" class="fact-label" data-i18n="ui.review_title">Awaiting additional verification</span>
+              <span class="provenance sim" data-i18n="ui.review_simulated">SIMULATED MERCHANT REVIEW</span>
+            </div>
+            <p id="reviewWhy" class="es-note"></p>
+            <p id="reviewNext" class="es-note" data-i18n="ui.review_next">The merchant opens a manual review and records its result. Isnad has not performed that review and has not contacted the customer.</p>
+            <p id="reviewState" class="es-note" data-i18n="ui.review_not_started">Review not started.</p>
+            <div class="review-actions">
+              <button id="reviewOpen" class="secondary" type="button" data-i18n="ui.review_open">Open a manual review</button>
+              <button id="reviewPassed" class="secondary" type="button" hidden data-i18n="ui.review_passed">Record: passed</button>
+              <button id="reviewFailed" class="secondary" type="button" hidden data-i18n="ui.review_failed">Record: failed</button>
+              <button id="reviewAbandoned" class="secondary" type="button" hidden data-i18n="ui.review_abandoned">Record: abandoned</button>
+            </div>
+            <p id="reviewEffect" class="es-note" data-i18n="ui.review_effect">Recording a result does not change the signed decision above. It is a separate, separately recorded fact: the original verdict, its signature and its receipt stay exactly as issued.</p>
+          </section>
+          <details class="wire-details" id="wireDetails" hidden>
+            <summary data-i18n="ui.wire_summary">Request and response details</summary>
+            <p class="es-note" id="wireProvenance"></p>
+            <pre id="wireBody" class="wire-body"></pre>
+          </details>
+          <details class="audit">
+            <summary>Technical and audit details</summary>
+            <div id="decision" class="decision small">—</div>
+            <div id="reason" class="reason">No evidence chain yet.</div>
+            <div id="grade" class="grade"></div>
+          </details>
+        </div>
+        <div id="receipt" class="receipt"><a id="receiptLink" href="#">Open signed receipt ↗</a><button id="verifySignature" type="button">Check Ed25519 signature</button><div id="vault" class="vault"></div></div>
+      </div>
+      <div id="sessionBeat" class="session-beat"><div class="session-title">Continue trust after checkout <span class="provenance sim">DEMO-ONLY · simulator</span></div><p id="sessionCopy" class="session-copy">Start a short trust session for this fixed checkout fixture, then simulate a SIM change. A live deployment waits for a real network signal instead.</p><div class="session-actions"><button id="startTrust" type="button">Continue trust</button><button id="simulateSwap" type="button" disabled>Simulate SIM swap</button></div><div id="sessionState" class="session-state">No live trust session.</div></div>
+    </article>
+  </section>
+
+
+
+
+  <section class="proof" aria-label="Why this is different">
+    <article class="card"><h3>MINIMUM NECESSARY EVIDENCE</h3><p>The agent spends its evidence budget only until the decision is justified. It can <b>stop early</b> rather than collect a surveillance profile.</p></article>
+    <article class="card"><h3>VISIBLE ORCHESTRATION</h3><p>Each selected CAMARA check shows its <b>decision rationale, source, and result</b>, instead of hiding a fixed rules sequence behind “AI.”</p></article>
+    <article class="card"><h3>VERIFIABLE AFTER THE SALE</h3><p>The final decision is stored as an <b>Ed25519-signed evidence receipt</b>. A merchant, customer, or dispute team can verify it later.</p></article>
+  </section>
+  <div id="fallback" class="fallback"></div>
+  <p class="technical">Risk scores are policy-derived and uncalibrated, not measured fraud probabilities. Signed receipts prove issuance by Isnad.</p>
+  <p class="technical">Need the full test console? <a href="/console">Open Isnad Live Agent Console</a></p>
+</main>
+<!-- Same origin, no CDN: the shared locale switch (I6). -->
+
+<script src="/ui/shared.js"></script>
+<script src="/ui/i18n.js"></script>
+<script src="/ui/pages/judge.js"></script>
+</body>
+</html>

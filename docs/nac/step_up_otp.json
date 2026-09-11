@@ -1,0 +1,24 @@
+{
+  "action": "step_up_otp",
+  "api": "Step-up (OTP)",
+  "sdk": "network-as-code",
+  "sdk_version": "10.0.0",
+  "rapidapi_host": "network-as-code.nokia.rapidapi.com",
+  "captured_at": "2026-08-30T12:07:24.234422+00:00",
+  "elapsed_ms": 0,
+  "device_suffix": "00",
+  "raw": {
+    "ok": true,
+    "result": "Result.INFO",
+    "signal": "CONSENT_REQUIRED",
+    "detail": "step-up verification is not a network provider call"
+  },
+  "normalized": {
+    "result": "Result.INFO",
+    "signal": "CONSENT_REQUIRED",
+    "detail": "step-up verification is not a network provider call",
+    "source": "nac",
+    "requires_consent": true,
+    "consent_basis": "NaC application authorization"
+  }
+}

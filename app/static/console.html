@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Isnad — Live Agent Console</title>
+<meta name="isnad-demo-token" content="__ISNAD_CONSOLE_TOKEN__">
+<link rel="stylesheet" href="/ui/pages/console.css">
+<link rel="stylesheet" href="/ui/shared.css">
+</head>
+<body class="site-page"><main class="site-shell">
+  <header class="site-header">
+    <a class="site-brand" href="/judge" aria-label="Isnad home"><span lang="ar">إسناد</span><span>Isnad<small data-i18n="ui.site_tagline">Network-verified trust</small></span></a>
+    <div class="site-language-slot"></div>
+  </header>
+  <nav class="site-nav" aria-label="Main navigation">
+    <a href="/judge" data-i18n="ui.nav_demo">Checkout demo</a>
+    <a href="/api-keys" data-i18n="ui.nav_api_keys">API keys</a>
+    <a href="/console" data-i18n="ui.nav_console" aria-current="page">Console</a>
+    <a href="/lab" data-i18n="ui.nav_lab">Lab</a>
+    <a href="/privacy" data-i18n="ui.nav_privacy">Privacy</a>
+  </nav>
+  <div id="sharedGemini"></div>
+  <header>
+    <h1><span class="ar">إسناد</span>Isnad — Live Agent Console</h1>
+    <span class="sub">network-verified trust engine</span>
+    <span class="status"><span id="dot" class="dot"></span><span id="statusText">connecting…</span></span>
+    <!-- I14: reads the journal the server wrote before each event went out
+         live. It resumes the record of a run, never the run itself. -->
+    <button id="recoverBtn" class="recover" type="button" disabled>Recover missed events</button>
+  </header>
+
+  <p id="recoverNote" class="recover-note" aria-live="polite"></p>
+  <!-- The live stream giving up for good, which only a reload fixes. role=alert
+       because the presenter is looking at the terminal, not at the header. -->
+  <p id="streamNotice" class="stream-notice" role="alert"></p>
+
+  <section class="runbook">
+    <div class="runbook-head">
+      <div>
+        <h2>Live demo runbook</h2>
+        <p>Use a guided button to exercise one capability or the full sequence. Real NaC actions are labeled; scripted attacks never pretend to be network events.</p>
+      </div>
+      <span id="modePill" class="mode-pill">reading server mode…</span>
+      <span id="plannerPill" class="mode-pill">planner: —</span>
+    </div>
+    <div class="runbook-grid">
+      <button class="scenario" id="runStageSuite">
+        <strong>Run full stage demo</strong>
+        <small>Act I–IV, then start a trust session and revoke it with a simulated SIM swap.</small>
+      </button>
+      <button class="scenario" id="runAct7">
+        <strong>Act VII — The bank that wasn't</strong>
+        <small>Same number, three answers. Only the announced call verifies.</small>
+      </button>
+      <button class="scenario" id="resetStage">
+        <strong>Reset stage state</strong>
+        <small>Clear caller velocity and simulated SIM swaps before the next run.</small>
+      </button>
+      <button class="scenario" id="runVelocityDemo">
+        <strong>Show caller velocity</strong>
+        <small>Screen one caller against many people and reveal the campaign pattern.</small>
+      </button>
+      <button class="scenario" id="runLiveSuite">
+        <strong>Run live API checks</strong>
+        <small>Health, forward verification, Reverse Isnad, idempotency replay, and vault validation.</small>
+      </button>
+      <button class="scenario" id="runLiveConsent">
+        <strong>Start real NaC consent</strong>
+        <small>Open Number Verification authorization, approve it, then resume the agent with the callback.</small>
+      </button>
+      <button class="scenario" id="runReverseCheck">
+        <strong>Verify inbound caller</strong>
+        <small>Run Reverse Isnad against the spoofed bank-officer scenario.</small>
+      </button>
+      <button class="scenario" id="runSessionDemo">
+        <strong>Test trust revocation</strong>
+        <small>Start a TTL session, inject a simulated swap, and wait for live revocation.</small>
+      </button>
+      <button class="scenario" id="runIdempotency">
+        <strong>Replay one request</strong>
+        <small>Send the same merchant request twice and confirm the chain ID is reused.</small>
+      </button>
+      <button class="scenario" id="verifyChainRun" disabled>
+        <strong>Verify latest evidence</strong>
+        <small>Check the latest signed chain in the Ed25519 evidence vault.</small>
+      </button>
+      <button class="scenario" id="runForwardCheck">
+        <strong>Run forward verification</strong>
+        <small>Call the merchant trust API and stream the agent's evidence decisions.</small>
+      </button>
+    </div>
+    <div id="runbookStatus" class="runbook-status">Ready. Choose a scenario to begin.</div>
+  </section>
+
+  <div class="wrap">
+    <div class="term">
+      <div class="bar">
+        <span class="c" style="background:#E06B6B"></span>
+        <span class="c" style="background:#E0A64B"></span>
+        <span class="c" style="background:#3FBF8F"></span>
+        <span class="t" id="sessionLabel">isnad-agent · idle</span>
+      </div>
+      <div class="log" id="log"><span class="meta">Ready. Trigger an act to watch the agent investigate.</span>
+<span class="cursor">▌</span></div>
+    </div>
+
+    <div class="side">
+      <div class="card">
+        <h2>Verdict</h2>
+        <div class="verdict" id="verdict">—</div>
+        <div class="grade" id="grade"></div>
+        <div class="reason" id="reason"></div>
+        <!-- T4: hand this to a judge. Enabled once a chain exists. -->
+        <div class="ask">
+          <input id="askInput" type="text" maxlength="280" disabled
+                 placeholder="Ask the agent about this decision…"
+                 aria-label="Ask the agent about this decision">
+          <button id="askBtn" disabled>ask</button>
+        </div>
+        <div class="reason" id="askAnswer"></div>
+        <!-- T5: the two paths side by side, each figure labelled with its basis. -->
+        <div class="cf" id="counterfactual" hidden></div>
+        <!-- T6: scan this and verify the chain on your own phone. -->
+        <div class="qr" id="qrBox" hidden>
+          <div id="qrCode"></div>
+          <a id="qrLink" class="qrlink" target="_blank" rel="noopener"></a>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Run a demo act</h2>
+        <div id="demoNotice" class="meta" style="font-size:11px;margin:-4px 0 12px"></div>
+        <button class="btn" data-act="act1">Act I — Kill the OTP
+          <small>Clean signup · network number match · ALLOW</small></button>
+        <button class="btn" data-act="act2">Act II — Catch the ghost
+          <small>SIM swap in window · COD · DECLINE</small></button>
+        <button class="btn" data-act="act3">Act III — Approve the invisible
+          <small>No bank record · clean network · ALLOW</small></button>
+        <button class="btn" data-act="act4">Act IV — Reverse Isnad
+          <small>Fake "bank officer" · spoofed line · REJECT</small></button>
+        <button class="btn" data-act="act5">Act V — The gap
+          <small>Consent withheld · one API dark · UNRESOLVED</small></button>
+        <button class="btn" data-act="act6">Act VI — The lost phone
+          <small>Real SIM replacement · not a takeover · DEGRADED</small></button>
+        <button class="btn" data-act="act9">Act IX — The established customer
+          <small>No risk signal · one call · ALLOW / partially attested</small></button>
+        <button class="btn" data-act="act8">Act VIII — The honest limit
+          <small>A bank's landline · no SIM to ask about · UNRESOLVED</small></button>
+        <button class="ghost btn" id="clearBtn">Clear console</button>
+      </div>
+
+      <div class="card">
+        <h2>Policy risk score</h2>
+        <div class="meterlab"><span>allow ≤ 0.15</span><span>decline ≥ 0.80</span></div>
+        <div class="meter"><div class="fill" id="fill"></div></div>
+        <div class="pval" id="pval">—</div>
+        <p class="reason">Policy-derived, uncalibrated score. Higher means more risk; this is not a measured fraud probability.</p>
+      </div>
+
+      <div class="card">
+        <h2>Trust with a TTL</h2>
+        <div id="sessState" style="font-family:var(--mono);font-size:13px;color:var(--mut);
+             padding:8px 0 12px">session: idle</div>
+        <button class="btn" id="startSess" disabled>Start session
+          <small>Keep watching the SIM after ALLOW</small></button>
+        <button class="btn" id="swapSess" disabled>Inject SIM swap
+          <small>Simulate a mid-session takeover</small></button>
+        <button class="btn" id="endSess" disabled>End session</button>
+      </div>
+
+      <div class="card" id="liveConsentCard" hidden>
+        <h2>Live Number Verification</h2>
+        <div class="meta" style="font-size:11px;margin-bottom:10px">
+          Uses the NaC consent screen, then resumes the agent.
+        </div>
+        <input id="consentPhone" value="+99999991000" aria-label="Phone number"
+          style="width:100%;background:#080B1F;color:var(--txt);border:1px solid var(--panel2);border-radius:8px;padding:10px;margin-bottom:10px" />
+        <button class="btn" id="startConsent">Start consent</button>
+        <a id="consentLink" class="btn" hidden target="_blank" rel="noopener">Open consent screen</a>
+        <button class="btn" id="resumeConsent" disabled>Resume verification</button>
+        <div id="consentState" class="meta" style="font-size:11px">consent: idle</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Network conditions. Moved here from /judge: it is an operator-facing
+       diagnostic about the NETWORK, not about a person, and it never touches a
+       verdict. On the judge page it competed with the decision for attention
+       and pushed the primary action below the fold. -->
+  <section class="network-conditions" aria-labelledby="ncTitle">
+    <h2 id="ncTitle" data-i18n="ui.network_conditions_title">Network conditions</h2>
+    <p class="nc-scope" data-i18n="ui.network_conditions_scope">Information about the network, shown separately from the trust decision. A congested cell can explain a slow or failed verification. It is not evidence about a person, it never changes the risk score, and it never waives a check.</p>
+    <div class="nc-actions">
+      <label class="visually-hidden" for="ncPhone">Subscriber number</label>
+      <input id="ncPhone" value="+99999991006" aria-label="Subscriber number" />
+      <button id="ncSubscribe" type="button" data-i18n="ui.network_conditions_subscribe">Start a network condition subscription</button>
+      <button id="ncForecast" type="button" disabled data-i18n="ui.network_conditions_forecast">Check the forecast</button>
+      <button id="ncHistory" type="button" disabled data-i18n="ui.network_conditions_history">Check the last hour</button>
+      <button id="ncDelete" type="button" disabled data-i18n="ui.network_conditions_delete">Delete the subscription</button>
+    </div>
+    <div id="ncState" class="nc-state" data-i18n="ui.network_conditions_idle">No subscription. Nothing is requested from the operator until you ask.</div>
+    <div id="ncResult" class="nc-result"></div>
+  </section>
+
+</main>
+<script src="/ui/shared.js"></script>
+<script src="/ui/pages/console.js"></script>
+<script src="/ui/i18n.js" defer></script>
+</body>
+</html>

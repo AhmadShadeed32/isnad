@@ -1,0 +1,356 @@
+{
+  "recorded_at_utc": "2026-09-09T14:10:41.460931+00:00",
+  "application_revision": "c32a24ec50ed0f0009d7d2c96c9771cc9d8368f2",
+  "space_revision": "1c866dbfecc6a5755d9c5115895bded78d8a6ed5",
+  "application_url": "https://ahmadshadeed32-isnad-trust-engine.hf.space",
+  "driven_from": "Chromium using the deployed /judge page, without Hugging Face authentication",
+  "evidence_level": "hosted_simulator",
+  "runs": [
+    {
+      "scenario": "swapped_subscriber",
+      "selector_source": "mock_nokia",
+      "run_id": "judge-1788963044186-ce384486a7dca8",
+      "chain_id": "chn_829ac37c9c5243f49051",
+      "decision": "DECLINE",
+      "chain_grade": "REFUTED",
+      "planner": "greedy",
+      "provider_sources": [
+        "nac_contract_mock"
+      ],
+      "outbound_attempts": 2,
+      "evidence_source": "nac_contract_mock",
+      "evidence_environment": "nokia_contract_mock",
+      "contract_version": "2026-09-09.1",
+      "judge": {
+        "evidence_source": "mock_nokia",
+        "evidence_environment": "nokia_contract_mock",
+        "contract_version": "2026-09-09.1",
+        "scenario": "swapped_subscriber",
+        "planner_requested": "greedy",
+        "policy_digest": "3c3c77aae2a9",
+        "replayed": false,
+        "outbound_attempts": 2,
+        "attempts": [
+          {
+            "operation": "sim_swap_check",
+            "method": "POST",
+            "path": "/passthrough/camara/v1/sim-swap/sim-swap/v0/check",
+            "status": 200,
+            "error": null,
+            "duration_ms": 0,
+            "at": "2026-09-09T14:10:44.752788+00:00"
+          },
+          {
+            "operation": "device_swap_check",
+            "method": "POST",
+            "path": "/passthrough/camara/v1/device-swap/device-swap/v1/check",
+            "status": 200,
+            "error": null,
+            "duration_ms": 0,
+            "at": "2026-09-09T14:10:44.762280+00:00"
+          }
+        ],
+        "allowance": {
+          "session": true,
+          "nac_capability": false,
+          "attempts_per_run": 2,
+          "session_attempts_left": 6,
+          "deployment_attempts_left": 24,
+          "active_real_runs": 0,
+          "expires_in_seconds": 1799
+        }
+      },
+      "visible_source": "This result: Nokia-compatible responses answered locally · no requests were sent to Nokia · contract 2026-09-09.1",
+      "receipt_signature_verified_independently": true,
+      "receipt_payload_sha256": "cdb14aba9122089ee6efc905178235ec642f7594a39f763fb059b473e8d48b7a",
+      "public_key": "ecaba3a8151077ed54cec64358ed008404ad61596f3d8cf6bf0622233680d341",
+      "signature": "a6a0cde5cf2b48f2ffb0d5b190b25cd164689731edb1778aa0ad10e0428dd0c37943efd3f7e24d26c330bbadf9c9f5e1915aa2d2187f0f21f4bbc04efbb07705",
+      "signed_payload": "{\"decision\":\"DECLINE\",\"chain_grade\":\"REFUTED\",\"confidence\":0.972,\"prior_logodds\":-0.242347,\"hypothesis\":\"account_takeover\",\"reason\":\"Fraud indicators: SIM swap inside the last 240 h, device swap inside the last 240 h.\",\"chain_id\":\"chn_829ac37c9c5243f49051\",\"chain\":[{\"step\":1,\"action\":\"sim_swap\",\"api\":\"SIM Swap\",\"result\":\"FLAG\",\"signal\":\"SIM_SWAPPED\",\"detail\":\"SIM swap inside the last 240 h\",\"consent_basis\":\"NaC authorization / end-user consent\",\"source\":\"nac_contract_mock\",\"requires_consent\":false,\"latency_ms\":12,\"max_age_hours\":240.0,\"timing\":{\"schema_version\":\"swap_timing/1\",\"provider_time\":null,\"retrieved_at\":\"2026-09-09T14:10:44.753997Z\",\"age_seconds_at_decision\":null,\"source_operation\":\"sim_swap.retrieve_date\",\"availability\":\"unsupported\",\"reason\":\"provider has no date operation\",\"ambiguity_key\":\"\",\"monitored_period_days\":null,\"disagrees_with_window\":null},\"delta_logodds\":2.2,\"at\":\"2026-09-09T14:10:44.753882Z\"},{\"step\":2,\"action\":\"device_swap\",\"api\":\"Device Swap\",\"result\":\"FLAG\",\"signal\":\"DEVICE_SWAPPED\",\"detail\":\"device swap inside the last 240 h\",\"consent_basis\":\"NaC application authorization\",\"source\":\"nac_contract_mock\",\"requires_consent\":false,\"latency_ms\":4,\"max_age_hours\":240.0,\"timing\":{\"schema_version\":\"swap_timing/1\",\"provider_time\":null,\"retrieved_at\":\"2026-09-09T14:10:44.762802Z\",\"age_seconds_at_decision\":null,\"source_operation\":\"device_swap.retrieve_date\",\"availability\":\"unsupported\",\"reason\":\"provider has no date operation\",\"ambiguity_key\":\"\",\"monitored_period_days\":null,\"disagrees_with_window\":null},\"delta_logodds\":1.6,\"at\":\"2026-09-09T14:10:44.762756Z\"}],\"evidence_cost\":4.0,\"latency_ms\":29,\"provider_sources\":[\"nac_contract_mock\"],\"planner\":\"greedy\",\"policy_snapshot\":{\"allow_below\":0.15,\"decline_above\":0.8},\"subject_hash\":\"b2d53815a52b56bdf4342c1f293b88440c7a898ac13974fbd7ad3ce68b6d1d26\",\"owner_hash\":\"01654f5ac07a72db18439ce975ce2d01671de3b8c6dc6dd84f94761caf6e7aa3\",\"request_hash\":\"b13683b09ec2108df2134d7c20d9e006ded17d161de79aa2cde6edfbece3f99c\",\"signed_at\":\"2026-09-09T14:10:44.767288+00:00\",\"unmet_corroboration\":[],\"budget_remaining\":8.0,\"operations\":2,\"evidence_source\":\"nac_contract_mock\",\"evidence_environment\":\"nokia_contract_mock\",\"contract_version\":\"2026-09-09.1\",\"outbound_attempts\":2,\"stopping_reason\":\"decisive\"}",
+      "tampered_copy_rejected": true,
+      "signed_provenance_verified": true,
+      "normalized_evidence": [
+        {
+          "step": 1,
+          "action": "sim_swap",
+          "api": "SIM Swap",
+          "result": "FLAG",
+          "signal": "SIM_SWAPPED",
+          "source": "nac_contract_mock",
+          "max_age_hours": 240.0
+        },
+        {
+          "step": 2,
+          "action": "device_swap",
+          "api": "Device Swap",
+          "result": "FLAG",
+          "signal": "DEVICE_SWAPPED",
+          "source": "nac_contract_mock",
+          "max_age_hours": 240.0
+        }
+      ],
+      "journal_gap": false,
+      "journal_decisions": [
+        {
+          "phase": "investigation",
+          "action": "sim_swap",
+          "planner": "greedy",
+          "rationale": "greedy: highest information-per-cost option still affordable"
+        },
+        {
+          "phase": "corroboration",
+          "action": "device_swap",
+          "planner": "policy",
+          "rationale": "policy: corroborate before this signal alone can decline"
+        }
+      ],
+      "mock_transport_attempts": 2,
+      "requests_sent_to_nokia": 0,
+      "replay": {
+        "same_chain": true,
+        "outbound_attempts": 0,
+        "session_allowance_unchanged": true,
+        "deployment_allowance_unchanged": true
+      },
+      "browser_signature_result": "✓ Signature valid",
+      "browser_tamper_result": "✗ Signature INVALID",
+      "browser_restore_verified": true,
+      "provenance_field_origin": "Extracted from the exact signed_payload stored in this record"
+    },
+    {
+      "scenario": "swapped_subscriber",
+      "selector_source": "nokia_simulator",
+      "run_id": "judge-1788963045971-028bce681e8ff8",
+      "chain_id": "chn_8b18d879238b4d80b6fb",
+      "decision": "DECLINE",
+      "chain_grade": "REFUTED",
+      "planner": "llm",
+      "provider_sources": [
+        "nac"
+      ],
+      "outbound_attempts": 2,
+      "evidence_source": "nac",
+      "evidence_environment": "nokia_hosted_simulator",
+      "contract_version": "2026-09-09.1",
+      "judge": {
+        "evidence_source": "nokia_simulator",
+        "evidence_environment": "nokia_hosted_simulator",
+        "contract_version": "2026-09-09.1",
+        "scenario": "swapped_subscriber",
+        "planner_requested": "gemini",
+        "policy_digest": "3c3c77aae2a9",
+        "replayed": false,
+        "outbound_attempts": 2,
+        "attempts": [
+          {
+            "operation": "sim_swap_check",
+            "method": "POST",
+            "path": "/passthrough/camara/v1/sim-swap/sim-swap/v0/check",
+            "status": 200,
+            "error": null,
+            "duration_ms": 3955,
+            "at": "2026-09-09T14:10:52.048781+00:00"
+          },
+          {
+            "operation": "device_swap_check",
+            "method": "POST",
+            "path": "/passthrough/camara/v1/device-swap/device-swap/v1/check",
+            "status": 200,
+            "error": null,
+            "duration_ms": 238,
+            "at": "2026-09-09T14:10:52.295704+00:00"
+          }
+        ],
+        "allowance": {
+          "session": true,
+          "nac_capability": true,
+          "attempts_per_run": 2,
+          "session_attempts_left": 4,
+          "deployment_attempts_left": 22,
+          "active_real_runs": 0,
+          "expires_in_seconds": 1792
+        }
+      },
+      "visible_source": "This result: actual requests to Nokia’s hosted simulator · contract 2026-09-09.1",
+      "receipt_signature_verified_independently": true,
+      "receipt_payload_sha256": "a65998bebc7d334eb8fc52febb113404d97ff443c88b50edc6b12f2aa58adcd0",
+      "public_key": "ecaba3a8151077ed54cec64358ed008404ad61596f3d8cf6bf0622233680d341",
+      "signature": "660e5185836d05f2e54ff208ba69a5d6e947d294598bdcd04aa0137b468aed183993ddd6557bc45cc85b6ba3993cca226ab13bc201de85f6ab5377048efd4b05",
+      "signed_payload": "{\"decision\":\"DECLINE\",\"chain_grade\":\"REFUTED\",\"confidence\":0.972,\"prior_logodds\":-0.242347,\"hypothesis\":\"account_takeover\",\"reason\":\"Fraud indicators: SIM swap inside the last 240 h, device swap inside the last 240 h.\",\"chain_id\":\"chn_8b18d879238b4d80b6fb\",\"chain\":[{\"step\":1,\"action\":\"sim_swap\",\"api\":\"SIM Swap\",\"result\":\"FLAG\",\"signal\":\"SIM_SWAPPED\",\"detail\":\"SIM swap inside the last 240 h\",\"consent_basis\":\"NaC authorization / end-user consent\",\"source\":\"nac\",\"requires_consent\":false,\"latency_ms\":3956,\"max_age_hours\":240.0,\"timing\":{\"schema_version\":\"swap_timing/1\",\"provider_time\":null,\"retrieved_at\":\"2026-09-09T14:10:52.049723Z\",\"age_seconds_at_decision\":null,\"source_operation\":\"sim_swap.retrieve_date\",\"availability\":\"unsupported\",\"reason\":\"provider has no date operation\",\"ambiguity_key\":\"\",\"monitored_period_days\":null,\"disagrees_with_window\":null},\"delta_logodds\":2.2,\"at\":\"2026-09-09T14:10:52.049641Z\"},{\"step\":2,\"action\":\"device_swap\",\"api\":\"Device Swap\",\"result\":\"FLAG\",\"signal\":\"DEVICE_SWAPPED\",\"detail\":\"device swap inside the last 240 h\",\"consent_basis\":\"NaC application authorization\",\"source\":\"nac\",\"requires_consent\":false,\"latency_ms\":240,\"max_age_hours\":240.0,\"timing\":{\"schema_version\":\"swap_timing/1\",\"provider_time\":null,\"retrieved_at\":\"2026-09-09T14:10:52.296549Z\",\"age_seconds_at_decision\":null,\"source_operation\":\"device_swap.retrieve_date\",\"availability\":\"unsupported\",\"reason\":\"provider has no date operation\",\"ambiguity_key\":\"\",\"monitored_period_days\":null,\"disagrees_with_window\":null},\"delta_logodds\":1.6,\"at\":\"2026-09-09T14:10:52.296491Z\"}],\"evidence_cost\":4.0,\"latency_ms\":5775,\"provider_sources\":[\"nac\"],\"planner\":\"llm\",\"policy_snapshot\":{\"allow_below\":0.15,\"decline_above\":0.8},\"subject_hash\":\"b2d53815a52b56bdf4342c1f293b88440c7a898ac13974fbd7ad3ce68b6d1d26\",\"owner_hash\":\"01654f5ac07a72db18439ce975ce2d01671de3b8c6dc6dd84f94761caf6e7aa3\",\"request_hash\":\"d2c45091b91df102c58867d677cc532eeb3860c4f873d10d7cab88f69d4ada77\",\"signed_at\":\"2026-09-09T14:10:52.302046+00:00\",\"unmet_corroboration\":[],\"budget_remaining\":8.0,\"operations\":2,\"evidence_source\":\"nac\",\"evidence_environment\":\"nokia_hosted_simulator\",\"contract_version\":\"2026-09-09.1\",\"outbound_attempts\":2,\"stopping_reason\":\"decisive\"}",
+      "tampered_copy_rejected": true,
+      "signed_provenance_verified": true,
+      "normalized_evidence": [
+        {
+          "step": 1,
+          "action": "sim_swap",
+          "api": "SIM Swap",
+          "result": "FLAG",
+          "signal": "SIM_SWAPPED",
+          "source": "nac",
+          "max_age_hours": 240.0
+        },
+        {
+          "step": 2,
+          "action": "device_swap",
+          "api": "Device Swap",
+          "result": "FLAG",
+          "signal": "DEVICE_SWAPPED",
+          "source": "nac",
+          "max_age_hours": 240.0
+        }
+      ],
+      "journal_gap": false,
+      "journal_decisions": [
+        {
+          "phase": "investigation",
+          "action": "sim_swap",
+          "planner": "llm",
+          "rationale": "Checking for a recent SIM swap provides the highest expected information to evaluate the account takeover hypothesis."
+        },
+        {
+          "phase": "corroboration",
+          "action": "device_swap",
+          "planner": "policy",
+          "rationale": "policy: corroborate before this signal alone can decline"
+        }
+      ],
+      "replay": {
+        "same_chain": true,
+        "outbound_attempts": 0,
+        "session_allowance_unchanged": true,
+        "deployment_allowance_unchanged": true
+      },
+      "browser_signature_result": "✓ Signature valid",
+      "browser_tamper_result": "✗ Signature INVALID",
+      "browser_restore_verified": true,
+      "provenance_field_origin": "Extracted from the exact signed_payload stored in this record"
+    },
+    {
+      "scenario": "stable_subscriber",
+      "selector_source": "nokia_simulator",
+      "run_id": "judge-1788963053074-f027a1469d65a",
+      "chain_id": "chn_fb30247fd6894965898b",
+      "decision": "CHALLENGE",
+      "chain_grade": "DEGRADED",
+      "planner": "llm",
+      "provider_sources": [
+        "nac"
+      ],
+      "outbound_attempts": 2,
+      "evidence_source": "nac",
+      "evidence_environment": "nokia_hosted_simulator",
+      "contract_version": "2026-09-09.1",
+      "judge": {
+        "evidence_source": "nokia_simulator",
+        "evidence_environment": "nokia_hosted_simulator",
+        "contract_version": "2026-09-09.1",
+        "scenario": "stable_subscriber",
+        "planner_requested": "gemini",
+        "policy_digest": "3c3c77aae2a9",
+        "replayed": false,
+        "outbound_attempts": 2,
+        "attempts": [
+          {
+            "operation": "sim_swap_check",
+            "method": "POST",
+            "path": "/passthrough/camara/v1/sim-swap/sim-swap/v0/check",
+            "status": 200,
+            "error": null,
+            "duration_ms": 128,
+            "at": "2026-09-09T14:10:54.888461+00:00"
+          },
+          {
+            "operation": "device_swap_check",
+            "method": "POST",
+            "path": "/passthrough/camara/v1/device-swap/device-swap/v1/check",
+            "status": 200,
+            "error": null,
+            "duration_ms": 102,
+            "at": "2026-09-09T14:10:56.530515+00:00"
+          }
+        ],
+        "allowance": {
+          "session": true,
+          "nac_capability": true,
+          "attempts_per_run": 2,
+          "session_attempts_left": 2,
+          "deployment_attempts_left": 20,
+          "active_real_runs": 0,
+          "expires_in_seconds": 1787
+        }
+      },
+      "visible_source": "This result: actual requests to Nokia’s hosted simulator · contract 2026-09-09.1",
+      "receipt_signature_verified_independently": true,
+      "receipt_payload_sha256": "91d77af1459e8e1d953808e534ebed9181ca8a942a891025fd0da3010b94497f",
+      "public_key": "ecaba3a8151077ed54cec64358ed008404ad61596f3d8cf6bf0622233680d341",
+      "signature": "ef9ee269f47263b1a3bbb9037d6e5f6fe42b77482a39cea048b80a8674e86d637455971bca772600f4a0291f2cc1921d7c8c0ae43cd19b9a5b00917c46096a01",
+      "signed_payload": "{\"decision\":\"CHALLENGE\",\"chain_grade\":\"DEGRADED\",\"confidence\":0.176,\"prior_logodds\":-0.242347,\"hypothesis\":\"account_takeover\",\"reason\":\"Unresolved doubt — cheapest step-up needed before trusting.\",\"chain_id\":\"chn_fb30247fd6894965898b\",\"chain\":[{\"step\":1,\"action\":\"sim_swap\",\"api\":\"SIM Swap\",\"result\":\"PASS\",\"signal\":\"SIM_STABLE\",\"detail\":\"no SIM swap in the last 240 h\",\"consent_basis\":\"NaC authorization / end-user consent\",\"source\":\"nac\",\"requires_consent\":false,\"latency_ms\":129,\"max_age_hours\":240.0,\"timing\":{\"schema_version\":\"swap_timing/1\",\"provider_time\":null,\"retrieved_at\":\"2026-09-09T14:10:54.889330Z\",\"age_seconds_at_decision\":null,\"source_operation\":\"sim_swap.retrieve_date\",\"availability\":\"unsupported\",\"reason\":\"provider has no date operation\",\"ambiguity_key\":\"\",\"monitored_period_days\":null,\"disagrees_with_window\":null},\"delta_logodds\":-0.8,\"at\":\"2026-09-09T14:10:54.889273Z\"},{\"step\":2,\"action\":\"device_swap\",\"api\":\"Device Swap\",\"result\":\"PASS\",\"signal\":\"DEVICE_STABLE\",\"detail\":\"no device swap in the last 240 h\",\"consent_basis\":\"NaC application authorization\",\"source\":\"nac\",\"requires_consent\":false,\"latency_ms\":104,\"max_age_hours\":240.0,\"timing\":{\"schema_version\":\"swap_timing/1\",\"provider_time\":null,\"retrieved_at\":\"2026-09-09T14:10:56.531273Z\",\"age_seconds_at_decision\":null,\"source_operation\":\"device_swap.retrieve_date\",\"availability\":\"unsupported\",\"reason\":\"provider has no date operation\",\"ambiguity_key\":\"\",\"monitored_period_days\":null,\"disagrees_with_window\":null},\"delta_logodds\":-0.5,\"at\":\"2026-09-09T14:10:56.531228Z\"}],\"evidence_cost\":4.0,\"latency_ms\":2928,\"provider_sources\":[\"nac\"],\"planner\":\"llm\",\"policy_snapshot\":{\"allow_below\":0.15,\"decline_above\":0.8},\"subject_hash\":\"1fade177c75e3bb57b68a55b862c2cae1746814ef9d474866f7a541eb8de743f\",\"owner_hash\":\"01654f5ac07a72db18439ce975ce2d01671de3b8c6dc6dd84f94761caf6e7aa3\",\"request_hash\":\"f82745b5dbe9609a590ba8f083bad690ed68622272c2eb85e427da6f5ae50804\",\"signed_at\":\"2026-09-09T14:10:56.538349+00:00\",\"unmet_corroboration\":[],\"budget_remaining\":8.0,\"operations\":2,\"evidence_source\":\"nac\",\"evidence_environment\":\"nokia_hosted_simulator\",\"contract_version\":\"2026-09-09.1\",\"outbound_attempts\":2,\"stopping_reason\":\"planner_stop\"}",
+      "tampered_copy_rejected": true,
+      "signed_provenance_verified": true,
+      "normalized_evidence": [
+        {
+          "step": 1,
+          "action": "sim_swap",
+          "api": "SIM Swap",
+          "result": "PASS",
+          "signal": "SIM_STABLE",
+          "source": "nac",
+          "max_age_hours": 240.0
+        },
+        {
+          "step": 2,
+          "action": "device_swap",
+          "api": "Device Swap",
+          "result": "PASS",
+          "signal": "DEVICE_STABLE",
+          "source": "nac",
+          "max_age_hours": 240.0
+        }
+      ],
+      "journal_gap": false,
+      "journal_decisions": [
+        {
+          "phase": "investigation",
+          "action": "sim_swap",
+          "planner": "llm",
+          "rationale": "Checking for a recent SIM swap is the most informative step to detect potential account takeover."
+        },
+        {
+          "phase": "investigation",
+          "action": "device_swap",
+          "planner": "llm",
+          "rationale": "Checking for recent device swaps is the only remaining action available within budget to gather evidence on the account takeover hypothesis."
+        },
+        {
+          "phase": "investigation",
+          "action": "stop",
+          "planner": "llm",
+          "rationale": "nothing affordable remains"
+        }
+      ],
+      "replay": {
+        "same_chain": true,
+        "outbound_attempts": 0,
+        "session_allowance_unchanged": true,
+        "deployment_allowance_unchanged": true
+      },
+      "browser_signature_result": "✓ Signature valid",
+      "browser_tamper_result": "✗ Signature INVALID",
+      "browser_restore_verified": true,
+      "provenance_field_origin": "Extracted from the exact signed_payload stored in this record"
+    }
+  ],
+  "limitations": [
+    "Project-agent smoke test, not an independent judge review.",
+    "Real HTTPS calls target Nokia hosted simulator test subscribers, not physical handsets.",
+    "Only SIM Swap check and Device Swap check are exposed by the paired demonstration.",
+    "Receipt storage and judge sessions remain ephemeral on this Space.",
+    "Request timing is measured by Isnad, not a Nokia service-level guarantee."
+  ],
+  "mock_default_visible": true,
+  "organizer_code_exchange_succeeded_and_input_cleared": true,
+  "page_error_count": 0,
+  "real_runs": 2,
+  "real_outbound_attempts": 4,
+  "completed_at_utc": "2026-09-09T14:10:57.248848+00:00",
+  "verification_note": "The public receipt browser checks completed after the run and replay checks, without additional provider calls."
+}

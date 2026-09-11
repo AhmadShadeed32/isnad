@@ -1,0 +1,24 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Isnad — consent complete</title>
+<!--
+  P4a — the generic landing page a subscriber's phone browser is redirected to
+  after the Number Verification provider callback, when that request prefers
+  HTML over JSON (see _prefers_html in app/api/routes_consent.py).
+
+  Deliberately carries no code, state, phone number, consent ID or provider
+  error text: everything the callback learned stays server-side. The operator
+  harness (demo/merchant_pilot) polls Isnad for the actual outcome and shows
+  it there — this page's only job is to tell the subscriber where to go next.
+-->
+<link rel="stylesheet" href="/ui/shared.css">
+<link rel="stylesheet" href="/ui/pages/consent_complete.css">
+<main>
+  <div class="card">
+    <h1>You're done here</h1>
+    <p>Return to the merchant to see what happens next.</p>
+  </div>
+</main>
+
+<script src="/ui/i18n.js" defer></script>

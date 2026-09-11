@@ -1,0 +1,316 @@
+# Scores and signal weights are heuristic, not calibrated fraud probabilities.
+# Correlated signals may compound one event; validate on outcomes before tuning.
+# Isnad policy / evidence-cost model.
+# This single file is the tuning surface for the whole agent: change costs,
+# signal weights, and thresholds here — no code changes needed.
+
+thresholds:
+  allow_below: 0.15      # policy risk score at/below this -> ALLOW
+  decline_above: 0.80    # policy risk score at/above this -> DECLINE
+  # strictly between the two -> CHALLENGE
+
+prior:
+  base_p: 0.08           # configured starting score, not an observed fraud rate
+  reverse_base_p: 0.25   # Reverse Isnad: an unverified inbound caller starts uncertain
+  new_account_logodds: 0.9        # account_age_days <= 1
+  cod_logodds: 0.6                # payment_method == "cod"
+  high_value_logodds: 0.7
+  high_value_threshold: 1000
+  sensitive_event_logodds: 0.5    # payout / password_reset / profile_change
+
+budget:
+  default: 8             # max total evidence cost the agent may spend
+  high_value: 12
+
+# Signal -> log-odds shift toward fraud (positive = more suspicious).
+signals:
+  NUMBER_MATCH: -1.2
+  NUMBER_MISMATCH: 1.5
+  SIM_STABLE: -0.8
+  SIM_SWAPPED: 2.2
+  DEVICE_STABLE: -0.5
+  DEVICE_SWAPPED: 1.6
+  # Number Recycling. A recycled number means the SIM this merchant once
+  # verified now belongs to someone else, so any stored trust in it is void.
+  NUMBER_RECYCLED: 1.8
+  # Exactly zero, and deliberately. "The subscriber did not change" removes a
+  # doubt; it does not attest that this person is who they say they are. The
+  # ALLOW gate counts only strictly-negative links as support, so a weight of
+  # zero is what makes "a non-recycled number never buys an automatic ALLOW"
+  # true in the engine rather than only in a comment.
+  NUMBER_CONTINUOUS: 0.0
+  AT_CLAIMED_LOCATION: -1.2
+  NOT_AT_CLAIMED_LOCATION: 1.6
+  LOCATION_UNKNOWN: 0.0
+  REACHABLE_NORMAL: -0.4
+  # RESERVED — nothing emits this. A reachability response says whether the
+  # device is reachable and over which channel; it cannot characterise a line as
+  # automated or VoIP. Kept priced for a provider that could one day say it.
+  REACHABLE_BOTPATTERN: 1.4
+  REACHABLE_UNAVAILABLE: 0.4
+  HOME_NETWORK: -0.3
+  ROAMING_NETWORK: 0.2
+  # RESERVED — nothing emits these two. Nokia Network as Code exposes no device
+  # reputation product: the captured probe in docs/nac/device_intelligence.json
+  # returns EVIDENCE_UNAVAILABLE. Until a reputation provider is wired in, a
+  # Device Intelligence link is a hole in the chain, not a verdict. Kept priced
+  # so that provider inherits a weight instead of a guess.
+  DEVICE_TRUSTED: -0.6
+  DEVICE_RISKY: 1.5
+  # RESERVED — nothing emits this. An OTP is sent by the merchant, in a channel
+  # this service does not own, so an OTP outcome could only ever arrive as a
+  # merchant-reported fact, never as evidence the agent gathered. Kept priced
+  # so the counterfactual has a number to argue against; if a merchant-reported
+  # channel is ever built, this is what it is worth.
+  OTP_CONFIRMED: -2.5
+  LOCATION_PARTIAL: 0.0
+  CONSENT_REQUIRED: 0.0
+  # --- Verified Caller / registry (local evidence, no network call) ---
+  # An institution announced this exact call, from a key bound to it, inside a
+  # window measured in seconds. This is the only local signal that can clear a
+  # caller, and it is strong for one reason: somebody proved who they were.
+  CALL_PRE_ANNOUNCED: -2.5
+  # The institution publishes this number for customers to call IN on and never
+  # originates calls from it. Seeing it as caller ID means it was spoofed.
+  REGISTRY_INBOUND_ONLY: 2.0
+  # Claims an institution the number does not belong to.
+  REGISTRY_CLAIM_MISMATCH: 1.5
+  # ZERO ON PURPOSE, and the most important line in this block. The number does
+  # belong to the institution — and that is worth nothing, because caller ID is
+  # spoofable and a scammer presenting the bank's real number produces exactly
+  # this. Giving it a negative delta would build a machine that trusts the
+  # attacks it exists to catch.
+  REGISTRY_MATCH_UNANNOUNCED: 0.0
+  # Also zero. Absence from a hand-curated registry is not evidence: almost
+  # every number in the world is missing from it and innocent.
+  REGISTRY_UNLISTED: 0.0
+  # One number screened against many different people in a short window. No
+  # individual call in a campaign looks wrong; the pattern does. This is the
+  # only signal here that no per-call check can produce, and the only one that
+  # improves as more people use the system.
+  CALLER_HIGH_VELOCITY: 1.8
+  PROVIDER_UNAVAILABLE: 0.0
+  EVIDENCE_UNAVAILABLE: 0.0
+
+# Adverse signals that a single check cannot settle, and the checks that could
+# still exonerate the customer.
+#
+# A SIM swap is the signal a rules engine declines on outright, and that is the
+# false decline this whole system exists to prevent: a swap is a takeover only
+# if the handset or the location moved with it. The same handset, still at the
+# usual place, is a customer who lost a phone and replaced the SIM.
+#
+# Before one of these signals may carry a DECLINE on its own, the agent must
+# have attempted the checks listed here — within budget; if it cannot afford
+# them the decline stands. This binds the DECLINE side only. A clean chain
+# still clears immediately.
+corroboration:
+  SIM_SWAPPED: [device_swap, location_verify]
+
+# What actually SATISFIES a corroboration requirement.
+#
+# Attempting a check is not the same as corroborating with it. A device-swap
+# call that comes back "we could not check" leaves the SIM change exactly as
+# unexplained as it was before the money was spent, so it must not license the
+# decline it was supposed to guard against. Only a RESOLVED answer counts — the
+# check returned PASS or FLAG — and `min_resolved` is how many of the listed
+# checks have to have done so.
+#
+# Deliberately a count of resolved checks, not a count of *agreeing* checks:
+# a corroborating check that comes back adverse is independent adverse evidence
+# and the decline stands on it.
+#
+# Nor are two responses treated as independent merely because the APIs have
+# different names. One resolved corroborator is what this policy claims, and
+# `min_resolved: 1` is that claim written down rather than implied.
+corroboration_rule:
+  min_resolved: 1
+
+# cost = normalized spend (latency + money + friction); gain = expected info.
+actions:
+  number_verify:       { cost: 1, gain: 1.2, friction: 0 }
+  sim_swap:            { cost: 2, gain: 2.0, friction: 0 }
+  device_swap:         { cost: 2, gain: 1.5, friction: 0 }
+  location_verify:     { cost: 3, gain: 1.5, friction: 0 }
+  reachability:        { cost: 2, gain: 1.3, friction: 0 }
+  roaming:             { cost: 2, gain: 1.6, friction: 0 }
+  # Priced, never selected — see planner._UNSERVED. No CAMARA device-reputation
+  # API exists on Nokia NaC, so the agent cannot buy this check today.
+  device_intelligence: { cost: 2, gain: 1.4, friction: 0 }
+  # Cheap and narrow: one boolean about subscriber continuity, and only
+  # answerable when the merchant supplied its own last-verified date.
+  number_recycling:    { cost: 1, gain: 1.1, friction: 0 }
+  # Priced, never selected. `cheapest_stepup` used to fall back to it, which
+  # spent 6 of a 12 budget on a provider call that does not exist. CHALLENGE is
+  # itself the instruction to step the customer up; the merchant runs it.
+  step_up_otp:         { cost: 6, gain: 2.5, friction: 5 }
+
+# Enrichments: extra provider operations attached to a link that already ran.
+#
+# `retrieve-date` is a SECOND billable CAMARA call, not a field of the check's
+# response. Pricing it here is what keeps the cost story true: hiding it inside
+# the boolean's cost would let a receipt claim one call where two were made.
+#
+# It carries no `gain`, deliberately. Gain is what the planner trades against
+# cost when choosing evidence, and this is not evidence the planner may choose:
+# it explains a link that already exists and never moves the score. `enabled`
+# turns the extra spend off for a deployment that does not want it.
+enrichments:
+  swap_date: { cost: 1, enabled: true }
+
+# What each hypothesis may buy. This is not a list of good checks: it is the
+# list of checks that can move THIS hypothesis, in either direction. The
+# planner selects from it, the ALLOW gate requires a supporting fact from it,
+# and the verdict sentence is written from what was gathered — so a check that
+# cannot speak to the hypothesis produces a receipt answering a question
+# nobody asked.
+hypotheses:
+  account_takeover: { relevant: [sim_swap, location_verify, device_swap, number_recycling] }
+  mule:             { relevant: [device_swap, reachability, device_intelligence] }
+  # number_verify was here and should not have been. It establishes that the
+  # handset presenting this number holds that SIM — and a bot farm runs real
+  # SIMs in real handsets at scale, so a match says nothing about whether this
+  # is one. Being the cheapest check priced, greedy bought it first, it
+  # satisfied the ALLOW gate on its own, and a day-zero signup was signed
+  # "Cleared by: network number matches the provided number" against a
+  # bot_farm hypothesis. The arithmetic was right the whole way through; the
+  # explanation was not.
+  #
+  # reachability stays because both of its outcomes bear on the question:
+  # REACHABLE_BOTPATTERN exists for this hypothesis, and REACHABLE_NORMAL is
+  # its exoneration.
+  bot_farm:         { relevant: [reachability, device_intelligence] }
+  legit:            { relevant: [] }
+  legit_thin_file:  { relevant: [] }
+  impersonation:    { relevant: [number_verify, sim_swap, reachability, roaming, number_recycling] }
+
+# Chain grading: how many corroborating links a chain needs before it counts as
+# fully attested rather than partially attested. Per hypothesis, since a takeover
+# investigation should not earn ATTESTED_FULL off a single cheap check.
+grading:
+  # Two independent corroborating network facts is the bar for full attestation.
+  # One is a single point of evidence, however clean it looks.
+  default_min_links: 2
+  # Raise a hypothesis above the default to demand a deeper chain before it can
+  # earn ATTESTED_FULL. Note that the agent stops as soon as belief is decisive,
+  # so a bar the cheap checks cannot reach makes ATTESTED_FULL unreachable for
+  # that hypothesis by design — which is a policy choice, not a bug.
+  min_links: {}
+  # A link whose delta pushed belief toward fraud by at least this much counts
+  # as adverse, even when the overall verdict still clears.
+  adverse_delta: 0.4
+  # An ALLOW must rest on at least one fact gathered from the network.
+  #
+  # Local evidence is free, and free is exactly the problem: a Verified Caller
+  # announcement proves somebody held an institution's API key at that moment,
+  # not that the call in front of you is real. At -2.5 it alone clears the allow
+  # threshold from the reverse prior, and the agent — which stops the instant
+  # belief is decisive — was returning ALLOW on a one-link chain having made no
+  # network call at all. A stolen key would then have been an instant pass.
+  #
+  # The mirror of `corroboration` on the decline side: one link is not a chain,
+  # whichever way it points.
+  # Applies to all ALLOW candidates, including a clean prior with no links.
+  # If the budget cannot buy support, retain CHALLENGE.
+  min_network_links_for_allow: 1
+
+# Evidence gathering mode.
+#
+# sequential is the default and is the RIGHT default: cheapest-first-then-stop
+# is what makes the cost story true, and it is why a clean chain often costs one
+# call instead of six.
+#
+# parallel trades that away for latency. It fires the top N affordable actions
+# at once, so it pays for evidence the sequential path might never have needed —
+# which directly WEAKENS the T5 counterfactual, because evidence_cost goes up.
+# The speed story and the cost story pull against each other and there is no
+# setting that wins both. Opt in per request, never globally.
+gather:
+  mode: sequential
+  parallel_batch: 3
+
+# Caller velocity — the cross-subscriber signal.
+#
+# HONESTY: both numbers below are INVENTED. They were chosen to make the demo
+# legible, not derived from measured campaign traffic, and no public dataset was
+# consulted. Treat them as a tuning surface, not a finding, and say so if asked.
+# Set distinct_callees_flag to 0 to disable the check entirely.
+velocity:
+  window_seconds: 600
+  distinct_callees_flag: 25
+
+planner:
+  relevant_weight: 1.6      # boost for actions relevant to the current hypothesis
+  base_weight: 1.0
+  numberverify_weight: 2.2  # favour the cheap number-association check first
+
+# --- OTP counterfactual (T5) --------------------------------------------------
+# What the same decision would have cost as a single SMS OTP.
+#
+# HONESTY RULE: every figure below carries its source, and every figure is
+# tagged `list_price` or `estimate`. The API and the console label them the same
+# way. A figure a judge can check and finds invented is worse than no figure, so
+# anything unsourced is left null and reported as unpriced rather than guessed.
+pricing:
+  currency: USD
+
+  # Cost of one CAMARA call in real money.
+  #
+  # NULL ON PURPOSE. The `cost` numbers under `actions:` above are abstract
+  # budget units (latency + money + friction), not dollars, and no public list
+  # price exists for Nokia NaC CAMARA calls — it is contract pricing. Fill this
+  # from your own Nokia agreement and the money comparison appears; until then
+  # the API reports evidence_cost_usd as null and says why.
+  camara_call_usd: null
+
+  # Outbound SMS list price per message, USD. Twilio's published pricing, which
+  # is first-party, public, and checkable on stage.
+  #   basis: list_price
+  #   retrieved: 2026-08-29
+  sms_otp_list_price_usd:
+    JO: 0.4429        # https://www.twilio.com/en-us/sms/pricing/jo
+    AE: 0.1176        # https://www.twilio.com/en-us/sms/pricing/ae
+    SA: 0.1949        # https://www.twilio.com/en-us/sms/pricing/sa
+    default: 0.4429   # falls back to the JO figure; the response says so
+
+  # E.164 country prefix -> the key above. Longest prefix wins.
+  country_prefixes:
+    "962": JO
+    "971": AE
+    "966": SA
+
+  # How long an SMS OTP round trip takes end to end, in seconds.
+  #   basis: estimate
+  #   source: IDlayr, "Failure to deliver: Your mobile onboarding is costing you
+  #     users!" — "the average consumer receives an SMS within 5-10 seconds".
+  #     https://idlayr.com/blog/mobile-onboarding-is-costing-you-users/
+  #   NOTE: 10s delivery plus code entry. This is an estimate, not a measurement,
+  #   and it is the optimistic end of the cited range.
+  otp_completion_seconds: 25
+
+  # Share of users who abandon rather than complete an SMS OTP.
+  #   basis: estimate
+  #   source: IDlayr (as above) — "20-30% of users drop off during the mobile
+  #     onboarding process". 0.20 is the LOW end of that range, chosen
+  #     deliberately.
+  #   CONFLICT OF INTEREST, STATE IT IF ASKED: IDlayr (4Auth Limited) sells
+  #   Silent Network Authentication as a replacement for SMS OTP, so they have a
+  #   commercial interest in this number being large. Taking the bottom of their
+  #   range is the conservative reading, and no better-sourced public figure was
+  #   found.
+  otp_dropoff_rate: 0.20
+
+  # What ONE false decline costs the merchant, in USD.
+  #
+  # NULL ON PURPOSE, exactly like camara_call_usd above. This is the number that
+  # makes Act VI a business case rather than a technical curiosity — a rules
+  # engine declines a real customer on SIM_SWAPPED alone, and this says what
+  # that mistake is worth. But it is merchant-specific (basket value, margin,
+  # lifetime value, the support contact the customer then makes) and NO public
+  # figure exists that would not be invented. So it stays null and the API says
+  # why, rather than shipping a plausible-looking number a judge could ask the
+  # source of.
+  #
+  # Fill it from your own data and the cost of false declines appears beside the
+  # cost of the checks.
+  false_decline_cost_usd: null

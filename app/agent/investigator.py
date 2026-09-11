@@ -1,0 +1,1022 @@
+from __future__ import annotations
+
+import asyncio
+import logging
+import time
+
+from app.agent import hypothesis as hypo
+from app.agent.belief import Belief
+from app.agent.planner import Choice, GreedyPlanner, Observation, get_planner
+from app.chain.models import Chain, CorroborationGap, EvidenceLink, Verdict
+from app.config import settings
+from app.domain.enums import API_LABEL, Action, Decision, Hypothesis, Result
+from app.domain.schemas import VerificationRequest
+from app.events import emit
+from app.policy.engine import PolicyEngine, get_engine
+from app.presentation import present
+from app.providers import timing as timing_lib
+from app.providers.base import EvidenceProvider
+
+log = logging.getLogger(__name__)
+
+_UNRESOLVED_SIGNALS = {"CONSENT_REQUIRED", "PROVIDER_UNAVAILABLE", "EVIDENCE_UNAVAILABLE"}
+
+# The one enrichment priced in policy.yaml today.
+_SWAP_DATE = "swap_date"
+
+# Why an enrichment was skipped so a required check stays affordable. Read back
+# after the loop by `_settle_deferred_enrichment`, which is what makes this a
+# deferral rather than a silent loss of the date.
+_DEFERRED_FOR_CORROBORATION = "deferred: budget reserved for a corroborating check"
+
+
+class Investigator:
+    """The orchestrator. Forms a hypothesis, gathers the cheapest useful evidence,
+    escalates only when suspicion warrants, and issues a verdict + chain."""
+
+    def __init__(
+        self,
+        engine: PolicyEngine,
+        provider: EvidenceProvider,
+        *,
+        planner=None,
+        event_sink=None,
+    ):
+        self.engine = engine
+        self.provider = provider
+        self.planner = planner or get_planner(engine)
+        # Defaults to the shared SSE bus; a lab/replay caller can inject its own
+        # per-run recording sink instead without touching that bus, so a demo
+        # run never leaks into (or is throttled by) another owner's stream.
+        self._emit = event_sink or emit
+        # Choreographed steps NEVER go through self.planner.
+        #
+        # This is the fourth time the same trap has been walked into. A rule the
+        # investigator must enforce cannot be expressed as a question to a
+        # planner, because LLMPlanner.next_best() is self.choose().action — it
+        # asks the model, and the model's own prompt tells it to STOP once
+        # belief has moved decisively. Every such rule then holds under greedy
+        # (which the suite pins) and silently fails under llm (which the console
+        # runs). cheapest_stepup already routes to greedy for this reason.
+        self._choreography = GreedyPlanner(engine)
+
+    async def investigate(
+        self,
+        request: VerificationRequest,
+        hypothesis_override: Hypothesis | None = None,
+        prior_override: float | None = None,
+        run_id: str | None = None,
+        local_evidence: list[EvidenceLink] | None = None,
+        parallel: bool | None = None,
+        required_action: Action | None = None,
+        available_actions: set[Action] | None = None,
+    ) -> Verdict:
+        started = time.perf_counter()
+        ctx = request.context
+        hypothesis = hypothesis_override or hypo.form(ctx)
+        if prior_override is not None:
+            prior = prior_override
+        elif hypothesis == Hypothesis.IMPERSONATION:
+            prior = self.engine.reverse_prior_logodds()
+        else:
+            prior = self.engine.prior_logodds(ctx)
+        belief = Belief(logodds=prior)
+        budget_left = float(self.engine.budget_for(ctx))
+        evidence_cost = 0.0
+        unresolved_signals: set[str] = set()
+        chain = Chain(hypothesis=hypothesis.value)
+        used: set = set()
+        # Checks this request cannot buy at all, for a reason that has nothing
+        # to do with the budget. Unioned into `used` at every selection site so
+        # no planner, choreography or step-up can pick one — see
+        # `_unavailable_actions`.
+        blocked = self._unavailable_actions(request)
+        if available_actions is not None:
+            # A bounded demonstration buys a named subset of the checks. Told to
+            # the planner as availability, exactly like a missing precondition,
+            # rather than letting it select a check and discovering afterwards
+            # that the run may not buy it: the second shape spends budget to
+            # learn something the caller already knew, and writes a hole into
+            # the chain that nothing outside this service put there.
+            blocked = blocked | (set(Action) - set(available_actions))
+        # Overwritten by whichever exit the loop actually takes. The default is
+        # the `while budget_left > 0` condition itself, which is the one exit
+        # with no statement of its own.
+        stopping_reason = "budget_exhausted"
+
+        await self._emit(
+            self._with_run_id(
+                {
+                    "type": "start",
+                    "chain_id": chain.id,
+                    "hypothesis": hypothesis.value,
+                    "prior_p_fraud": round(belief.p_fraud, 3),
+                },
+                run_id,
+            )
+        )
+
+        observations: list[Observation] = []
+        planner_sources: set[str] = set()
+        choreographed = False
+
+        # --- local evidence first: free, and already in hand ---
+        # The registry and any Verified Caller pre-announcement are answered from
+        # this service's own state, so they cost nothing and are applied before
+        # the budget is opened. They enter the chain as real links — a verdict
+        # that turned on "the institution announced this call" must be able to
+        # show that, and it must be inside the signed payload like every other
+        # link, not a note beside it.
+        for link in local_evidence or []:
+            link.step = chain.next_step()
+            link.delta_logodds = self.engine.signal_delta(link.signal)
+            chain.add(link)
+            belief.apply(link.detail, link.delta_logodds)
+            observations.append(
+                Observation(
+                    action=link.action, signal=link.signal, delta_logodds=link.delta_logodds
+                )
+            )
+            await self._emit_link(link, belief, run_id)
+
+        # --- continuity before reused trust -------------------------------
+        #
+        # A merchant that sends `last_verified_at` is telling us it already
+        # trusts this number from an earlier verification. Before that trust is
+        # reused, ask whether the subscriber behind the number has changed —
+        # otherwise an established-customer path hands a recycled number the
+        # standing of the person who used to hold it.
+        #
+        # Choreographed, not planned: the merchant's own date is what makes the
+        # question askable, so there is nothing for a planner to decide. Same
+        # budget and accounting as every other network call.
+        if ctx.last_verified_at is not None:
+            recycling_cost = self.engine.action_cost(Action.NUMBER_RECYCLING)
+            if recycling_cost <= budget_left:
+                continuity = Choice(
+                    Action.NUMBER_RECYCLING,
+                    "policy: check subscriber continuity before reusing stored trust",
+                    "policy",
+                )
+                await self._emit(
+                    self._with_run_id(
+                        self._selection_event(
+                            continuity, hypothesis, budget_left, phase="continuity"
+                        ),
+                        run_id,
+                    )
+                )
+                link = await self._call(Action.NUMBER_RECYCLING, request, chain)
+                belief.apply(link.detail, link.delta_logodds)
+                evidence_cost += recycling_cost
+                budget_left -= recycling_cost
+                if link.signal in _UNRESOLVED_SIGNALS:
+                    unresolved_signals.add(link.signal)
+                used.add(Action.NUMBER_RECYCLING)
+                observations.append(
+                    Observation(
+                        action=Action.NUMBER_RECYCLING,
+                        signal=link.signal,
+                        delta_logodds=link.delta_logodds,
+                    )
+                )
+                await self._emit_link(link, belief, run_id)
+                choreographed = True
+
+        # A caller may arrive with authorization for one specific provider
+        # action already granted. That authorization is part of the request's
+        # contract, not a suggestion to the planner: asking the model whether to
+        # use it lets STOP produce a completed consent with no Number
+        # Verification evidence. Run it once, within the same policy budget and
+        # accounting as every other network call, before either planner mode.
+        if required_action is not None:
+            action_cost = self.engine.action_cost(required_action)
+            if action_cost > budget_left:
+                raise ValueError("required evidence action exceeds the policy budget")
+            required = Choice(
+                required_action,
+                "policy: use the provider authorization granted for this request",
+                "policy",
+            )
+            await self._emit(
+                self._with_run_id(
+                    self._selection_event(
+                        required,
+                        hypothesis,
+                        budget_left,
+                        phase="authorization",
+                    ),
+                    run_id,
+                )
+            )
+            link = await self._call(required_action, request, chain)
+            belief.apply(link.detail, link.delta_logodds)
+            evidence_cost += action_cost
+            budget_left -= action_cost
+            spent = await self._enrich_timing(
+                link,
+                request,
+                budget_left - self._corroboration_reserve(link, chain, used, blocked, budget_left),
+                run_id,
+            )
+            evidence_cost += spent
+            budget_left -= spent
+            if link.signal in _UNRESOLVED_SIGNALS:
+                unresolved_signals.add(link.signal)
+            used.add(required_action)
+            observations.append(
+                Observation(
+                    action=required_action,
+                    signal=link.signal,
+                    delta_logodds=link.delta_logodds,
+                )
+            )
+            await self._emit_link(link, belief, run_id)
+            choreographed = True
+
+        # --- optional parallel batch, for latency-critical callers only ---
+        # Fires the top N affordable actions at once instead of one at a time.
+        # It buys wall-clock at the cost of the thing that makes the cost story
+        # true: sequential stops as soon as belief is decisive, so it often pays
+        # for one call where this pays for three. evidence_cost rises and the T5
+        # counterfactual gets weaker. Off unless a caller asks.
+        use_parallel = self.engine.gather_mode() == "parallel" if parallel is None else parallel
+        if use_parallel and not self.engine.is_decisive(belief.p_fraud):
+            before = len(chain.links)
+            budget_left, evidence_cost = await self._gather_parallel(
+                hypothesis,
+                request,
+                chain,
+                belief,
+                used,
+                observations,
+                unresolved_signals,
+                budget_left,
+                evidence_cost,
+                run_id,
+                planner_sources,
+                blocked,
+            )
+            choreographed = choreographed or len(chain.links) > before
+
+        # --- gather loop: cheapest evidence first, stop when decisive ---
+        # `observations` is what the planner is allowed to see. It carries the
+        # normalized signal name and the delta, never link.detail — see the
+        # prompt-injection boundary in planner.py.
+        while budget_left > 0:
+            if self.engine.is_decisive(belief.p_fraud):
+                # Belief is decisive — but a single adverse signal is not allowed
+                # to carry a DECLINE on its own while policy still names a check
+                # that could exonerate. Declining on SIM_SWAPPED alone is exactly
+                # the false decline this agent exists to avoid, and whether it
+                # happened used to depend on the order the planner picked in.
+                # Choreographed, not planned: `corroboration` in policy.yaml.
+                action = self._next_corroboration(
+                    observations, used | blocked, belief, budget_left
+                )
+                rationale = "policy: corroborate before this signal alone can decline"
+                if action is None:
+                    # Clean — but possibly on local evidence alone. An
+                    # announcement is somebody proving they held a key, not
+                    # proof that this call is real.
+                    #
+                    # Asked rather than choreographed, this rule would not hold:
+                    # the planner is free to STOP on a clean belief, and the LLM
+                    # planner does. It would then survive the suite (which runs
+                    # greedy, which never stops) and fail in the console (which
+                    # runs llm) — the exact shape of the Act VI regression.
+                    if not self._needs_a_network_fact(belief, chain, hypothesis):
+                        stopping_reason = "decisive"
+                        break
+                    action = self._choreography.next_best(hypothesis, used | blocked, budget_left)
+                    if action is None:
+                        stopping_reason = "nothing_affordable"
+                        break  # nothing affordable; the local chain stands
+                    rationale = "policy: an allow must rest on a network fact"
+                    phase = "attestation"
+                else:
+                    phase = "corroboration"
+                choice = Choice(action, rationale, "policy")
+                # Tracked separately from planner_sources: "policy" is not a
+                # planner, and the label is a signed field whose vocabulary is
+                # llm / greedy / llm+greedy. What was wrong was only the empty
+                # case — a run reporting "none" beside a chain of real network
+                # calls reads as "nothing was decided".
+                choreographed = True
+            else:
+                phase = "investigation"
+                # Model selection can make a synchronous network request. Keep
+                # it off the event loop so a slow model does not stall other
+                # investigations, health checks or SSE delivery. to_thread
+                # preserves the request's ContextVars (including its model key)
+                # and uses the event loop's bounded worker pool.
+                choice = await asyncio.to_thread(
+                    self.planner.choose,
+                    hypothesis, used | blocked, budget_left, belief.p_fraud, observations,
+                )
+                planner_sources.add(choice.source)
+            if choice.stops:
+                # The agent decided it has enough. A first-class outcome.
+                await self._emit(
+                    self._with_run_id(
+                        {
+                            "type": "decision",
+                            "phase": "investigation",
+                            "action": "stop",
+                            "api": "—",
+                            "hypothesis": hypothesis.value,
+                            "rationale": choice.rationale,
+                            "planner": choice.source,
+                            "cost": 0.0,
+                            "budget_left": round(budget_left, 3),
+                        },
+                        run_id,
+                    )
+                )
+                stopping_reason = "planner_stop"
+                break
+            action = choice.action
+            await self._emit(
+                self._with_run_id(
+                    self._selection_event(choice, hypothesis, budget_left, phase=phase),
+                    run_id,
+                )
+            )
+            link = await self._call(action, request, chain)
+            belief.apply(link.detail, link.delta_logodds)
+            action_cost = self.engine.action_cost(action)
+            evidence_cost += action_cost
+            budget_left -= action_cost
+            # The date is explanatory; the corroborating check is what the
+            # decision needs. Where paying for the first would put the second
+            # out of reach, the date waits — and is settled below if budget
+            # survives the check, rather than quietly lost.
+            spent = await self._enrich_timing(
+                link,
+                request,
+                budget_left - self._corroboration_reserve(link, chain, used, blocked, budget_left),
+                run_id,
+            )
+            evidence_cost += spent
+            budget_left -= spent
+            if link.signal in _UNRESOLVED_SIGNALS:
+                unresolved_signals.add(link.signal)
+            used.add(action)
+            observations.append(
+                Observation(action=action, signal=link.signal, delta_logodds=link.delta_logodds)
+            )
+            await self._emit_link(link, belief, run_id)
+
+        decision = self.engine.decide(belief.p_fraud)
+
+        # --- CHALLENGE: choreograph the single cheapest doubt-resolving step ---
+        if decision == Decision.CHALLENGE:
+            action = self.planner.cheapest_stepup(used | blocked, budget_left)
+            if action is not None:
+                # The step-up is a policy choreography, not a planner decision:
+                # it is the cheapest doubt-resolving move, chosen deterministically.
+                stepup = Choice(action, "cheapest step that could resolve the doubt", "policy")
+                await self._emit(
+                    self._with_run_id(
+                        self._selection_event(stepup, hypothesis, budget_left, phase="step_up"),
+                        run_id,
+                    )
+                )
+                link = await self._call(action, request, chain)
+                belief.apply(link.detail, link.delta_logodds)
+                step_up_cost = self.engine.action_cost(action)
+                evidence_cost += step_up_cost
+                # Spent, not merely costed. `budget_left` was left untouched
+                # here, so the reported remainder counted money the step-up had
+                # already used, and the reserve below would have been computed
+                # against a budget that no longer existed.
+                budget_left -= step_up_cost
+                spent = await self._enrich_timing(
+                    link,
+                    request,
+                    budget_left
+                    - self._corroboration_reserve(link, chain, used, blocked, budget_left),
+                    run_id,
+                )
+                evidence_cost += spent
+                budget_left -= spent
+                if link.signal in _UNRESOLVED_SIGNALS:
+                    unresolved_signals.add(link.signal)
+                used.add(action)
+                await self._emit_link(link, belief, run_id)
+
+        # Every date that stood aside for a required check gets its answer now,
+        # if the budget survived that check. Without this the reserve would not
+        # be a deferral at all — it would silently drop the explanation.
+        spent = await self._settle_deferred_enrichment(chain, request, budget_left, run_id)
+        evidence_cost += spent
+        budget_left -= spent
+
+        decision = self.engine.decide(belief.p_fraud)
+
+        # --- the final decision gate --------------------------------------
+        #
+        # One placement, after every gathering path has finished: the sequential
+        # loop, an early STOP, an exhausted budget, the parallel batch and the
+        # step-up all arrive here. It used to live inside `while budget_left > 0`
+        # as part of choosing the next action, so a run that never re-entered
+        # that loop was never gated at all.
+        gaps = self._corroboration_gaps(chain, used, blocked, budget_left)
+        decision, uncorroborated = self._apply_corroboration_gate(decision, chain, gaps)
+
+        missing_support = self._needs_a_network_fact(belief, chain, hypothesis)
+        evidence_unresolved = bool(unresolved_signals) or missing_support
+        if decision == Decision.ALLOW and evidence_unresolved:
+            decision = Decision.CHALLENGE
+        # A recycled number is not a score adjustment to be outweighed. The
+        # merchant asked this question because it was about to rely on trust it
+        # stored earlier, and the operator answered that the subscriber behind
+        # the number changed — so that stored trust is about somebody else.
+        # Fresh verification, whatever the surrounding evidence says.
+        #
+        # Deliberately not in `_UNRESOLVED_SIGNALS`: this is a definite answer,
+        # not a hole. It blocks an ALLOW without pretending the check failed.
+        if decision == Decision.ALLOW and any(
+            link.signal == "NUMBER_RECYCLED" for link in chain.links
+        ):
+            decision = Decision.CHALLENGE
+
+        grade = self.engine.grade(
+            p_fraud=belief.p_fraud,
+            unresolved=evidence_unresolved,
+            link_deltas=[link.delta_logodds for link in chain.links],
+            hypothesis=hypothesis,
+            corroboration_unmet=bool(uncorroborated),
+        )
+
+        verdict = Verdict(
+            decision=decision,
+            prior_logodds=round(prior, 6),
+            planner=self._planner_label(planner_sources, choreographed),
+            policy_snapshot={
+                "allow_below": self.engine.allow_below,
+                "decline_above": self.engine.decline_above,
+            },
+            chain_grade=grade,
+            confidence=round(belief.p_fraud, 3),
+            hypothesis=hypothesis.value,
+            # One definition of "material", read from policy rather than
+            # duplicated as a literal in two files that could drift apart.
+            reason=belief.explain(
+                decision.value,
+                unresolved=evidence_unresolved,
+                material=self.engine.adverse_delta(),
+                uncorroborated=uncorroborated,
+            ),
+            chain_id=chain.id,
+            chain=chain.links,
+            evidence_cost=round(evidence_cost, 2),
+            # Wall clock for the whole investigation, NOT the sum of the link
+            # latencies. The sum was a number parallel mode could never move:
+            # three 300ms calls fired at once still summed to 900, so the mode
+            # whose entire purpose is latency reported no improvement, and the
+            # T5 counterfactual published that sum as `basis="measured"` beside
+            # an OTP round trip in seconds. This is the time the customer
+            # actually waited, which is the only number that comparison means.
+            latency_ms=int((time.perf_counter() - started) * 1000),
+            provider_sources=sorted({link.source for link in chain.links}),
+            unmet_corroboration=gaps,
+            budget_remaining=round(max(budget_left, 0.0), 2),
+            operations=self._operation_count(chain),
+            stopping_reason=stopping_reason,
+        )
+        await self._emit(
+            self._with_run_id(
+                {
+                    "type": "verdict",
+                    "chain_id": chain.id,
+                    "decision": decision.value,
+                    "planner": verdict.planner,
+                    "chain_grade": grade.value,
+                    "confidence": verdict.confidence,
+                    "reason": verdict.reason,
+                    "evidence_steps": len(verdict.chain),
+                    "evidence_cost": verdict.evidence_cost,
+                    "latency_ms": verdict.latency_ms,
+                    "budget_remaining": verdict.budget_remaining,
+                    "operations": verdict.operations,
+                    "stopping_reason": verdict.stopping_reason,
+                    "uncorroborated": uncorroborated,
+                    # Same projection HTTP responses carry (P2), computed from
+                    # this same already-finalized verdict object -- not a
+                    # second decision, just the plain-language view of the one
+                    # already made above. Emitted here, before the caller has
+                    # persisted anything, is why judge.html must not treat the
+                    # SSE 'verdict' event alone as proof of a saved receipt.
+                    "presentation": present(verdict).model_dump(mode="json"),
+                },
+                run_id,
+            )
+        )
+        return verdict
+
+    async def _gather_parallel(
+        self,
+        hypothesis,
+        request,
+        chain,
+        belief,
+        used,
+        observations,
+        unresolved_signals,
+        budget_left,
+        evidence_cost,
+        run_id,
+        planner_sources,
+        blocked=frozenset(),
+    ):
+        """Fire a batch of affordable actions concurrently.
+
+        Chosen with the deterministic planner rather than the model — really
+        deterministic, via self._choreography: a batch is a spend decision made
+        before any of its answers are known, so there is nothing for a reasoning
+        planner to reason about, and asking one meant the model could STOP and
+        silently collapse parallel mode back to sequential. Belief is applied after
+        the batch returns, in a fixed order, so two runs over the same evidence
+        produce the same number regardless of which call finished first.
+        """
+        batch: list = []
+        remaining = budget_left
+        for _ in range(self.engine.parallel_batch()):
+            action = self._choreography.next_best(
+                hypothesis, used | set(batch) | set(blocked), remaining
+            )
+            if action is None:
+                break
+            batch.append(action)
+            remaining -= self.engine.action_cost(action)
+        if not batch:
+            return budget_left, evidence_cost
+
+        for action in batch:
+            choice = Choice(action, "policy: parallel batch", "policy")
+            await self._emit(
+                self._with_run_id(
+                    self._selection_event(choice, hypothesis, budget_left, phase="parallel"),
+                    run_id,
+                )
+            )
+
+        links = await asyncio.gather(*(self._call(action, request, chain) for action in batch))
+        # Sorted by step so the belief update order is the chain order, not the
+        # order the network happened to answer in.
+        for link in sorted(links, key=lambda item: item.step):
+            belief.apply(link.detail, link.delta_logodds)
+            cost = self.engine.action_cost(link.action)
+            evidence_cost += cost
+            budget_left -= cost
+            spent = await self._enrich_timing(
+                link,
+                request,
+                budget_left - self._corroboration_reserve(link, chain, used, blocked, budget_left),
+                run_id,
+            )
+            evidence_cost += spent
+            budget_left -= spent
+            if link.signal in _UNRESOLVED_SIGNALS:
+                unresolved_signals.add(link.signal)
+            used.add(link.action)
+            observations.append(
+                Observation(
+                    action=link.action, signal=link.signal, delta_logodds=link.delta_logodds
+                )
+            )
+            await self._emit_link(link, belief, run_id)
+        return budget_left, evidence_cost
+
+    def _needs_a_network_fact(
+        self, belief: Belief, chain: Chain, hypothesis: Hypothesis | None = None
+    ) -> bool:
+        """Is this a clean verdict resting on local evidence alone — or on local
+        evidence plus a network fact that contradicts it?
+
+        Only the ALLOW side. A decline already has its own gate (corroboration),
+        and a chain in the uncertain band has not stopped anyway.
+        """
+        if belief.p_fraud > self.engine.allow_below:
+            return False
+        # A clean prior is not evidence either. Apply the same minimum to
+        # empty chains and local-only chains; otherwise low-risk context can
+        # bypass the very provider check the ALLOW claims to rest on.
+        # Counted SUPPORTING, not merely present. A network link that came back
+        # adverse is not the fact the gate is asking for: an announcement worth
+        # -2.5 outweighs a NUMBER_MISMATCH worth +1.5, so a chain of
+        # "announced, and the network says the call is not coming from that
+        # line" cleared the allow threshold and stopped — the announcement had
+        # bought a pass past the very evidence that contradicts it.
+        #
+        # It held under greedy, which never stops and would have gone on to the
+        # swap and the bot pattern, and failed under any planner that stops when
+        # belief is decisive — which is what the LLM planner's prompt tells it to
+        # do. The same trap as C1, a fifth time.
+        # Strictly negative, not merely "not adverse". A network link worth 0.0
+        # is the could-not-check family — LOCATION_UNKNOWN, LOCATION_PARTIAL,
+        # and the mock's own catch-all — and a link that moved belief by nothing
+        # attests nothing. Counting it would leave the same hole one notch
+        # weaker: announcement (-2.5) plus one zero-information network call,
+        # gate satisfied, ALLOW. Supporting means it moved belief TOWARD the
+        # customer.
+        #
+        # And the supporting fact has to bear on what was suspected. A day-zero
+        # signup is investigated as a bot farm; Number Verification is the
+        # cheapest check priced, so it went first, came back NUMBER_MATCH, and
+        # satisfied this gate on its own. But a match establishes that the
+        # handset presenting the number holds that SIM, and a bot farm runs
+        # real SIMs in real handsets — so the chain cleared on a check that
+        # could not distinguish the thing it was looking for. The same hole
+        # sits under account_takeover: a swapped SIM still number-matches.
+        # Every number in those chains was right; the sentence a merchant
+        # reads was not, and the sentence is the product.
+        #
+        # Only applied where the hypothesis names its checks. `legit` and
+        # `legit_thin_file` list none, and an empty list is an answer — no
+        # hypothesis-driven check — not a wildcard; filtering on their behalf
+        # would make the gate unsatisfiable and loop until the budget ran out.
+        relevant = self.engine.relevant_actions(hypothesis) if hypothesis else set()
+        supporting = sum(
+            1
+            for link in chain.links
+            if link.source != "local"
+            and link.delta_logodds < 0
+            and (not relevant or link.action.value in relevant)
+        )
+        return supporting < self.engine.min_network_links_for_allow()
+
+    @staticmethod
+    def _unavailable_actions(request: VerificationRequest) -> set:
+        """Checks this request cannot buy, for a reason that is not the budget.
+
+        Location Verification answers a claim. With no `claimed_location` there
+        is no claim to answer, and both providers already refuse to call the
+        network for one (`tests/test_provider_preconditions.py`) — but the
+        investigator still selected it, charged its full cost, and wrote an
+        EVIDENCE_UNAVAILABLE link into the chain. That is budget spent on an
+        operation that never left the process, and a hole in the chain that
+        nothing outside this service put there.
+
+        Returned as a set to union into `used` at every selection site, so a
+        planner is never offered a choice that does not exist.
+        """
+        blocked = set()
+        if request.context.claimed_location is None:
+            blocked.add(Action.LOCATION_VERIFY)
+        return blocked
+
+    def _resolved_corroborators(self, chain: Chain, required) -> list[str]:
+        """Which of `required` actually answered.
+
+        PASS or FLAG only. An INFO result is the network saying it could not
+        tell us — LOCATION_UNKNOWN, PROVIDER_UNAVAILABLE, a withheld consent —
+        and a check that could not tell us anything corroborates nothing. This
+        is the distinction the old gate missed: it asked whether a corroborating
+        action was still *outstanding*, so an attempted check counted as
+        satisfied however empty its answer was.
+        """
+        answered = {
+            link.action for link in chain.links if link.result in (Result.PASS, Result.FLAG)
+        }
+        return [action.value for action in required if action in answered]
+
+    def _corroboration_gaps(
+        self, chain: Chain, used: set, blocked, budget_left: float
+    ) -> list[CorroborationGap]:
+        """Every adverse signal whose policy-required corroboration is unmet.
+
+        Computed from the finished chain rather than from the planner's state,
+        so it is the same answer on every exit path.
+        """
+        minimum = self.engine.corroboration_min_resolved()
+        gaps: list[CorroborationGap] = []
+        seen: set[str] = set()
+        for link in chain.links:
+            if link.delta_logodds < self.engine.adverse_delta() or link.signal in seen:
+                continue
+            required = self.engine.corroboration_for(link.signal)
+            if not required:
+                # No corroboration is required for this signal, so it is
+                # independent adverse evidence and gates nothing.
+                continue
+            seen.add(link.signal)
+            resolved = self._resolved_corroborators(chain, required)
+            if len(resolved) >= minimum:
+                continue
+            attempted = {item.action for item in chain.links}
+            outstanding = [action for action in required if action not in attempted]
+            if len(required) > len(outstanding):
+                # Bought, and it came back "we could not check".
+                reason = "unresolved"
+            elif outstanding and all(action in blocked for action in outstanding):
+                reason = "unavailable"
+            elif outstanding and all(
+                action in blocked or self.engine.action_cost(action) > budget_left
+                for action in outstanding
+            ):
+                reason = "budget"
+            else:
+                reason = "not_attempted"
+            gaps.append(
+                CorroborationGap(
+                    signal=link.signal,
+                    required=[action.value for action in required],
+                    resolved=resolved,
+                    reason=reason,
+                )
+            )
+        return gaps
+
+    def _apply_corroboration_gate(
+        self, decision: Decision, chain: Chain, gaps: list[CorroborationGap]
+    ) -> tuple[Decision, list[str]]:
+        """A SIM change alone may not decline while the checks that could clear
+        it are missing, unavailable or unaffordable.
+
+        The downgrade is deliberately narrow. It applies only when EVERY
+        materially adverse link in the chain is one of the gated signals: a
+        second adverse finding that policy does not gate — a device swap, a
+        location mismatch, a recycled number — is independent adverse evidence,
+        and the decline stands on it. A corroborating check that came back
+        adverse is likewise a resolved answer, so it satisfies the requirement
+        rather than blocking the decline it supports.
+        """
+        if decision != Decision.DECLINE or not gaps:
+            return decision, []
+        gated = {gap.signal for gap in gaps}
+        adverse = [
+            link.signal
+            for link in chain.links
+            if link.delta_logodds >= self.engine.adverse_delta()
+        ]
+        if not adverse or any(signal not in gated for signal in adverse):
+            return decision, []
+        return Decision.CHALLENGE, sorted(gated)
+
+    def _corroboration_reserve(
+        self, link: EvidenceLink, chain: Chain, used: set, blocked, budget_left: float
+    ) -> float:
+        """What to hold back from this link's optional date call so the check
+        that the decision actually needs stays affordable.
+
+        Zero unless this exact link carries a signal whose corroboration is
+        still outstanding — the common case pays nothing for this rule.
+        """
+        required = self.engine.corroboration_for(link.signal)
+        if not required:
+            return 0.0
+        if len(self._resolved_corroborators(chain, required)) >= (
+            self.engine.corroboration_min_resolved()
+        ):
+            return 0.0
+        costs = [
+            self.engine.action_cost(action)
+            for action in required
+            if action not in used
+            and action not in blocked
+            and self.engine.action_cost(action) <= budget_left
+        ]
+        return min(costs) if costs else 0.0
+
+    async def _settle_deferred_enrichment(
+        self, chain: Chain, request: VerificationRequest, budget_left: float, run_id: str | None
+    ) -> float:
+        """Retry the dates that stood aside for a required check.
+
+        Only those: a date skipped because the budget genuinely could not cover
+        it stays skipped, and says so.
+        """
+        spent = 0.0
+        for link in chain.links:
+            timing = link.timing
+            if timing is None or timing.reason != _DEFERRED_FOR_CORROBORATION:
+                continue
+            paid = await self._enrich_timing(link, request, budget_left - spent, run_id)
+            spent += paid
+        return spent
+
+    @staticmethod
+    def _operation_count(chain: Chain) -> int:
+        """Billable provider operations attempted, including failed ones.
+
+        Not the link count. A swap check and its separate date call are two
+        operations against one link, and an operator that was asked and
+        answered with an error was still asked. `unsupported` and
+        `not_attempted` mean no request left the process, so they are not
+        counted — the same rule `_enrich_timing` charges by.
+        """
+        free = {"unsupported", "not_attempted"}
+        return len(chain.links) + sum(
+            1 for link in chain.links if link.timing and link.timing.availability not in free
+        )
+
+    def _next_corroboration(
+        self,
+        observations: list[Observation],
+        used: set,
+        belief: Belief,
+        budget_left: float,
+    ):
+        """The next outstanding exculpatory check, or None.
+
+        Only ever gates the DECLINE side: a chain that has cleared stops as soon
+        as it clears, and pays for nothing further. Affordability is checked per
+        action, so a budget that cannot cover the corroboration lets the decline
+        stand rather than looping.
+        """
+        if belief.p_fraud < self.engine.decline_above:
+            return None
+        for obs in observations:
+            for action in self.engine.corroboration_for(obs.signal):
+                if action not in used and self.engine.action_cost(action) <= budget_left:
+                    return action
+        return None
+
+    async def _call(self, action, request: VerificationRequest, chain: Chain) -> EvidenceLink:
+        t0 = time.perf_counter()
+        link = await self.provider.gather(action, request)
+        if not link.latency_ms:
+            link.latency_ms = int((time.perf_counter() - t0) * 1000)
+        link.step = chain.next_step()
+        link.delta_logodds = self.engine.signal_delta(link.signal)
+        chain.add(link)
+        return link
+
+    async def _enrich_timing(
+        self,
+        link: EvidenceLink,
+        request: VerificationRequest,
+        budget_left: float,
+        run_id: str | None,
+    ) -> float:
+        """Attach the operator's date to a swap link. Returns what it cost.
+
+        Kept out of `_call` on purpose. This is a second billable operation, so
+        it is decided where the budget is decided — and a link that could not
+        afford it still says so, rather than looking like a provider that had
+        no date to give.
+
+        It never touches `result`, `signal` or `delta_logodds`. The score came
+        from the boolean; a date that arrives afterwards explains the link, it
+        does not re-decide it.
+        """
+        if link.action not in timing_lib.TIMED_ACTIONS:
+            return 0.0
+        if not self.engine.enrichment_enabled(_SWAP_DATE):
+            return 0.0
+        cost = self.engine.enrichment_cost(_SWAP_DATE)
+        if cost > budget_left:
+            # `budget_left` here is already net of anything reserved for a
+            # corroborating check, so the two cases are told apart by which
+            # reason is recorded — and only the deferral is retried later.
+            link.timing = timing_lib.not_attempted(
+                link.action,
+                _DEFERRED_FOR_CORROBORATION
+                if self.engine.corroboration_for(link.signal)
+                else "budget did not cover the extra date call",
+            )
+            await self._emit_timing(link, 0.0, run_id)
+            return 0.0
+
+        enrich = getattr(self.provider, "enrich_timing", None)
+        if enrich is None:
+            # A provider with no date operation costs nothing: no call was made.
+            link.timing = timing_lib.unsupported(link.action)
+            await self._emit_timing(link, 0.0, run_id)
+            return 0.0
+        try:
+            result = await enrich(link.action, request, link.signal)
+        except Exception:
+            log.warning("swap date enrichment failed for %s", link.action, exc_info=True)
+            result = timing_lib.failure(link.action, "invalid", "date request failed")
+        link.timing = timing_lib.with_window_agreement(
+            result, link.signal, link.max_age_hours
+        )
+        # Charged whenever the call was actually attempted, including when it
+        # failed: the operator was asked either way. `unsupported` means no call
+        # left the process, so it is not charged.
+        spent = 0.0 if link.timing.availability == "unsupported" else cost
+        await self._emit_timing(link, spent, run_id)
+        return spent
+
+    async def _emit_timing(self, link: EvidenceLink, cost: float, run_id: str | None) -> None:
+        """A separate trace row, because it was a separate call.
+
+        Labelled `enrichment`, never a planner selection: nothing chose this.
+        """
+        timing = link.timing
+        if timing is None:
+            return
+        await self._emit(
+            self._with_run_id(
+                {
+                    "type": "enrichment",
+                    "step": link.step,
+                    "api": link.api,
+                    "operation": timing.source_operation,
+                    "availability": timing.availability,
+                    "provider_time": (
+                        timing.provider_time.isoformat() if timing.provider_time else None
+                    ),
+                    "age_seconds": timing.age_seconds_at_decision,
+                    "monitored_period_days": timing.monitored_period_days,
+                    "disagrees_with_window": timing.disagrees_with_window,
+                    "reason": timing.reason,
+                    "cost": cost,
+                },
+                run_id,
+            )
+        )
+
+    async def _emit_link(self, link: EvidenceLink, belief: Belief, run_id: str | None) -> None:
+        await self._emit(
+            self._with_run_id(
+                {
+                    "type": "evidence",
+                    "step": link.step,
+                    "api": link.api,
+                    "result": link.result.value,
+                    "signal": link.signal,
+                    "detail": link.detail,
+                    "source": link.source,
+                    "max_age_hours": link.max_age_hours,
+                    "p_fraud": round(belief.p_fraud, 3),
+                },
+                run_id,
+            )
+        )
+
+    @staticmethod
+    def _planner_label(sources: set[str], choreographed: bool = False) -> str:
+        """Which planner produced this run.
+
+        "llm+greedy" when the run fell back partway through — the honest label,
+        and the one that makes the fallback visible rather than something the
+        badge quietly rounds off.
+
+        "policy" when no planner was consulted but policy choreographed real
+        calls: corroboration, the attestation gate, or a parallel batch. That
+        case used to report "none", which reads as "nothing was decided" beside
+        a chain of network evidence.
+        """
+        if not sources:
+            return "policy" if choreographed else "none"
+        if sources == {"llm"}:
+            return "llm"
+        if sources == {"greedy"}:
+            return "greedy"
+        return "+".join(sorted(sources))
+
+    @staticmethod
+    def _with_run_id(event: dict, run_id: str | None) -> dict:
+        if run_id:
+            event["run_id"] = run_id
+        return event
+
+    def _selection_event(
+        self, choice: Choice, hypothesis: Hypothesis, budget_left: float, phase: str
+    ) -> dict:
+        """The event the console renders as the agent's reasoning.
+
+        The rationale is whoever decided's own words, verbatim. This used to be an
+        if/elif template that produced a sentence no component had actually
+        reasoned — a heuristic dressed as reasoning, which is worse than a
+        heuristic. `planner` says who decided, so greedy is never mistaken for the
+        model, and the console badges it.
+        """
+        action = choice.action
+        return {
+            "type": "decision",
+            "phase": phase,
+            "action": action.value,
+            "api": API_LABEL[action],
+            "hypothesis": hypothesis.value,
+            "rationale": choice.rationale,
+            "planner": choice.source,
+            "cost": self.engine.action_cost(action),
+            "score": round(self.engine.score(action, hypothesis), 3),
+            "budget_left": round(budget_left, 3),
+        }
+
+
+def build_investigator(
+    provider: EvidenceProvider,
+    *,
+    engine: PolicyEngine | None = None,
+    planner=None,
+    event_sink=None,
+) -> Investigator:
+    engine = engine or get_engine(str(settings.policy_path))
+    return Investigator(engine, provider, planner=planner, event_sink=event_sink)
+
+
+def build_engine_for_pricing() -> PolicyEngine:
+    """The same cached policy the agent ran on, for the T5 counterfactual.
+
+    Read at response time rather than stored on the verdict: the counterfactual
+    needs the subject's country, and the signed payload deliberately contains no
+    phone number (S5).
+    """
+    return get_engine(str(settings.policy_path))

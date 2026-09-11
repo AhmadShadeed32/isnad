@@ -1,0 +1,40 @@
+# Runtime dependencies (pip install -r requirements.txt)
+#
+# Lower bounds here exclude the advisories in S8; the *exact* versions a
+# deployment runs are in requirements.lock.txt, which is what the Dockerfile
+# installs. This file stays a range so `pip install -r` still works for a
+# developer on another platform.
+fastapi>=0.139.2
+uvicorn[standard]>=0.51
+# Not a direct import, but FastAPI's ASGI layer and the subject of three
+# reachable advisories (Host header, URL reconstruction, urlencoded-body DoS).
+# Pinned explicitly so a FastAPI resolution cannot quietly drag it backwards.
+starlette>=1.3.1
+pydantic>=2.13
+pydantic-settings>=2.14.2
+pyyaml>=6.0.3
+httpx>=0.28.1
+sqlalchemy>=2.0.51
+# It signs the chains. 50.0.0 is the first release clear of PYSEC-2026-3552.
+cryptography>=50.0.0
+# Validates the Number Verification consent flow's ID token (issuer, audience,
+# expiry, nonce) against the operator's JWKS (P4a). 2.13.0 has no open advisory
+# at time of pinning; RS256 support comes from the `cryptography` dependency
+# above, already required, so this adds no new native dependency.
+pyjwt>=2.13.0
+# Transitive, both with advisories reachable through httpx.
+idna>=3.15
+urllib3>=2.7.0
+# QR codes for the public receipt (T6). Pure Python, no runtime deps, so the
+# console keeps zero external origins — the SVG is inlined, not fetched.
+segno>=1.6.6
+# Gemini runtime calls use the existing ``httpx`` dependency above. Keeping
+# the adapter dependency-free means a missing vendor SDK cannot silently turn
+# ISNAD_PLANNER=llm into a greedy-only demo.
+# The CAMARA provider (T1). Note: this package declares `pip==25.3` as a hard
+# runtime dependency, which is a packaging mistake on the vendor's side — the
+# SDK never imports pip (the only occurrences are an error-message string, its
+# README and a test), and it imports and resolves NetworkAsCodeApi fine with pip
+# absent. pip 25.3 carries six advisories, so pip is deliberately kept OUT of
+# requirements.lock.txt and stripped from the venv in the Dockerfile.
+network-as-code>=10.0.0

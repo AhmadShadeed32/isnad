@@ -1,0 +1,54 @@
+{
+  "observed_at_utc": "2026-09-07T00:12:37.647044+00:00",
+  "purpose": "runbook gate 11.2 - one bounded Gemini run over mock network data",
+  "how": "in-process build_investigator against MockProvider, ISNAD_PROVIDER=mock ISNAD_PLANNER=llm; key read from settings, never printed or logged",
+  "provider": "mock",
+  "planner_setting": "llm",
+  "model": "gemini-3.6-flash",
+  "call_cap_per_investigation": 6,
+  "timeout_seconds": 6.0,
+  "external_requests": {
+    "nokia": 0,
+    "gemini_selection_calls": 2
+  },
+  "wall_clock_ms": 4120,
+  "verdict": {
+    "decision": "DECLINE",
+    "chain_grade": "REFUTED",
+    "planner_label": "llm",
+    "evidence_cost": 6.0,
+    "links": 2
+  },
+  "selections": [
+    {
+      "phase": "investigation",
+      "planner": "llm",
+      "action": "sim_swap",
+      "api": "SIM Swap",
+      "rationale": "Checking for a recent SIM swap yields the highest expected information to evaluate the account takeover hypothesis.",
+      "cost": 2.0
+    },
+    {
+      "phase": "investigation",
+      "planner": "llm",
+      "action": "device_swap",
+      "api": "Device Swap",
+      "rationale": "Checking for a recent device swap provides strong additional evidence relevant to the account takeover hypothesis alongside the confirmed SIM swap.",
+      "cost": 2.0
+    }
+  ],
+  "chain": [
+    {"action": "sim_swap", "signal": "SIM_SWAPPED", "result": "FLAG", "timing": "available"},
+    {"action": "device_swap", "signal": "DEVICE_SWAPPED", "result": "FLAG", "timing": "available"}
+  ],
+  "reading": [
+    "Both selections carry planner=llm, so the model chose the actions; no greedy or policy fallback fired and no NO_ANSWER reason appears.",
+    "The rationales are the model's own text, not a template: they name the hypothesis and the second one refers back to the first result.",
+    "Two calls against a cap of six: the run stopped because the chain reached a decision, not because the budget ran out.",
+    "The verdict is the same DECLINE/REFUTED the greedy planner reaches on this fixture. This exercises the live contract, not a difference in outcome."
+  ],
+  "not_established_by_this_run": [
+    "No operator was called: the evidence is the mock provider's, so this says nothing about Nokia behaviour.",
+    "One request shape on one fixture. Neither degraded-model behaviour nor the fallback reason labels were exercised against the live endpoint."
+  ]
+}

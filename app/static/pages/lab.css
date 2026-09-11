@@ -1,0 +1,130 @@
+:root{
+    --night:#070b20; --surface:#111834; --surface2:#182247; --line:#2d3b70;
+    --text:#eef2ff; --muted:#aab5d4; --gold:#e5bb59; --green:#56d3a0;
+    --red:#ff7979; --amber:#ffc35c;
+    --sans:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    --mono:"SFMono-Regular",Consolas,"Liberation Mono",monospace;
+  }
+  
+  body{margin:0;min-height:100vh;color:var(--text);font-family:var(--sans);
+       background:radial-gradient(circle at 14% -10%,#243673 0,transparent 31rem),var(--night)}
+  /* `clip`, not `hidden`: the page itself never scrolls sideways, but this
+     must not become a scroll container — that would trap programmatic
+     scrolling and break `position:sticky` inside it.
+
+     What this fixes (R15): the root reported 797px of scrollable width at
+     375px while the viewport was 375. Measured, not guessed — scrolling the
+     root 422px right and screenshotting shows only background, and a sweep
+     for any element whose border box escapes a clipping ancestor comes back
+     empty. The scrollable area is phantom: the audit table's own wrapper is a
+     working scroll container (client 299, scroll 740) and its content still
+     inflated an ancestor's scrollWidth. Nothing is out there, so nothing is
+     lost by declaring that the page does not scroll horizontally; the table
+     keeps scrolling inside `.table-wrap`, verified at 320/375/768/1440 in
+     both languages with all 12 focusable controls inside the viewport. */
+  .shell{max-width:1100px;margin:0 auto;padding:26px 28px 64px;overflow-x:clip}
+  a{color:var(--gold)}
+  header{display:flex;justify-content:space-between;align-items:center;gap:16px;
+         border-bottom:1px solid #24315e;padding-bottom:21px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:12px;font-weight:700;letter-spacing:.02em}
+  .brand .arabic{font-size:23px;color:var(--gold);font-weight:500}
+  .brand small{font-size:12px;color:var(--muted);font-weight:500;display:block;margin-top:2px;letter-spacing:0}
+  nav{display:flex;gap:14px;font-size:12px}
+  .eyebrow{color:var(--gold);font:700 11px var(--mono);letter-spacing:.13em;text-transform:uppercase}
+  h1{font-size:clamp(26px,4vw,40px);letter-spacing:-.04em;line-height:1.05;margin:11px 0 12px}
+  .lead p{max-width:660px;color:var(--muted);font-size:15px;line-height:1.55;margin:0}
+  .card{background:linear-gradient(145deg,rgba(24,34,71,.96),rgba(13,19,45,.96));
+        border:1px solid var(--line);border-radius:18px;padding:20px 22px;margin-top:18px}
+  h2{font-size:14px;margin:0 0 4px;letter-spacing:.01em}
+  .caption{font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;max-width:680px}
+  .banner{border:1px solid #946f2e;background:#2a2113;border-radius:12px;padding:12px 14px;
+          margin-top:18px;font-size:12px;line-height:1.5;color:var(--amber)}
+  .banner strong{color:#ffe0a3}
+  .banner.drift{border-color:#70404b;background:#321d2a;color:#ffc4c4}
+  .banner.drift strong{color:#ffdada}
+  ul.limits{margin:0;padding-inline-start:18px;color:var(--muted);font-size:12px;line-height:1.6}
+  ul.limits li{margin:5px 0}
+  .cases{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+  .case-btn{border:1px solid #526695;border-radius:9px;background:#152448;color:var(--text);
+            font:inherit;font-size:12px;font-weight:700;padding:9px 11px;cursor:pointer;text-align:start}
+  .case-btn:hover{border-color:var(--gold);color:var(--gold)}
+  .case-btn[aria-pressed="true"]{border-color:var(--gold);background:#241d0f;color:var(--gold)}
+  .case-btn:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+  .ghost{border:1px solid var(--line);border-radius:9px;background:none;color:var(--muted);
+         font:inherit;font-size:12px;padding:9px 11px;cursor:pointer}
+  .ghost:hover{border-color:var(--gold);color:var(--gold)}
+  .ghost:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+  .ghost:disabled{opacity:.45;cursor:not-allowed}
+  .assumptions{border-inline-start:2px solid var(--gold);padding:6px 0 6px 13px;margin:14px 0;
+               font-size:12px;color:var(--muted);line-height:1.55}
+  .assumptions b{color:var(--text)}
+  .tag{display:inline-block;border:1px solid #43527f;border-radius:999px;padding:2px 7px;
+       font:10px var(--mono);color:var(--muted);margin-inline-end:6px}
+  .tag.greedy{border-color:#43527f}
+  .tag.llm{border-color:#946f2e;color:var(--amber)}
+  .tag.policy{border-color:#317b61;color:var(--green)}
+  .tag.hypothetical{border-color:#946f2e;color:var(--amber)}
+  .replay{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:14px 0 10px}
+  .replay input[type=range]{flex:1;min-width:180px;accent-color:var(--gold)}
+  .replay input[type=range]:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+  .counter{font:11px var(--mono);color:var(--muted);white-space:nowrap}
+  .events{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px;
+          max-height:340px;overflow:auto}
+  .event{border:1px solid #26325b;background:#0c1230;border-radius:10px;padding:9px 11px;font-size:12px}
+  .event.pending{opacity:.32}
+  .event-head{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+  .event-title{font-weight:700}
+  .event-meta{font:10px var(--mono);color:var(--muted);white-space:nowrap}
+  .event-detail{margin-top:4px;color:var(--muted);line-height:1.45}
+  .diag{color:var(--amber)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .panel{border:1px solid #26325b;background:#0c1230;border-radius:12px;padding:13px 15px}
+  .decision{font:800 20px var(--mono);letter-spacing:.04em}
+  .decision.ALLOW{color:var(--green)} .decision.CHALLENGE{color:var(--amber)} .decision.DECLINE{color:var(--red)}
+  .kv{display:flex;justify-content:space-between;gap:12px;font-size:12px;padding:3px 0;text-align:start}
+  .kv .k{color:var(--muted)}
+  /* `overflow-x:auto` alone does not contain a wide table: a grid or flex item
+     defaults to min-width:auto, so the wrapper grows to its content instead of
+     scrolling, and the whole page ends up 400px wider than the phone. The
+     min-width:0 is what makes the scroll container actually a scroll container. */
+  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;min-width:0;max-width:100%}
+  .grid2>*,.panel,.replay{min-width:0}
+  table{width:100%;min-width:520px;border-collapse:collapse;font-size:12px;margin-top:6px}
+  th{text-align:start;color:var(--muted);font-weight:500;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:6px 8px;border-bottom:1px solid #1d2749;text-align:start}
+  .num{font:11px var(--mono)}
+  .foot{margin-top:26px;font-size:11px;color:var(--muted);line-height:1.6}
+  .scroll-hint{font:10px var(--mono);color:var(--muted);margin-top:4px}
+  @media(max-width:760px){
+    .shell{padding:20px 15px 40px}
+    .grid2{grid-template-columns:1fr}
+    .case-btn{width:100%}
+  }
+  @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* Investigation workbench */
+.lab-hero{display:flex;align-items:center;justify-content:space-between;gap:32px;padding-block:24px 12px}
+.lab-hero h1{font-size:clamp(32px,4vw,52px);max-width:760px;line-height:1.08}
+.lab-hero p{max-width:690px}.lab-download{flex-shrink:0;border:1px solid #526695;padding:12px 16px;border-radius:10px;text-decoration:none;font-size:12px}
+.lab-badges{display:flex;gap:8px;flex-wrap:wrap;margin-top:20px}.lab-badges span{font-size:11px;color:#c3cce5;background:#182247;border:1px solid #384462;border-radius:999px;padding:5px 10px}
+.lab-disclosure summary,.audit-details summary{cursor:pointer;color:#eef2ff;font-weight:600;font-size:13px;min-height:28px}
+.lab-disclosure .limits{margin-top:12px}.lab-workspace{display:grid;grid-template-columns:260px minmax(0,1fr);gap:24px;margin-top:20px}
+.case-library{min-width:0}.case-library #cases{display:grid;gap:10px}.case-library .case-btn{width:100%;padding:15px;background:#0c1230;color:#eef2ff;border-color:#384462}
+.case-btn strong{display:block;font-size:14px;line-height:1.45}.case-description{display:block;font-size:11px;font-weight:400;color:#aab5d4;margin:8px 0;line-height:1.5}
+.case-outcome{display:inline-block;font:10px var(--mono);border:1px solid #526695;padding:4px 7px;border-radius:6px}
+.case-outcome.ALLOW{color:#56d3a0}.case-outcome.CHALLENGE{color:#ffc35c}.case-outcome.DECLINE{color:#ff7979}
+.case-library .case-btn[aria-pressed=true]{border-color:#e5bb59;background:#20263b;box-shadow:inset 3px 0 #e5bb59}
+#caseDetail{min-width:0}#caseTitle{font-size:22px;line-height:1.3;margin:0 0 12px;letter-spacing:-.025em}
+#caseDetail .assumptions{margin-top:0}.risk-chart{border:1px solid #384462;border-radius:12px;background:#080e24;padding:14px 16px}
+.chart-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:12px}.chart-heading .num{color:#f0cf78;font-size:22px}
+#riskChart{display:block;width:100%;height:auto;margin:12px 0;direction:ltr}.risk-chart .caption{font-size:11px;margin:0}
+.replay{padding:12px;border:1px solid #384462;background:#101731;border-radius:12px}.replay .ghost{min-height:40px;color:#c3cce5}.replay .play-btn{background:#f0cf78;color:#17162b;border-color:#f0cf78;font-weight:700}
+.replay select{min-height:40px;background:#182247;border:1px solid #526695;color:#eef2ff;border-radius:8px;padding:6px}
+.replay input[type=range]{flex-basis:45%;min-width:130px}.events{position:relative;max-height:430px;overscroll-behavior:contain}.event{border-inline-start:3px solid #526695;padding:12px}.event.pending{opacity:.4}
+#caseDetail .grid2{grid-template-columns:1fr}.audit-details .kv{flex-wrap:wrap;overflow-wrap:anywhere}.audit-details[open] summary{margin-bottom:10px}
+.lab-deep-dive{margin-top:24px}#caseCard h2{font-size:20px}.lab-disclosure summary:focus-visible,.audit-details summary:focus-visible,.lab-download:focus-visible,.replay select:focus-visible{outline:2px solid #f0cf78;outline-offset:4px}
+@media(max-width:950px){.lab-hero{align-items:start;flex-direction:column;gap:18px}.lab-workspace{grid-template-columns:1fr}.case-library #cases{grid-template-columns:repeat(2,minmax(0,1fr))}.case-library .case-btn{height:100%}}
+@media(max-width:550px){.case-library #cases{grid-template-columns:1fr}.lab-hero h1{font-size:34px}#caseCard{padding:16px}.case-description{display:none}.case-btn strong{font-size:13px}.case-outcome{margin-top:6px}.lab-badges span{font-size:10px}.replay{gap:8px}.chart-heading{flex-wrap:wrap}}
+.lab-model-actions{border:1px solid #526695;border-radius:10px;padding:12px;margin-bottom:14px}
+.lab-model-actions .ghost{margin-inline-end:8px;color:#eef2ff}
+.lab-model-actions p{color:#c3cce5;font-size:12px;line-height:1.6;margin-bottom:0}

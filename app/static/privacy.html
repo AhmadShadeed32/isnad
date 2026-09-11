@@ -1,0 +1,39 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Isnad — what we keep</title>
+<!--
+  The answer to "you HMAC subscriber numbers and query their location — which
+  regulator permits that?" Every number on this page is fetched from
+  /v1/privacy/posture rather than written here, because a hard-coded retention
+  window becomes a lie the first time somebody tunes it.
+
+  Zero external origins, like receipt.html and console.html.
+-->
+<link rel="stylesheet" href="/ui/pages/privacy.css">
+<link rel="stylesheet" href="/ui/shared.css">
+
+<body class="site-page"><main class="site-shell">
+  <header class="site-header">
+    <a class="site-brand" href="/judge" aria-label="Isnad home"><span lang="ar">إسناد</span><span>Isnad<small data-i18n="ui.site_tagline">Network-verified trust</small></span></a>
+    <div class="site-language-slot"></div>
+  </header>
+  <nav class="site-nav" aria-label="Main navigation">
+    <a href="/judge" data-i18n="ui.nav_demo">Checkout demo</a>
+    <a href="/api-keys" data-i18n="ui.nav_api_keys">API keys</a>
+    <a href="/console" data-i18n="ui.nav_console">Console</a>
+    <a href="/lab" data-i18n="ui.nav_lab">Lab</a>
+    <a href="/privacy" data-i18n="ui.nav_privacy" aria-current="page">Privacy</a>
+  </nav>
+  <div id="sharedGemini"></div>
+  <h1>What this system keeps</h1>
+  <p class="sub">Read live from this deployment, not written down here.
+    Source: <code>/v1/privacy/posture</code></p>
+
+  <div id="out"><p class="sub">Loading…</p></div>
+</main>
+
+<script src="/ui/shared.js"></script>
+<script src="/ui/pages/privacy.js"></script>
+
+<script src="/ui/i18n.js" defer></script>

@@ -1,0 +1,142 @@
+{
+  "note": "Written by hand from Nokia's public operation pages and the SDK's own serialization, NOT generated from Isnad's adapter, normalizer or policy. tests/test_nac_mock_parity.py compares BOTH the application mock and the real adapter against this file, so a change in Isnad's code cannot quietly change what 'correct' means.",
+  "sources": {
+    "sim_swap": "https://networkascode.nokia.io/_docs/sim-swap/sim-swap (accessed 2026-09-09)",
+    "device_swap": "https://networkascode.nokia.io/_docs/device-swap/device-swap (accessed 2026-09-09)",
+    "hosted_observation": "docs/nac/observations/2026-09-06-hosted-simulator.jsonl"
+  },
+  "operations": {
+    "sim_swap_check": {
+      "method": "POST",
+      "path": "/passthrough/camara/v1/sim-swap/sim-swap/v0/check",
+      "body_keys": [
+        "phoneNumber",
+        "maxAge"
+      ],
+      "max_age_units": "hours",
+      "max_age_range": [
+        1,
+        2400
+      ],
+      "required_headers": [
+        "x-rapidapi-key",
+        "x-rapidapi-host"
+      ],
+      "success_body_keys": [
+        "swapped"
+      ]
+    },
+    "device_swap_check": {
+      "method": "POST",
+      "path": "/passthrough/camara/v1/device-swap/device-swap/v1/check",
+      "body_keys": [
+        "phoneNumber",
+        "maxAge"
+      ],
+      "max_age_units": "hours",
+      "max_age_range": [
+        1,
+        2400
+      ],
+      "required_headers": [
+        "x-rapidapi-key",
+        "x-rapidapi-host"
+      ],
+      "success_body_keys": [
+        "swapped"
+      ]
+    }
+  },
+  "scenarios": {
+    "swapped_subscriber": {
+      "phone_number": "+99999991000",
+      "sim_swap_check": {
+        "status": 200,
+        "body": {
+          "swapped": true
+        }
+      },
+      "device_swap_check": {
+        "status": 200,
+        "body": {
+          "swapped": true
+        }
+      },
+      "expected_normalization": {
+        "sim_swap": {
+          "result": "FLAG",
+          "signal": "SIM_SWAPPED"
+        },
+        "device_swap": {
+          "result": "FLAG",
+          "signal": "DEVICE_SWAPPED"
+        }
+      }
+    },
+    "stable_subscriber": {
+      "phone_number": "+99999991001",
+      "sim_swap_check": {
+        "status": 200,
+        "body": {
+          "swapped": false
+        }
+      },
+      "device_swap_check": {
+        "status": 200,
+        "body": {
+          "swapped": false
+        }
+      },
+      "expected_normalization": {
+        "sim_swap": {
+          "result": "PASS",
+          "signal": "SIM_STABLE"
+        },
+        "device_swap": {
+          "result": "PASS",
+          "signal": "DEVICE_STABLE"
+        }
+      }
+    }
+  },
+  "malformed": {
+    "missing_boolean": {
+      "body": {},
+      "expected": {
+        "result": "INFO",
+        "signal": "PROVIDER_UNAVAILABLE"
+      },
+      "why": "A required boolean that is absent is unknown. SDK 10.0.0's own response model refuses the body, so the adapter reports a provider failure. What matters for the parity claim is the negative: it is never read as false, which is the defect the contender review found in a peer project's wrapper."
+    },
+    "null_boolean": {
+      "body": {
+        "swapped": null
+      },
+      "expected": {
+        "result": "INFO",
+        "signal": "PROVIDER_UNAVAILABLE"
+      },
+      "why": "null is distinct from false, and is refused by the same response model."
+    }
+  },
+  "errors": {
+    "403": {
+      "expected": {
+        "result": "INFO",
+        "signal": "CONSENT_REQUIRED"
+      }
+    },
+    "422": {
+      "expected": {
+        "result": "INFO",
+        "signal": "EVIDENCE_UNAVAILABLE"
+      }
+    },
+    "503": {
+      "expected": {
+        "result": "INFO",
+        "signal": "PROVIDER_UNAVAILABLE"
+      }
+    }
+  }
+}

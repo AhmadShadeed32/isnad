@@ -1,0 +1,38 @@
+# Never let a secret or a local artifact into the build context.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.isnad/
+*.db
+*.db-wal
+*.db-shm
+*.db.*
+.venv/
+.venv311/
+.git/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+tests/
+docs/
+demo/
+# ...except the recorded lab, which `/lab` imports and reads at runtime (R10).
+# The merchant pilot and the fake operator stay out: they are development
+# harnesses, and a runtime image has no business carrying a fake operator.
+# Docker takes the LAST matching pattern, so the re-exclusion below still wins
+# for bytecode caches.
+!demo/__init__.py
+!demo/lab/**
+demo/lab/**/__pycache__/
+
+# Exclude local signatures, but ship the bundled demo registry's signature.
+# Its public verification key is pinned in the image and Render blueprint.
+app/registry/*.sig
+!app/registry/registry.yaml.sig
+
+# Submission and review material: judge guide, decks, Phase 1 template. None of
+# it is read at runtime.
+submission/
+graphify-out/

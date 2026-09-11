@@ -1,0 +1,69 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtual environments
+.venv/
+.venv311/
+venv/
+env/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+
+# Environment / secrets. Never commit a real .env, signing key or database.
+.env
+.env.*
+!.env.example
+*.local
+*.pem
+*.key
+
+# Local database and vault state
+*.db
+*.db-wal
+*.db-shm
+*.db.*
+.isnad/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+# Office lock files, left behind while a deck or document is open
+~$*
+
+# Working material kept on disk but out of the submission: agent instructions,
+# the local knowledge graph, and the internal engineering notes and review
+# records that predate the public README.
+.claude/
+CLAUDE.md
+graphify-out/
+docs/_internal/
+
+# Video production. The finished submission video and its captions live in
+# submission/; nothing the pipeline needs to render them belongs in an
+# application repository — not the intermediates, and not the ~350 MB
+# neural-TTS model the narration is synthesised with.
+video-build/
+*.webm
+audio/
+frames/
+probe/
+out/
+*.aiff
+*.wav
+*.onnx
+voices-*.bin
+
+# Superseded submission material. Previous versions of a deliverable are kept
+# out of submission/ so a judge cannot open the wrong one; they stay in
+# docs/_internal/superseded/, which the docs/_internal/ rule above already
+# excludes, and in git history.

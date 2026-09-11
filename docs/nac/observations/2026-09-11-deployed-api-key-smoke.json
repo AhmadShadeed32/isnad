@@ -1,0 +1,95 @@
+{
+  "recorded_at_utc": "2026-09-11T16:19:01.362527+00:00",
+  "application_revision": "e283cc5ce6ffe279152d487093dde50d60e8d360",
+  "space_revision": "ffa73f7109439709051f67cc80f1a97dc5bb12d7",
+  "application_url": "https://ahmadshadeed32-isnad-trust-engine.hf.space",
+  "driven_from": "httpx from a developer machine, following submission/JUDGE_GUIDE.md 'Calling the hosted API'",
+  "evidence_level": "mock_provider",
+  "note": "A judge-minted merchant key exercising the merchant API on the deployed Space. The default provider is the mock: no request reached Nokia. The access code and the minted key are not recorded; the key expired on its own TTL.",
+  "api_keys_capability": {
+    "available": true,
+    "requires_access": true,
+    "ttl_seconds": 7200,
+    "provider": "mock",
+    "planner_default": "llm"
+  },
+  "chain_id": "chn_e451467c648f4f52818e",
+  "receipt_payload_sha256": "a3eb8a6673b888f8c26c014376592500f55087ac7102304f11dcc604c9647376",
+  "steps": [
+    {
+      "step": "published_local_key_refused",
+      "status": 403,
+      "detail": "invalid_api_key"
+    },
+    {
+      "step": "judge_session",
+      "status": 200,
+      "expires_in": 1799
+    },
+    {
+      "step": "mint_api_key",
+      "status": 201,
+      "prefix": "mk_HmkKXcf\u2026",
+      "expires_in": 7199,
+      "provider": "mock",
+      "planner_default": "llm"
+    },
+    {
+      "step": "verify_greedy",
+      "status": 200,
+      "decision": "CHALLENGE",
+      "chain_grade": "DEGRADED",
+      "confidence": 0.322,
+      "planner": "greedy",
+      "links": 5,
+      "provider_sources": [
+        "mock"
+      ],
+      "link_sources": [
+        "mock"
+      ]
+    },
+    {
+      "step": "chain_read_with_key",
+      "status": 200,
+      "same_decision": true
+    },
+    {
+      "step": "chain_read_with_minting_session",
+      "status": 200
+    },
+    {
+      "step": "chain_read_with_another_judge_session",
+      "status": 404
+    },
+    {
+      "step": "signature",
+      "status": 200,
+      "valid": true,
+      "key_trusted": true,
+      "algorithm": "Ed25519",
+      "public_key": "ecaba3a8151077ed54cec64358ed008404ad61596f3d8cf6bf0622233680d341"
+    },
+    {
+      "step": "idempotent_replay",
+      "status": 200,
+      "same_chain": true
+    },
+    {
+      "step": "changed_body_same_key",
+      "status": 409
+    },
+    {
+      "step": "verify_without_planner_header",
+      "status": 200,
+      "planner": "llm",
+      "decision": "CHALLENGE",
+      "confidence": 0.28
+    },
+    {
+      "step": "receipt_public",
+      "status": 200,
+      "key_trusted": true
+    }
+  ]
+}

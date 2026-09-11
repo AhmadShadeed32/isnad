@@ -1,0 +1,62 @@
+[project]
+name = "isnad"
+version = "0.1.0"
+description = "Isnad — an agentic network-verified trust engine (CAMARA / Nokia Network-as-Code)"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.139.2",
+    "uvicorn[standard]>=0.51",
+    "starlette>=1.3.1",
+    "pydantic>=2.13",
+    "pydantic-settings>=2.14.2",
+    "pyyaml>=6.0.3",
+    "httpx>=0.28.1",
+    "sqlalchemy>=2.0.51",
+    "cryptography>=50.0.0",
+    "pyjwt>=2.13.0",
+    "idna>=3.15",
+    "urllib3>=2.7.0",
+    "segno>=1.6.6",
+    "network-as-code>=10.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    # tests/browser. `python -m playwright install chromium` fetches the
+    # browser itself; the package alone cannot launch one.
+    "playwright>=1.62",
+    "ruff>=0.4",
+    "pip-audit>=2.10",
+    "alembic>=1.14",
+    # demo/fake_operator (P4a): dev/test-only, never imported by app.main.
+    "python-multipart>=0.0.20",
+]
+# Retained as a no-op compatibility extra: the provider is a core runtime
+# dependency so `pip install .` and the Docker image have the same contract.
+nac = []
+# The optional Gemini planner uses the core ``httpx`` dependency. Set
+# ISNAD_PLANNER=llm and ISNAD_GEMINI_API_KEY to enable it.
+# Optional Redis cache backend (ISNAD_CACHE_BACKEND=redis):
+redis = ["redis>=5.0"]
+# Postgres driver (set ISNAD_DATABASE_URL=postgresql+psycopg://...):
+postgres = ["psycopg[binary]>=3.1"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*", "demo*"]
+
+[tool.setuptools.package-data]
+app = ["static/*.html", "static/*.js", "static/*.css", "static/pages/*.css", "static/pages/*.js", "static/i18n/*.json", "policy/*.yaml", "registry/*.yaml", "registry/*.sig", "nac_capabilities.json"]
+demo = ["merchant_pilot/static/*.html", "fake_operator/static/*.html", "lab/artifacts/*.json"]

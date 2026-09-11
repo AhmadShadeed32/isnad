@@ -1,0 +1,129 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Isnad merchant pilot</title>
+<style>
+  body{font-family:system-ui,sans-serif;max-width:480px;margin:2.5rem auto;padding:0 1rem}
+  label{display:block;margin:.6rem 0 .2rem;font-size:.9rem;color:#444}
+  input,select{width:100%;padding:.5rem;box-sizing:border-box}
+  button{margin-top:1rem;padding:.6rem 1.2rem;background:#1a7f37;color:#fff;border:0;border-radius:4px;cursor:pointer}
+  .err{color:#b91c1c;margin-top:.6rem}
+  form.logout{display:inline;float:right}
+  form.logout button{background:#6e7781;padding:.3rem .7rem;font-size:.8rem}
+  fieldset{border:1px solid #ddd;border-radius:6px;padding:.7rem .9rem;margin-top:1rem}
+  legend{font-size:.85rem;color:#444;padding:0 .3rem}
+  .optional{color:#6e7781;font-weight:normal}
+  .hint{font-size:.78rem;color:#555;line-height:1.45;margin:.3rem 0}
+  .row3{display:flex;gap:.5rem}
+  .row3 label{flex:1;margin-top:.3rem}
+  .nav{margin-top:1.4rem;font-size:.85rem}
+</style>
+<form class="logout" method="post" action="/logout"><button type="submit">Sign out</button></form>
+<h1>Start a Number Verification consent</h1>
+<p>This calls Isnad's real consent API. Nothing here talks to a live network —
+the provider is whatever <code>ISNAD_PROVIDER</code> Isnad itself is running with.</p>
+<form id="new-flow">
+  <label>Customer phone number (E.164)
+    <input type="text" name="phone_number" placeholder="+15551234567" required>
+  </label>
+  <label>Event
+    <select name="event">
+      <option value="checkout" selected>checkout</option>
+      <option value="signup">signup</option>
+      <option value="payout">payout</option>
+    </select>
+  </label>
+
+  <!-- I11 step 3: an explicit CLAIMED checkout area. This is what the customer
+       or merchant says, never an observed phone location — the wording here
+       has to keep that distinction, because the whole point of Location
+       Verification is answering a claim rather than tracking a device. Leaving
+       it blank is a supported choice: the checkout then simply cannot have its
+       location verified, which is stated rather than inferred. -->
+  <fieldset id="claim-fieldset">
+    <legend>Claimed delivery area <span class="optional">(optional)</span></legend>
+    <p class="hint">A <strong>claim</strong> made by the customer or merchant — not an
+    observed device location. Leave blank and location cannot be verified for this
+    checkout; nothing is guessed from the phone number.</p>
+    <div class="row3">
+      <label>Latitude<input type="number" step="any" name="lat" placeholder="31.9539"></label>
+      <label>Longitude<input type="number" step="any" name="lon" placeholder="35.9106"></label>
+      <label>Radius (m)<input type="number" name="radius_m" placeholder="2000" min="1" max="50000"></label>
+    </div>
+    <p class="hint" id="claim-state">No claim: location cannot be verified.</p>
+  </fieldset>
+
+  <button type="submit">Start consent</button>
+</form>
+<p class="err" id="error"></p>
+<p class="nav"><a href="/capabilities">Provider readiness &rarr;</a></p>
+<script>
+const csrfToken = "__CSRF_TOKEN__";
+
+// A claim is all-or-nothing: a latitude with no longitude is not a partial
+// claim, it is an incomplete one, and sending it would let the server infer a
+// coordinate the operator never actually supplied.
+function readClaim(form) {
+  const lat = form.get("lat"), lon = form.get("lon"), radius = form.get("radius_m");
+  if (!lat && !lon && !radius) return null;
+  if (!lat || !lon) return "incomplete";
+  return {
+    lat: Number(lat),
+    lon: Number(lon),
+    radius_m: radius ? Number(radius) : 2000,
+  };
+}
+
+function refreshClaimState() {
+  const form = new FormData(document.getElementById("new-flow"));
+  const claim = readClaim(form);
+  const el = document.getElementById("claim-state");
+  if (claim === null) {
+    el.textContent = "No claim: location cannot be verified.";
+  } else if (claim === "incomplete") {
+    el.textContent = "Incomplete claim: latitude and longitude are both required.";
+  } else {
+    el.textContent = `Claim: ${claim.lat}, ${claim.lon} within ${claim.radius_m} m (customer/merchant stated).`;
+  }
+}
+for (const field of ["lat", "lon", "radius_m"]) {
+  document.querySelector(`[name="${field}"]`).addEventListener("input", refreshClaimState);
+}
+
+document.getElementById("new-flow").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = new FormData(event.target);
+  const errorEl = document.getElementById("error");
+  errorEl.textContent = "";
+
+  const claim = readClaim(form);
+  if (claim === "incomplete") {
+    errorEl.textContent = "Enter both latitude and longitude, or clear the claim entirely.";
+    return;
+  }
+  const payload = {
+    phone_number: form.get("phone_number"),
+    event: form.get("event"),
+  };
+  if (claim) payload.claimed_location = claim;
+
+  try {
+    const response = await fetch("/api/flows", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const detail = await response.json().catch(() => ({}));
+      errorEl.textContent = "Could not start consent: " + (detail.detail || response.status);
+      return;
+    }
+    const data = await response.json();
+    window.location.href = "/flow/" + data.flow_id;
+  } catch (err) {
+    errorEl.textContent = "Request failed: " + err;
+  }
+});
+</script>
+
+<script src="/ui/i18n.js" defer></script>

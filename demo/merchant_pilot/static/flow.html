@@ -1,0 +1,423 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Isnad merchant pilot — consent status</title>
+<style>
+  body{font-family:system-ui,sans-serif;max-width:480px;margin:2.5rem auto;padding:0 1rem}
+  #qr{max-width:220px;margin:1rem 0}
+  .status{font-size:1.1rem;font-weight:600;margin:.6rem 0}
+  .card{border:1px solid #ddd;border-radius:6px;padding:.9rem;margin:.6rem 0}
+  ul{margin:.3rem 0;padding-left:1.2rem}
+  a.back{display:inline-block;margin-top:1rem}
+  .challenge{border:1px solid #b45309;border-radius:6px;padding:.9rem;margin:.6rem 0;background:#fffbeb}
+  .challenge h3{margin-top:0}
+  .challenge button{margin:.3rem .4rem .3rem 0;padding:.4rem .8rem;border:0;border-radius:4px;cursor:pointer}
+  .challenge button.pass{background:#1a7f37;color:#fff}
+  .challenge button.fail{background:#b91c1c;color:#fff}
+  .challenge button.abandon{background:#6e7781;color:#fff}
+  .challenge .err{color:#b91c1c}
+  .outcomes{border:1px solid #ddd;border-radius:6px;padding:.9rem;margin:.6rem 0}
+  .outcomes h3{margin-top:0}
+  .outcomes .row{margin:.6rem 0}
+  .outcomes label{display:block;font-size:.85rem;color:#444;margin-bottom:.2rem}
+  .outcomes select{padding:.35rem;margin-right:.4rem}
+  .outcomes button{padding:.35rem .8rem;border:0;border-radius:4px;background:#0969da;color:#fff;cursor:pointer}
+  .outcomes .current{font-size:.85rem;color:#555;margin-top:.2rem}
+  .outcomes .err{color:#b91c1c}
+  .session{border:1px solid #38556d;border-radius:6px;padding:.9rem;margin:.6rem 0;background:#f6f8fa}
+  .session h3{margin-top:0}
+  .session button{margin:.3rem .4rem .3rem 0;padding:.4rem .8rem;border:0;border-radius:4px;cursor:pointer;background:#0969da;color:#fff}
+  .session button.danger{background:#b45309}
+  .session .state{font:11px ui-monospace,Menlo,monospace;border-radius:999px;padding:2px 8px;margin-left:.3rem}
+  .session .state.ACTIVE{background:#dafbe1;color:#116329;border:1px solid #4ac26b}
+  .session .state.REVOKED{background:#ffebe9;color:#a40e26;border:1px solid #ff8182}
+  .session .state.EXPIRED,.session .state.ENDED{background:#eaeef2;color:#57606a;border:1px solid #afb8c1}
+  .session .state.UNKNOWN{background:#fff8c5;color:#7d4e00;border:1px solid #d4a72c}
+  .session .note{font-size:.78rem;color:#555;line-height:1.5;margin-top:.5rem}
+  .session .err{color:#b91c1c}
+  /* F1: an upstream-complete flow whose receipt has not reached this harness
+     yet, and an upstream consent that is gone for good. Both used to be
+     invisible — the page simply stopped. */
+  .recovery-note{border:1px solid #d4a72c;background:#fff8c5;color:#7d4e00;
+                 border-radius:6px;padding:.7rem .8rem;margin:.6rem 0;
+                 font-size:.82rem;line-height:1.5}
+</style>
+<h1>Number Verification consent</h1>
+<p>Scan this with the phone being verified. Disable Wi-Fi first if the provider
+requires a mobile data connection.</p>
+<div id="qr"></div>
+<p><a id="open-link" href="#" target="_blank" rel="noopener">Open the authorization link directly</a></p>
+<p class="status" id="status">Loading…</p>
+<p class="recovery-note" id="recovery-note" role="status" hidden></p>
+<div id="outcome"></div>
+<div id="challenge-panel"></div>
+<div id="outcomes-panel"></div>
+<div id="session-panel"></div>
+<a class="back" href="/">← Start another consent</a>
+<script>
+const flowId = "__FLOW_ID__";
+const csrfToken = "__CSRF_TOKEN__";
+const TERMINAL = new Set(["COMPLETED", "DENIED", "FAILED", "EXPIRED", "UNAVAILABLE"]);
+let delayMs = 1500;
+const MAX_DELAY_MS = 8000;
+
+function renderOutcome(result) {
+  if (!result || !result.presentation) return;
+  const p = result.presentation;
+  const facts = (title, items) => items && items.length
+    ? `<p><strong>${title}:</strong></p><ul>${items.map(f => `<li>${f}</li>`).join("")}</ul>`
+    : "";
+  document.getElementById("outcome").innerHTML = `
+    <div class="card">
+      <h2>${p.title}</h2>
+      <p>${p.summary}</p>
+      ${facts("Supporting", p.supporting_facts)}
+      ${facts("Adverse", p.adverse_facts)}
+      ${facts("Unresolved", p.unresolved_checks)}
+      <p><em>${p.next_action}</em></p>
+    </div>`;
+}
+
+async function postJson(url, body) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
+    body: JSON.stringify(body),
+  });
+  const data = await response.json().catch(() => ({}));
+  return { ok: response.ok, status: response.status, data };
+}
+
+// This block is deliberately separate from renderOutcome(): the signed
+// CHALLENGE decision above never changes, and a merchant's own followup
+// report must always read as an addition next to it, never as a replacement
+// or an upgrade to ALLOW (P3).
+function renderChallengePanel(challenge, decision) {
+  const panel = document.getElementById("challenge-panel");
+  if (decision !== "CHALLENGE") {
+    panel.innerHTML = "";
+    return;
+  }
+  if (!challenge) {
+    panel.innerHTML = `
+      <div class="challenge">
+        <h3>Continue merchant verification</h3>
+        <p>This decision was CHALLENGE. Record what your own follow-up (a manual
+        review, a callback) found.</p>
+        <button id="start-challenge">Start a followup</button>
+        <p class="err" id="challenge-err"></p>
+      </div>`;
+    document.getElementById("start-challenge").addEventListener("click", async () => {
+      const { ok, data } = await postJson("/api/flows/" + flowId + "/challenge", {});
+      if (!ok) {
+        document.getElementById("challenge-err").textContent =
+          "Could not start followup: " + (data.detail || "error");
+        return;
+      }
+      poll();
+    });
+    return;
+  }
+  if (challenge.status === "PENDING") {
+    // I5: the merchant and the subscriber are two different audiences with
+    // two different questions. This is a storyboard of what the subscriber's
+    // own side of the same hold looks like -- there is no separate customer
+    // app here, so it is described rather than rendered live.
+    const expiresAt = new Date(challenge.expires_at);
+    const expired = Number.isFinite(expiresAt.getTime()) && expiresAt.getTime() < Date.now();
+    panel.innerHTML = `
+      <div class="challenge">
+        <h3>Continue merchant verification</h3>
+        <p>Followup attempt <code>${challenge.attempt_id}</code> is open. Report what
+        you found — this is separate from the signed decision above and never
+        changes it.</p>
+        <button class="pass" data-result="PASSED">Passed</button>
+        <button class="fail" data-result="FAILED">Failed</button>
+        <button class="abandon" data-result="ABANDONED">Abandoned</button>
+        <p class="err" id="challenge-err"></p>
+        <details style="margin-top:.6rem">
+          <summary>What the subscriber's side of this hold looks like (storyboard)</summary>
+          <p class="note" style="margin:.4rem 0 0">
+            <strong>Why held:</strong> the network could not fully confirm this checkout on its own.
+            <strong>Required action:</strong> none from the subscriber yet — this merchant is
+            reviewing manually (a callback or a check), not waiting on an OTP.
+            <strong>Expiry:</strong> this followup ${expired ? "has expired" : "expires at " + challenge.expires_at}.
+            <strong>Return path:</strong> the subscriber returns to the merchant's own order
+            status page, which is separate from this operator console.
+          </p>
+        </details>
+      </div>`;
+    for (const button of panel.querySelectorAll("button[data-result]")) {
+      button.addEventListener("click", async () => {
+        const { ok, data } = await postJson("/api/flows/" + flowId + "/challenge/events", {
+          result: button.dataset.result,
+        });
+        if (!ok) {
+          document.getElementById("challenge-err").textContent =
+            "Could not report result: " + (data.detail || "error");
+          return;
+        }
+        poll();
+      });
+    }
+    return;
+  }
+  panel.innerHTML = `
+    <div class="challenge">
+      <h3>Merchant verification: ${challenge.status}</h3>
+      <p>Reported at ${challenge.reported_at || challenge.created_at}. This is the
+      merchant's own followup — the signed decision above is unchanged.</p>
+    </div>`;
+}
+
+const ORDER_STATUS_VALUES = ["ACCEPTED", "FULFILLED", "CANCELLED", "UNKNOWN"];
+const FRAUD_VALUES = ["CONFIRMED_FRAUD", "CONFIRMED_LEGITIMATE", "INCONCLUSIVE", "UNKNOWN"];
+const CONFIRMED_FRAUD_VALUES = new Set(["CONFIRMED_FRAUD", "CONFIRMED_LEGITIMATE"]);
+
+// Available regardless of decision (P5 has no CHALLENGE gate, unlike P3's
+// panel above). "Not yet reported" is its own state, never conflated with an
+// explicit UNKNOWN the merchant chose to record.
+function renderOutcomesPanel(outcomes) {
+  const panel = document.getElementById("outcomes-panel");
+  const current = outcomes || {};
+
+  // P5 known gap #4: this panel re-renders on every poll tick, which used to
+  // reset an operator's half-made selection under their cursor — the poll
+  // interval decides whether your click lands on what you chose. Capture the
+  // live values first and restore them after, so a re-render only ever
+  // updates the *reported* state, never the in-progress one.
+  const inProgress = {};
+  for (const id of ["order-status-value", "fraud-value", "fraud-basis"]) {
+    const el = document.getElementById(id);
+    if (el) inProgress[id] = el.value;
+  }
+
+  const optionsFor = (values) => values.map(v => `<option value="${v}">${v}</option>`).join("");
+  const currentLine = (dimension) => current[dimension]
+    ? `<p class="current">Current: <strong>${current[dimension].value}</strong>${current[dimension].basis ? " (" + current[dimension].basis + ")" : ""}</p>`
+    : `<p class="current">Not yet reported.</p>`;
+
+  panel.innerHTML = `
+    <div class="outcomes">
+      <h3>Report what actually happened</h3>
+      <div class="row">
+        <label>Order status</label>
+        <select id="order-status-value">${optionsFor(ORDER_STATUS_VALUES)}</select>
+        <button id="order-status-submit">Report</button>
+        ${currentLine("order_status")}
+      </div>
+      <div class="row">
+        <label>Fraud assessment</label>
+        <select id="fraud-value">${optionsFor(FRAUD_VALUES)}</select>
+        <select id="fraud-basis">
+          <option value="manual_investigation">manual_investigation</option>
+          <option value="customer_confirmation">customer_confirmation</option>
+        </select>
+        <button id="fraud-submit">Report</button>
+        ${currentLine("fraud_assessment")}
+      </div>
+      <p class="err" id="outcomes-err"></p>
+    </div>`;
+
+  // Restore whatever the operator had selected before this re-render.
+  for (const [id, value] of Object.entries(inProgress)) {
+    const el = document.getElementById(id);
+    if (el && value) el.value = value;
+  }
+
+  const fraudValue = document.getElementById("fraud-value");
+  const fraudBasis = document.getElementById("fraud-basis");
+  // The select's own default (its first option, CONFIRMED_FRAUD) needs a
+  // basis just as much as one reached by an explicit change — initialize
+  // from the live value, not only react to a 'change' event that a default
+  // selection never fires.
+  const syncBasisVisibility = () => {
+    fraudBasis.style.display = CONFIRMED_FRAUD_VALUES.has(fraudValue.value) ? "" : "none";
+  };
+  syncBasisVisibility();
+  fraudValue.addEventListener("change", syncBasisVisibility);
+
+  document.getElementById("order-status-submit").addEventListener("click", async () => {
+    const value = document.getElementById("order-status-value").value;
+    const { ok, data } = await postJson("/api/flows/" + flowId + "/outcomes", {
+      dimension: "order_status",
+      value,
+    });
+    if (!ok) {
+      document.getElementById("outcomes-err").textContent = "Could not report: " + (data.detail || "error");
+      return;
+    }
+    poll();
+  });
+
+  document.getElementById("fraud-submit").addEventListener("click", async () => {
+    const value = fraudValue.value;
+    const body = { dimension: "fraud_assessment", value };
+    if (CONFIRMED_FRAUD_VALUES.has(value)) {
+      body.basis = fraudBasis.value;
+    }
+    const { ok, data } = await postJson("/api/flows/" + flowId + "/outcomes", body);
+    if (!ok) {
+      document.getElementById("outcomes-err").textContent = "Could not report: " + (data.detail || "error");
+      return;
+    }
+    poll();
+  });
+}
+
+// I8. Four states are shown distinctly, and an unavailable lookup is its own
+// fifth — "we could not ask" is never rendered as permission to proceed, the
+// same distinction the whole product is built on.
+const KNOWN_SESSION_STATES = new Set(["ACTIVE", "REVOKED", "EXPIRED", "ENDED"]);
+
+function renderSessionPanel(session, decision) {
+  const panel = document.getElementById("session-panel");
+  if (decision !== "ALLOW") {
+    // Continuity monitoring is for an order that was actually allowed to
+    // proceed; a held order has nothing to revoke yet.
+    panel.innerHTML = "";
+    return;
+  }
+  if (!session) {
+    panel.innerHTML = `
+      <div class="session">
+        <h3>Trust continuity <span class="state UNKNOWN">not monitored</span></h3>
+        <p class="note">This checkout was allowed. Opening a trust session keeps
+        watching the SIM and device <em>after</em> the verdict, so a change before
+        fulfilment can put the order back on hold. The signed receipt above is
+        historical either way and never changes.</p>
+        <button id="open-session">Open a trust session</button>
+        <p class="err" id="session-err"></p>
+      </div>`;
+    document.getElementById("open-session").addEventListener("click", async () => {
+      const { ok, data } = await postJson("/api/flows/" + flowId + "/trust-session", {});
+      if (!ok) {
+        document.getElementById("session-err").textContent =
+          "Could not open a session: " + (data.detail || "error");
+        return;
+      }
+      poll();
+    });
+    return;
+  }
+
+  const state = KNOWN_SESSION_STATES.has(session.status) ? session.status : "UNKNOWN";
+  const released = session.fulfillment_state === "RELEASED";
+  const stateNote = state === "ACTIVE"
+    ? "The network has reported no SIM or device change since the verdict."
+    : state === "REVOKED"
+      ? "A SIM or device change was observed. Fulfilment stays held; releasing is refused."
+      : state === "UNKNOWN"
+        ? "The session's state could not be read. That is not permission to proceed — this is a hold, not an allow."
+        : `Monitoring is over (${state}). A new decision needs a fresh verification, not this receipt.`;
+
+  panel.innerHTML = `
+    <div class="session">
+      <h3>Trust continuity <span class="state ${state}">${state}</span></h3>
+      <p class="note">Session <code>${session.session_id}</code> ·
+      fulfilment <strong>${session.fulfillment_state}</strong></p>
+      <p class="note">${stateNote}</p>
+      ${released
+        ? `<p class="note"><strong>Order released.</strong> A later revocation holds
+           <em>future</em> fulfilment; it cannot undo a release that already happened.</p>`
+        : `<button id="release-order">Release the order</button>
+           <button class="danger" id="simulate-swap">Simulate a SIM swap</button>`}
+      <p class="err" id="session-err"></p>
+      <p class="note"><em>Simulator.</em> State lives in this process only; it is not
+      durable across a restart, and this is not transactional enforcement against a
+      real commerce backend.</p>
+    </div>`;
+
+  const release = document.getElementById("release-order");
+  if (release) {
+    release.addEventListener("click", async () => {
+      const { ok, data } = await postJson("/api/flows/" + flowId + "/release-order", {});
+      if (!ok) {
+        document.getElementById("session-err").textContent =
+          "Release refused: " + (data.detail || "error");
+      }
+      poll();
+    });
+  }
+  const swap = document.getElementById("simulate-swap");
+  if (swap) {
+    swap.addEventListener("click", async () => {
+      const { ok, data } = await postJson("/api/flows/" + flowId + "/simulate-swap", {});
+      if (!ok) {
+        document.getElementById("session-err").textContent =
+          "Could not simulate: " + (data.detail || "error");
+        return;
+      }
+      poll();
+    });
+  }
+}
+
+async function poll() {
+  try {
+    const response = await fetch("/api/flows/" + flowId);
+    if (!response.ok) {
+      if ([401, 403, 404, 410].includes(response.status)) {
+        document.getElementById("status").textContent =
+          "This flow or login session is no longer available. Return to checkout to start again.";
+        return;
+      }
+      throw new Error("Status temporarily unavailable; retrying automatically.");
+    }
+    const data = await response.json();
+    // F1: COMPLETED is set from the upstream consent before the signed result
+    // is recovered, so a failed recovery answers COMPLETED with no receipt.
+    // Stopping here left the page quiet until a manual reload — the operator's
+    // order looked finished with nothing to show for it.
+    document.getElementById("status").textContent = data.recovering
+      ? "Status: COMPLETED upstream — recovering the signed result…"
+      : "Status: " + data.status;
+    const recoveryNote = document.getElementById("recovery-note");
+    if (data.recovering) {
+      recoveryNote.textContent =
+        "The network finished this verification, but its result did not reach this "
+        + "harness. Retrying automatically — Isnad returns the same completed result, "
+        + "so no check is bought again and no second investigation starts.";
+      recoveryNote.hidden = false;
+    } else if (data.status === "UNAVAILABLE") {
+      recoveryNote.textContent =
+        "The upstream consent for this order is no longer available — it passed its "
+        + "retention window or was revoked. Nothing further will arrive for it. Start "
+        + "a new verification if this order still needs one.";
+      recoveryNote.hidden = false;
+    } else {
+      recoveryNote.hidden = true;
+      recoveryNote.textContent = "";
+    }
+    if (data.qr_svg && !document.getElementById("qr").innerHTML) {
+      document.getElementById("qr").innerHTML = data.qr_svg;
+      document.getElementById("open-link").href = data.authorization_url;
+    }
+    if (!data.authorization_url) {
+      document.getElementById("qr").replaceChildren();
+      document.getElementById("open-link").removeAttribute("href");
+      document.getElementById("open-link").hidden = true;
+    }
+    if (data.result) {
+      renderOutcome(data.result);
+      renderChallengePanel(data.challenge, data.result.decision);
+      renderOutcomesPanel(data.outcomes);
+      renderSessionPanel(data.session, data.result.decision);
+    }
+    if (TERMINAL.has(data.status) && !data.recovering) {
+      // Stop only once there is nothing left to arrive: a terminal state does
+      // not change again, but a COMPLETED flow still recovering its receipt is
+      // not finished yet.
+      return;
+    }
+  } catch (err) {
+    document.getElementById("status").textContent = "Request failed: " + err;
+  }
+  delayMs = Math.min(delayMs * 1.5, MAX_DELAY_MS);
+  setTimeout(poll, delayMs);
+}
+
+poll();
+</script>
+
+<script src="/ui/i18n.js" defer></script>

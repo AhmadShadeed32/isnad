@@ -1,0 +1,64 @@
+/* Shared primitives. Page palettes and layouts live in pages/<name>.css. */
+*{box-sizing:border-box}
+bdi{unicode-bidi:isolate}
+
+/* Page navigation uses real links, so browser history and open-in-new-tab work. */
+.site-nav{display:flex;flex-wrap:wrap;gap:.35rem;margin-block:1.25rem 1.5rem;
+  padding:.35rem;background:#101731;border:1px solid #384462;border-radius:12px}
+.site-nav a{flex:1 1 auto;display:flex;justify-content:center;align-items:center;
+  min-height:44px;padding:.55rem 1rem;border-radius:8px;border:1px solid transparent;
+  color:#c3cce5;font:600 .875rem/1.4 system-ui,Arial,sans-serif;text-decoration:none;
+  text-align:center}
+.site-nav a:hover{background:#222e50;color:#fff}
+.site-nav a[aria-current="page"]{background:#29334b;color:#f0cf78;border-color:#a18749}
+.site-nav a:focus-visible{outline:3px solid #f0cf78;outline-offset:2px}
+@media(max-width:480px){.site-nav a{flex-basis:calc(50% - .35rem);padding-inline:.5rem}}
+
+/* Shared site frame, palette and account controls. */
+body.site-page{--night:#070b20;--bg:#070b20;--ink:#070b20;--ink2:#111834;
+  --surface:#111834;--card:#111834;--surface2:#182247;--panel:#182247;--panel2:#2d3b70;
+  --line:#2d3b70;--text:#eef2ff;--txt:#eef2ff;--fg:#eef2ff;--muted:#aab5d4;--mut:#aab5d4;
+  --gold:#e5bb59;--gold2:#e5bb59;--green:#56d3a0;--amber:#ffc35c;
+  margin:0;padding:0;min-height:100vh;color:var(--text);
+  font:14px/1.5 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+  background:radial-gradient(circle at 14% -10%,#243673 0,transparent 31rem),var(--night)}
+.site-page .site-shell{width:100%;max-width:1240px;margin:0 auto;padding:26px 28px 48px}
+.site-page .site-header{display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:18px;border-bottom:1px solid var(--line);padding:0 0 20px;margin:0}
+.site-brand{display:flex;gap:12px;align-items:center;color:#eef2ff;text-decoration:none;
+  font-size:18px;font-weight:750;line-height:1.2;flex-shrink:0}
+.site-brand>span[lang]{font-size:26px;color:#e5bb59}
+.site-brand small{display:block;font-size:12px;font-weight:400;color:#aab5d4;margin-top:5px}
+.site-header .isnad-language{padding:0;margin:0;font-size:12px}
+.site-header .isnad-language small{flex-basis:100%;max-width:36ch}
+.site-header select{background:#182247;color:#eef2ff;border:1px solid #43527f;border-radius:8px;padding:8px}
+.site-page .site-nav{margin-block:20px 12px}
+.site-key{margin:0 0 24px;border:1px solid #384462;border-radius:12px;background:#101731;color:#c3cce5}
+.site-key summary{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;
+  gap:8px;padding:13px 16px;cursor:pointer;font-size:13px;list-style:none}
+.site-key summary::-webkit-details-marker{display:none}
+.site-key summary>span:first-child::before{content:'+ ';color:#e5bb59}
+.site-key[open] summary>span:first-child::before{content:'− '}
+.site-key #byokState{font-size:12px;color:#c3cce5}
+.site-key-body{padding:0 16px 16px;border-top:1px solid #384462}
+.site-key-body p{max-width:85ch;font-size:13px;line-height:1.6;margin:12px 0 0;color:#c3cce5}
+.site-key-body a{color:#f0cf78}
+.site-key-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-block:14px}
+.site-key-actions label{flex-basis:100%;font-size:12px;color:#eef2ff}
+.site-key-actions input{flex:1 1 250px;width:auto;min-width:0;min-height:44px;background:#070b20;
+  border:1px solid #526695;color:#eef2ff;border-radius:8px;padding:10px;font:14px monospace}
+.site-key-actions button{width:auto;min-height:44px;padding:10px 16px;border:1px solid #526695;
+  border-radius:8px;color:#eef2ff;background:#182247;font:600 13px system-ui;cursor:pointer}
+.site-key-actions button[type=submit]{background:#f0cf78;color:#17162b;border-color:#f0cf78}
+.site-key-actions button:disabled{opacity:.5;cursor:not-allowed}
+.site-key :is(input,button,summary,a):focus-visible,.site-brand:focus-visible{outline:3px solid #f0cf78;outline-offset:3px}
+.site-page .card{border-color:#2d3b70;border-radius:14px;background:#111834}
+@media(max-width:600px){.site-page .site-shell{padding:20px 16px 36px}.site-header .header-controls{flex-basis:100%}.site-key-actions button{flex:1}.site-key-actions input{flex-basis:100%}}
+
+.planner-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px;margin-bottom:10px;
+  border:1px solid #384462;border-radius:12px;background:#101731;color:#c3cce5;font-size:13px}
+.planner-bar label{font-weight:600}.planner-bar span{font-size:12px}
+.planner-bar select{padding:8px 12px;min-height:44px;border:1px solid #526695;border-radius:8px;
+  background:#182247;color:#eef2ff;font:inherit}
+.planner-bar select:focus-visible{outline:3px solid #f0cf78;outline-offset:2px}
+#runCode,#provenanceFoot{overflow-wrap:anywhere}

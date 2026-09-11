@@ -1,0 +1,108 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Isnad — evidence receipt</title>
+<!--
+  T6 — a public receipt anyone can verify on their own phone.
+
+  Zero external origins, like console.html: no CDN, no font host, no QR library,
+  no analytics. The Ed25519 check is done here in the browser with WebCrypto
+  against the public key, over the exact bytes the server signed. Nothing on this
+  page is taken on trust from the server except those bytes, and the whole point
+  is that they either verify or they do not.
+
+  No PII: the signed payload contains no phone number by construction (S5 binds
+  to an HMAC instead), and this page renders only the decision, the grade and the
+  normalized link signals — never link.detail, which on the NaC path carries
+  operator-supplied strings.
+-->
+<link rel="stylesheet" href="/ui/shared.css">
+<link rel="stylesheet" href="/ui/pages/receipt.css">
+<main>
+  <p class="note"><a href="/judge" style="color:inherit" id="backLink"><span
+    id="backArrow" aria-hidden="true">&larr;</span> <span
+    data-i18n="ui.back_to_demo">Back to the checkout demo</span></a></p>
+  <h1>Isnad — evidence receipt</h1>
+  <div class="sub"><bdi id="chainId" dir="ltr">loading…</bdi></div>
+
+  <div class="toolbar">
+    <label for="locale" class="note">Language / اللغة</label>
+    <select id="locale">
+      <option value="en">English</option>
+      <option value="ar">العربية</option>
+    </select>
+    <span class="draft" id="draftNote" hidden></span>
+  </div>
+
+  <div class="card">
+    <div class="status pending" id="status">⋯ verifying signature…</div>
+    <div class="note" id="statusNote"></div>
+    <button id="tamperBtn" disabled>tamper with one byte and re-verify</button>
+    <button id="resetBtn" hidden>restore the original bytes</button>
+    <!-- I7: hands the reader the exact bytes the server signed, so the same
+         check can be redone with no Isnad involvement at all. -->
+    <button id="downloadBtn" disabled>download this receipt</button>
+    <p class="note" id="downloadNote">
+      The download is the bytes this page just checked, saved exactly as the
+      server sent them — not this page's re-rendering of them. Verify it with
+      no network and no Isnad involvement:
+      <bdi dir="ltr" class="mono">python scripts/verify_receipt.py receipt.json</bdi>
+    </p>
+    <p class="note">
+      It contains the signed payload, its signature, the public key and the
+      algorithm — and no phone number. The subject and owner commitments inside
+      it are pseudonymous and potentially linkable, not anonymous. It proves
+      issuance and integrity at signing time; current session status, who owns
+      the key, and whether the operator evidence was true all need separate
+      evidence. A downloaded copy cannot be revoked or erased remotely.
+    </p>
+  </div>
+
+  <div class="card" id="summaryCard" hidden>
+    <div class="row"><span class="k">decision</span><span id="decision"></span></div>
+    <div class="row"><span class="k">chain grade</span><span id="grade"></span></div>
+    <div class="row"><span class="k" data-i18n="ui.risk_score">risk score</span><span id="confidence"></span></div>
+    <p class="note" data-i18n="ui.risk_score_note">Policy-derived, uncalibrated score from 0 to 1. It is not a measured fraud probability.</p>
+    <div class="row"><span class="k">hypothesis</span><span id="hypothesis"></span></div>
+    <div class="row"><span class="k">planner</span><span id="planner"></span></div>
+    <div class="row"><span class="k">signed at</span><span id="signedAt"></span></div>
+  </div>
+
+  <div class="card" id="stepsCard" hidden>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>#</th><th>network API</th><th>signal</th><th>result</th><th>&Delta; log-odds</th><th>asked over</th></tr></thead>
+        <tbody id="steps"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- The belief, redone rather than asserted. Every number here comes out of
+       the signed payload, and the page adds them up in front of the reader: a
+       total computed on the server and printed would be one more claim to take
+       on trust, which is the opposite of the point. -->
+  <div class="card" id="mathCard" hidden>
+    <div class="k" style="margin-bottom:8px">check our arithmetic</div>
+    <div class="row"><span class="k">prior (log-odds)</span><span id="mPrior"></span></div>
+    <div class="row"><span class="k">+ evidence above</span><span id="mDeltas"></span></div>
+    <div class="row"><span class="k">= total</span><span id="mTotal"></span></div>
+    <div class="row"><span class="k">risk score = 1/(1+e<sup>-total</sup>)</span><span id="mP"></span></div>
+    <div class="row"><span class="k">policy thresholds</span><span id="mThresholds"></span></div>
+    <div class="row"><span class="k">signed decision</span><span id="mVerdict"></span></div>
+    <div class="mono" id="mNote" style="margin-top:10px"></div>
+  </div>
+
+  <div class="card">
+    <div class="k">public key (Ed25519, raw hex)</div>
+    <div class="mono" id="publicKey"></div>
+    <div class="k" style="margin-top:.5rem">signature</div>
+    <div class="mono" id="signature"></div>
+    <div class="note">
+      This page contains no phone number. Verification runs in your browser
+      against the exact bytes the server signed. A valid signature proves issuance by the signing key; it does not establish that the underlying evidence is true.
+    </div>
+  </div>
+</main>
+<!-- Same origin, no CDN: the shared locale switch (I6). -->
+<script src="/ui/i18n.js"></script>
+<script src="/ui/pages/receipt.js"></script>

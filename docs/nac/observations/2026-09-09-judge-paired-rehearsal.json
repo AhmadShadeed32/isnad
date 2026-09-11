@@ -1,0 +1,134 @@
+{
+  "recorded_at_utc": "2026-09-09T10:51:50.120563+00:00",
+  "evidence_level": "hosted_simulator",
+  "what_this_is": "Bounded rehearsal of the judge-selected REAL evidence source, run through POST /v1/judge/run on a local instance of this application. Not a deployed-judge observation and not a physical-subscriber observation. Nothing here is a live-network claim: the Nokia account is in Simulator mode. These are the two CLI-driven runs; the three browser-driven runs of the same path are recorded in 2026-09-09-judge-browser-real-runs.json.",
+  "application_revision": "working tree at 4b8fc6a plus the judge paired-source change",
+  "contract_version": "2026-09-09.1",
+  "policy_digest": "3c3c77aae2a9",
+  "host": "https://network-as-code.p-eu.apihub.nokia.io",
+  "sdk": "network_as_code==10.0.0",
+  "request_options": {
+    "timeout_in_seconds": 8.0,
+    "max_retries": 0
+  },
+  "requested_window_hours": 240,
+  "runs": [
+    {
+      "scenario": "swapped_subscriber",
+      "device": "+9999…1000",
+      "chain_id": "chn_5663387814954fbdaac9",
+      "evidence_source": "nac",
+      "evidence_environment": "nokia_hosted_simulator",
+      "planner_requested": "gemini",
+      "planner_that_ran": "llm",
+      "decision": "DECLINE",
+      "chain_grade": "REFUTED",
+      "stopping_reason": "decisive",
+      "operations_charged": 2,
+      "outbound_attempts": 2,
+      "attempts": [
+        {
+          "operation": "sim_swap_check",
+          "method": "POST",
+          "path": "/passthrough/camara/v1/sim-swap/sim-swap/v0/check",
+          "http_status": 200,
+          "duration_ms": 443,
+          "observed_at_utc": "2026-09-09T10:50:10.388194+00:00"
+        },
+        {
+          "operation": "device_swap_check",
+          "method": "POST",
+          "path": "/passthrough/camara/v1/device-swap/device-swap/v1/check",
+          "http_status": 200,
+          "duration_ms": 175,
+          "observed_at_utc": "2026-09-09T10:50:10.565154+00:00"
+        }
+      ],
+      "normalized_evidence": [
+        {
+          "step": 1,
+          "action": "sim_swap",
+          "result": "FLAG",
+          "signal": "SIM_SWAPPED",
+          "source": "nac",
+          "max_age_hours": 240.0
+        },
+        {
+          "step": 2,
+          "action": "device_swap",
+          "result": "FLAG",
+          "signal": "DEVICE_SWAPPED",
+          "source": "nac",
+          "max_age_hours": 240.0
+        }
+      ],
+      "receipt_signature_verified": true,
+      "driven_from": "scripts/nac_simulator_demo.py --execute"
+    },
+    {
+      "scenario": "stable_subscriber",
+      "device": "+9999…1001",
+      "chain_id": "chn_ea46c6d30d774c6a869a",
+      "evidence_source": "nac",
+      "evidence_environment": "nokia_hosted_simulator",
+      "planner_requested": "gemini",
+      "planner_that_ran": "llm",
+      "decision": "CHALLENGE",
+      "chain_grade": "DEGRADED",
+      "stopping_reason": "planner_stop",
+      "operations_charged": 2,
+      "outbound_attempts": 2,
+      "attempts": [
+        {
+          "operation": "sim_swap_check",
+          "method": "POST",
+          "path": "/passthrough/camara/v1/sim-swap/sim-swap/v0/check",
+          "http_status": 200,
+          "duration_ms": 341,
+          "observed_at_utc": "2026-09-09T10:51:00.638181+00:00"
+        },
+        {
+          "operation": "device_swap_check",
+          "method": "POST",
+          "path": "/passthrough/camara/v1/device-swap/device-swap/v1/check",
+          "http_status": 200,
+          "duration_ms": null,
+          "observed_at_utc": null,
+          "note": "HTTP 200 was observed for this attempt. Its transport duration and exact transport timestamp were truncated out of the console output that was captured, and are NOT reconstructed: they stay null. The signed verdict for this chain does carry the investigator's own measurement of the same call, recovered below, which is a slightly wider interval than the transport figure (it includes normalization) and is not a substitute for it.",
+          "chain_latency_ms": 167,
+          "chain_step_at_utc": "2026-09-09T10:51:02.635347+00:00",
+          "chain_measurement_source": "signed verdict chn_ea46c6d30d774c6a869a, step 2"
+        }
+      ],
+      "normalized_evidence": [
+        {
+          "step": 1,
+          "action": "sim_swap",
+          "result": "PASS",
+          "signal": "SIM_STABLE",
+          "source": "nac",
+          "max_age_hours": 240.0
+        },
+        {
+          "step": 2,
+          "action": "device_swap",
+          "result": "PASS",
+          "signal": "DEVICE_STABLE",
+          "source": "nac",
+          "max_age_hours": 240.0
+        }
+      ],
+      "receipt_signature_verified": true,
+      "driven_from": "scripts/nac_simulator_demo.py --execute"
+    }
+  ],
+  "limitations": [
+    "Local application rehearsal. This is not evidence of deployed judge access.",
+    "Nokia account is in Simulator mode. No live-network subscriber was contacted.",
+    "Only the two boolean swap checks were exposed and attempted. retrieve-date was disabled in both modes.",
+    "Gemini ran on the deployment's own key with a 3-call-per-run ceiling; its selections are not deterministic and a repeat run may choose a different order.",
+    "Durations are wall-clock at this application's transport, not a Nokia service-level measurement."
+  ],
+  "amended_at_utc": "2026-09-09T12:05:19.239838+00:00",
+  "amendment": "Amended after the runs, not during them. Two additions, no observation removed or changed: `driven_from` on each run, and — for the one attempt whose transport duration was truncated out of the captured output — the investigator's own measurement of the same call, recovered from the signed verdict and recorded under separate `chain_*` keys. The transport figures for that attempt stay null."
+}

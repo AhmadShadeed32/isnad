@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "generated_from": "docs/nac/*.json (H2's own recorded evidence captures, 30 Aug 2026)",
+  "note": "A green past capture is not an uptime probe, an entitlement guarantee, or a nationwide operator coverage claim. It records that one recorded call to Nokia's sandbox on the stated date returned the stated signal.",
+  "capabilities": [
+    {
+      "action": "number_verify",
+      "api": "Number Verification",
+      "adapter": "network-as-code",
+      "adapter_version": "10.0.0",
+      "environment_scope": "sandbox",
+      "status": "verified",
+      "checked_at": "2026-08-30T12:07:22.144981+00:00",
+      "source_reference": "docs/nac/number_verify.json",
+      "consent_required": true,
+      "coverage_caveat": "The recorded call itself returned CONSENT_REQUIRED (no end-user consent was granted in that run) -- the reachable/CONSENT_REQUIRED path is verified, PASS/FLAG on a consented request is not separately captured here."
+    },
+    {
+      "action": "sim_swap",
+      "api": "SIM Swap",
+      "adapter": "network-as-code",
+      "adapter_version": "10.0.0",
+      "environment_scope": "sandbox",
+      "status": "verified",
+      "checked_at": "2026-08-30T12:07:22.145633+00:00",
+      "source_reference": "docs/nac/sim_swap.json",
+      "consent_required": false,
+      "coverage_caveat": "Application-level NaC authorization only; no separate end-user consent flow for this API."
+    },
+    {
+      "action": "device_swap",
+      "api": "Device Swap",
+      "adapter": "network-as-code",
+      "adapter_version": "10.0.0",
+      "environment_scope": "sandbox",
+      "status": "verified",
+      "checked_at": "2026-08-30T12:07:23.010029+00:00",
+      "source_reference": "docs/nac/device_swap.json",
+      "consent_required": false,
+      "coverage_caveat": "Application-level NaC authorization only."
+    },
+    {
+      "action": "reachability",
+      "api": "Device Reachability Status",
+      "adapter": "network-as-code",
+      "adapter_version": "10.0.0",
+      "environment_scope": "sandbox",
+      "status": "verified",
+      "checked_at": "2026-08-30T12:07:23.445836+00:00",
+      "source_reference": "docs/nac/reachability.json",
+      "consent_required": false,
+      "coverage_caveat": "Application-level NaC authorization only."
+    },
+    {
+      "action": "roaming",
+      "api": "Device Roaming Status",
+      "adapter": "network-as-code",
+      "adapter_version": "10.0.0",
+      "environment_scope": "sandbox",
+      "status": "verified",
+      "checked_at": "2026-08-30T12:07:23.885937+00:00",
+      "source_reference": "docs/nac/roaming.json",
+      "consent_required": false,
+      "coverage_caveat": "Application-level NaC authorization only."
+    },
+    {
+      "action": "location_verify",
+      "api": "Location Verification",
+      "adapter": "network-as-code",
+      "adapter_version": "10.0.0",
+      "environment_scope": "sandbox",
+      "status": "verified",
+      "checked_at": "2026-08-30T12:07:54.436505+00:00",
+      "source_reference": "docs/nac/location_verify.json",
+      "consent_required": false,
+      "coverage_caveat": "Requires a claimed_location on the request (P1's zero-SDK-call missing-claim guarantee); the recorded call used an authored claim."
+    },
+    {
+      "action": "device_intelligence",
+      "api": "Device Intelligence",
+      "adapter": "network-as-code",
+      "adapter_version": "10.0.0",
+      "environment_scope": "sandbox",
+      "status": "unavailable",
+      "checked_at": "2026-08-30T12:07:24.233431+00:00",
+      "source_reference": "docs/nac/device_intelligence.json",
+      "consent_required": false,
+      "coverage_caveat": "The recorded call itself returned EVIDENCE_UNAVAILABLE -- this capability is not currently usable in the tested sandbox plan/scope, not merely unconsented."
+    },
+    {
+      "action": "step_up_otp",
+      "api": "One-Time Password (step-up)",
+      "adapter": "network-as-code",
+      "adapter_version": "10.0.0",
+      "environment_scope": "sandbox",
+      "status": "verified",
+      "checked_at": "2026-08-30T12:07:24.234422+00:00",
+      "source_reference": "docs/nac/step_up_otp.json",
+      "consent_required": true,
+      "coverage_caveat": "The recorded call returned CONSENT_REQUIRED; not currently used by the live decision path (Isnad's step-up is a merchant-side manual review, not an OTP send)."
+    }
+  ]
+}
